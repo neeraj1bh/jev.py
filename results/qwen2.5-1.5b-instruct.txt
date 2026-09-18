@@ -1,4 +1,4 @@
-# python eval.py Qwen/Qwen2.5-1.5B-Instruct   (2026-09-18, Ryzen 7 7700X, CPU, bf16, frozen results/eval-set.json incl. fields)
+# python eval.py Qwen/Qwen2.5-1.5B-Instruct   (2026-09-18, Ryzen 7 7700X, CPU, bf16, frozen results/eval-set.json: 1,736 items)
 
 show     noul    n=120  accuracy=0.608  brier=0.316
   p(yes)       n   actually yes
@@ -46,7 +46,59 @@ answer   choice  n=400  accuracy=0.497  (chance 0.25)
   [0.3,0.6)     44   0.70
   [0.6,0.8)     25   0.96
   [0.8,1.0)     16   0.94
+
+sentiment noul    n=100  accuracy=0.950  brier=0.051
+  p(yes)       n   actually yes
+  [0.0,0.1)     42   0.02
+  [0.1,0.3)      1   0.00
+  [0.3,0.5)      2   0.00
+  [0.7,0.9)      3   0.67
+  [0.9,1.0)     52   0.94
+
+phishing noul    n=100  accuracy=0.810  brier=0.154
+  p(yes)       n   actually yes
+  [0.0,0.1)     71   0.14
+  [0.1,0.3)      8   0.75
+  [0.3,0.5)      4   0.75
+  [0.5,0.7)      2   1.00
+  [0.7,0.9)      7   1.00
+  [0.9,1.0)      8   1.00
+
+entails  noul    n=100  accuracy=0.760  brier=0.184
+  p(yes)       n   actually yes
+  [0.0,0.1)     38   0.16
+  [0.1,0.3)     14   0.50
+  [0.3,0.5)      4   0.75
+  [0.5,0.7)      3   1.00
+  [0.7,0.9)     11   0.64
+  [0.9,1.0)     30   0.87
+
+snli     choice  n=100  accuracy=0.760  (chance 0.33)
+  confidence   n   accuracy
+  [0.0,0.3)     46   0.63
+  [0.3,0.6)     16   0.81
+  [0.6,0.8)     11   0.82
+  [0.8,1.0)     27   0.93
+
+topic    choice  n=100  accuracy=0.820  (chance 0.25)
+  confidence   n   accuracy
+  [0.0,0.3)      2   1.00
+  [0.3,0.6)      2   1.00
+  [0.6,0.8)      6   0.33
+  [0.8,1.0)     90   0.84
+
+intent   choice  n=100  accuracy=0.660  (chance 0.04)
+  confidence   n   accuracy
+  [0.0,0.3)      3   0.00
+  [0.3,0.6)     57   0.56
+  [0.6,0.8)     31   0.81
+  [0.8,1.0)      9   1.00
+
+toxicity choice  n=100  accuracy=0.390  (chance 0.25)
+  confidence   n   accuracy
+  [0.0,0.3)     95   0.38
+  [0.3,0.6)      5   0.60
   by subject: biology 0.57  chemistry 0.35  physics 0.40  medicine 0.53  electrical_engineering 0.62  computer_science 0.40  computer_security 0.78  professional_law 0.33  econometrics 0.28  world_religions 0.72
 
-1036 items, 974 ms each on cpu, Qwen/Qwen2.5-1.5B-Instruct
-every answer, probability and latency: results/logs/Qwen-Qwen2.5-1.5B-Instruct.jsonl
+1736 items, 856 ms each on cpu, Qwen/Qwen2.5-1.5B-Instruct
+every answer, probability and latency: results/logs/qwen2.5-1.5b-instruct.jsonl
