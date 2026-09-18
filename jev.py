@@ -17,6 +17,7 @@ Point any TypeSafe client at http://localhost:8080/v1/systemone.
 Request and response shapes follow https://docs.typesafe.ai/api.
 """
 
+import copy
 import json
 import math
 import sys
@@ -27,6 +28,8 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 DEFAULT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
+CACHE_BUDGET = 16_384  # prefix tokens × option tails held at once; keeps long states under ~1 GB
+
 SYSTEM = (
     "You are a calibrated decision engine. "
     "Read the STATE and answer the QUESTION with exactly one of the OPTIONS."
@@ -94,28 +97,35 @@ class Jev:
         cap = min(len(s) - k - 1 for s, k in seqs)  # every tail keeps its answer and one token before it
         while pre < cap and all(s[pre] == seqs[0][0][pre] for s, _ in seqs):
             pre += 1
-        cache = None
+        prefix = None
         if pre:
-            cache = self.model(
+            prefix = self.model.model(
                 torch.tensor([seqs[0][0][:pre]], device=self.device), use_cache=True
             ).past_key_values
-            cache.batch_repeat_interleave(n)
         tails = [s[pre:] for s, _ in seqs]
-        width = max(map(len, tails))
         pad = self.tok.pad_token_id or 0
-        ids = torch.full((n, width), pad, device=self.device)
-        mask = torch.zeros((n, pre + width), dtype=torch.long, device=self.device)
-        mask[:, :pre] = 1
-        for i, t in enumerate(tails):
-            ids[i, : len(t)] = torch.tensor(t, device=self.device)
-            mask[i, pre : pre + len(t)] = 1
-        hidden = self.model.model(
-            ids, attention_mask=mask, past_key_values=cache, use_cache=True
-        ).last_hidden_state
+        # the shared cache is copied once per tail; keep the copies within a token budget
+        step = max(1, CACHE_BUDGET // max(pre, 1))
+        hidden = []
+        for j in range(0, n, step):
+            chunk = tails[j : j + step]
+            width = max(map(len, chunk))
+            ids = torch.full((len(chunk), width), pad, device=self.device)
+            mask = torch.zeros((len(chunk), pre + width), dtype=torch.long, device=self.device)
+            mask[:, :pre] = 1
+            for i, t in enumerate(chunk):
+                ids[i, : len(t)] = torch.tensor(t, device=self.device)
+                mask[i, pre : pre + len(t)] = 1
+            cache = None
+            if prefix is not None:
+                cache = copy.deepcopy(prefix)
+                cache.batch_repeat_interleave(len(chunk))
+            out = self.model.model(ids, attention_mask=mask, past_key_values=cache, use_cache=True)
+            hidden.extend(out.last_hidden_state)
         scores = []
         for i, (t, k) in enumerate(zip(tails, [k for _, k in seqs], strict=True)):
             pos = torch.arange(len(t) - k - 1, len(t) - 1, device=self.device)
-            logp = torch.log_softmax(self.model.lm_head(hidden[i, pos]).float(), -1)
+            logp = torch.log_softmax(self.model.lm_head(hidden[i][pos]).float(), -1)
             tok = torch.tensor(t[len(t) - k :], device=self.device)
             scores.append(logp[torch.arange(k), tok].mean().item())
         return scores, pre + sum(map(len, tails))

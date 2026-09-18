@@ -115,6 +115,8 @@ class Remote:
 
     def _one(self, state, q):
         labels, descs = _options(q)
+        if len(labels) > len(LETTERS):
+            raise ValueError(f"hosted backends take at most {len(LETTERS)} options, got {len(labels)}")
         lines = []
         for letter, la, d in zip(LETTERS, labels, descs, strict=False):
             name = f"level {la}" if q["type"] == "score" else la
