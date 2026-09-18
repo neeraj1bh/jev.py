@@ -39,7 +39,15 @@ def generate(jev, state, questions):
     streamer = TextIteratorStreamer(jev.tok, skip_prompt=True, skip_special_tokens=True)
     Thread(
         target=jev.model.generate,
-        kwargs=dict(**enc, streamer=streamer, do_sample=False, max_new_tokens=24 * len(questions)),
+        kwargs=dict(
+            **enc,
+            streamer=streamer,
+            do_sample=False,
+            temperature=None,
+            top_p=None,
+            top_k=None,
+            max_new_tokens=24 * len(questions),
+        ),
     ).start()
     yield from streamer
 
@@ -58,7 +66,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
             self.wfile.write(data)
 
         def do_GET(self):
-            self._send(200, open(PAGE, "rb").read(), "text/html; charset=utf-8")
+            page = open(PAGE, encoding="utf-8").read().replace("{{model}}", model_id)
+            self._send(200, page.encode(), "text/html; charset=utf-8")
 
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")

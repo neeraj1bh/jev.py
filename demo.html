@@ -12,31 +12,42 @@
     --code: #0d0f11; --good: #4cc172; --warn: #f0a15b; --bar: #2a2f36;
   }
   * { box-sizing: border-box; }
-  html { color-scheme: light dark; }
+  html { color-scheme: light; }
+  html[data-theme="dark"] { color-scheme: dark; }
+  * { scrollbar-width: thin; scrollbar-color: var(--bar) transparent; }
   body {
     margin: 0; background: var(--bg); color: var(--fg);
     font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 24px 48px; }
-  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  header { display: flex; align-items: center; gap: 14px; }
   header h1 { font-size: 22px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
-  header p { margin: 0; color: var(--dim); }
-  header .right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  header p { margin: 0; color: var(--dim); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header .right { display: flex; align-items: center; gap: 10px; flex: none; }
   .chip { font-size: 12px; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
   button { font: inherit; cursor: pointer; border-radius: 8px; }
-  #theme { background: none; border: 1px solid var(--line); color: var(--dim); width: 32px; height: 32px; }
+  #theme { background: none; border: 1px solid var(--line); color: var(--dim); padding: 4px 12px; border-radius: 999px; font-size: 13px; }
   #run { background: var(--fg); color: var(--bg); border: 0; padding: 9px 18px; font-weight: 600; }
-  #run:disabled { opacity: 0.5; cursor: default; }
-  .controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 22px 0 14px; }
-  details { color: var(--dim); font-size: 14px; }
-  details[open] { flex-basis: 100%; }
-  summary { cursor: pointer; }
+  #run:disabled, #replay:disabled { opacity: 0.5; cursor: default; }
+  #replay { background: none; border: 1px solid var(--line); color: var(--fg); padding: 8px 16px; }
+  .controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 22px 0 12px; }
+  details { color: var(--dim); font-size: 14px; margin: 0 0 14px; }
+  summary { cursor: pointer; width: fit-content; }
   .editors { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+  .editors label { display: block; font-size: 13px; color: var(--dim); margin-bottom: 6px; }
+  .seg { position: relative; display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--panel); }
+  .seg i { position: absolute; top: 3px; left: 0; height: calc(100% - 6px); width: 0; background: var(--fg); border-radius: 999px; transition: transform 0.25s ease, width 0.25s ease; }
+  .seg button { position: relative; border: 0; background: none; color: var(--dim); padding: 5px 12px; border-radius: 999px; font-size: 14px; transition: color 0.25s; }
+  .seg button.on { color: var(--bg); }
+  @media (prefers-reduced-motion: reduce) { .seg i, .seg button { transition: none; } }
   textarea {
-    width: 100%; height: 150px; resize: vertical; padding: 10px; font-size: 12px; line-height: 1.45;
+    width: 100%; min-height: 140px; resize: none;
+    padding: 12px; font-size: 12.5px; line-height: 1.5; tab-size: 2; overflow: hidden;
     background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px;
   }
+  textarea:focus-visible, summary:focus-visible, button:focus-visible { outline: 2px solid var(--good); outline-offset: 2px; }
+  textarea:focus, summary:focus, button:focus { outline: none; }
   #verdict { min-height: 24px; margin: 0 0 14px; font-size: 16px; }
   #verdict b { color: var(--good); }
   #verdict .miss { color: var(--warn); }
@@ -50,7 +61,7 @@
   .clock { margin: 14px 0 16px; font-size: 40px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; }
   .clock small { font-size: 15px; color: var(--dim); font-weight: 400; margin-left: 4px; }
   .done .clock { color: var(--good); }
-  pre { margin: 0; flex: 1; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.5;
+  pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.5;
         background: var(--code); border-radius: 8px; padding: 12px; min-height: 120px; }
   .row { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
   .row .q { font-size: 13px; color: var(--dim); }
@@ -68,31 +79,59 @@
 <div class="wrap">
   <header>
     <h1>jev.py</h1>
-    <p>One model, two ways to ask it the same four questions.</p>
+    <p>One model, two ways to ask it the same questions.</p>
     <div class="right">
-      <span class="chip mono" id="model">loading…</span>
-      <button id="theme" title="Switch light and dark">◐</button>
+      <span class="chip mono" id="model">{{model}}</span>
+      <button id="theme" title="Switch light and dark">Dark</button>
     </div>
   </header>
 
   <div class="controls">
     <button id="run">Run</button>
-    <details>
-      <summary>Edit the ticket and the questions</summary>
-      <div class="editors">
-        <textarea id="state" class="mono">{ "ticket": "I was charged twice for order #4411 and I want my money back. This is the third time I've written, I'm done with you people.",
-  "customer_since": "2019" }</textarea>
-        <textarea id="questions" class="mono">{ "refund_requested": { "type": "noul", "instructions": "Is the customer asking for a refund?" },
-  "is_spam": { "type": "noul", "instructions": "Is this message spam or an advertisement?" },
-  "department": { "type": "choice", "instructions": "Which team should handle this ticket?",
-    "criteria": { "billing": "charges, refunds, invoices", "shipping": "delivery, tracking, lost parcels", "returns": "returning or exchanging an item", "other": null } },
-  "frustration": { "type": "score", "instructions": "How frustrated is the customer?",
-    "criteria": ["calm and polite", "annoyed but civil", "angry, threatening to leave"] } }</textarea>
-      </div>
-    </details>
+    <button id="replay" disabled>Replay together</button>
+    <div id="examples" class="seg"><i></i><button type="button" data-name="Support ticket" class="on">Support ticket</button><button type="button" data-name="Shell command">Shell command</button><button type="button" data-name="Inbox email">Inbox email</button><button type="button" data-name="Pull request">Pull request</button></div>
   </div>
 
-  <p id="verdict"></p>
+  <details>
+      <summary>Edit the state and the questions</summary>
+      <div class="editors">
+        <div><label for="state">State — the thing being judged</label><textarea id="state" class="mono">{
+  "ticket": "I was charged twice for order #4411 and I want my money back. This is the third time I've written, I'm done with you people.",
+  "customer_since": "2019"
+}</textarea></div>
+        <div><label for="questions">Questions — what to ask about it</label><textarea id="questions" class="mono">{
+  "refund_requested": {
+    "type": "noul",
+    "instructions": "Is the customer asking for a refund?"
+  },
+  "is_spam": {
+    "type": "noul",
+    "instructions": "Is this message spam or an advertisement?"
+  },
+  "department": {
+    "type": "choice",
+    "instructions": "Which team should handle this ticket?",
+    "criteria": {
+      "billing": "charges, refunds, invoices",
+      "shipping": "delivery, tracking, lost parcels",
+      "returns": "returning or exchanging an item",
+      "other": null
+    }
+  },
+  "frustration": {
+    "type": "score",
+    "instructions": "How frustrated is the customer?",
+    "criteria": [
+      "calm and polite",
+      "annoyed but civil",
+      "angry, threatening to leave"
+    ]
+  }
+}</textarea></div>
+      </div>
+  </details>
+
+  <p id="verdict">Run to compare.</p>
 
   <main>
     <section id="gen">
@@ -102,7 +141,7 @@
       <div class="foot" id="gen-foot">Waiting to run.</div>
     </section>
     <section id="jev">
-      <h2>Read the answers off the logits<small>one forward pass, a probability for every option</small></h2>
+      <h2>Read the answers off the logits<small>one pass over the state, a probability for every option</small></h2>
       <div class="clock mono"><span>0</span><small>ms</small></div>
       <div id="jev-out"></div>
       <div class="foot" id="jev-foot">Waiting to run.</div>
@@ -113,36 +152,78 @@
 <script>
   const $ = (s) => document.querySelector(s);
   const root = document.documentElement;
-  const setTheme = (t) => { root.dataset.theme = t; try { localStorage.theme = t; } catch {} };
+  const setTheme = (t) => { root.dataset.theme = t; $("#theme").textContent = t === "dark" ? "Light" : "Dark"; try { localStorage.theme = t; } catch {} };
   setTheme((() => { try { if (localStorage.theme) return localStorage.theme; } catch {} return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; })());
   $("#theme").onclick = () => setTheme(root.dataset.theme === "dark" ? "light" : "dark");
 
-  const clock = (sec) => {
+  const EXAMPLES = {"Support ticket": {"state": {"ticket": "I was charged twice for order #4411 and I want my money back. This is the third time I've written, I'm done with you people.", "customer_since": "2019"}, "questions": {"refund_requested": {"type": "noul", "instructions": "Is the customer asking for a refund?"}, "is_spam": {"type": "noul", "instructions": "Is this message spam or an advertisement?"}, "department": {"type": "choice", "instructions": "Which team should handle this ticket?", "criteria": {"billing": "charges, refunds, invoices", "shipping": "delivery, tracking, lost parcels", "returns": "returning or exchanging an item", "other": null}}, "frustration": {"type": "score", "instructions": "How frustrated is the customer?", "criteria": ["calm and polite", "annoyed but civil", "angry, threatening to leave"]}}}, "Shell command": {"state": {"command": "git push --force origin main", "run_by": "an unattended coding agent"}, "questions": {"writes": {"type": "noul", "instructions": "Does this command create, modify or delete anything?"}, "reversible": {"type": "noul", "instructions": "Can its effect be undone easily?"}, "needs_human": {"type": "noul", "instructions": "Should a person approve this before it runs?"}, "risk": {"type": "score", "instructions": "How risky is running this unattended?", "criteria": ["harmless", "recoverable if wrong", "destructive"]}}}, "Inbox email": {"state": {"from": "noreply@bank-alerts.example", "subject": "Action required: your account will be suspended", "body": "We detected unusual activity. Verify your identity within 24 hours by entering your password at the link below or your account will be closed."}, "questions": {"phishing": {"type": "noul", "instructions": "Is this email a phishing attempt?"}, "needs_reply": {"type": "noul", "instructions": "Does the recipient need to reply?"}, "category": {"type": "choice", "instructions": "Which folder does this belong in?", "criteria": {"personal": null, "work": null, "promotions": "marketing and offers", "alerts": "automated notifications", "suspicious": "scams and phishing"}}, "urgency": {"type": "score", "instructions": "How urgent is it for the recipient?", "criteria": ["can wait a week", "this week", "today"]}}}, "Pull request": {"state": {"title": "Move session token check into middleware", "description": "Refactors the per-route auth check into one middleware. No behaviour change intended. Removed the old helper. Tests not updated yet.", "files_changed": ["src/auth/middleware.py", "src/routes/*.py", "src/auth/helpers.py"]}, "questions": {"touches_auth": {"type": "noul", "instructions": "Does this change affect authentication or authorization?"}, "needs_tests": {"type": "noul", "instructions": "Should tests be added or updated before merging?"}, "kind": {"type": "choice", "instructions": "What kind of change is this?", "criteria": {"fix": "fixes a bug", "feature": "adds behaviour", "refactor": "restructures without changing behaviour", "docs": null, "chore": "tooling or dependencies"}}, "review_depth": {"type": "score", "instructions": "How carefully should a reviewer read it?", "criteria": ["skim", "normal review", "line by line, security in mind"]}}}};
+  const fit = () => {
+    const ts = [...document.querySelectorAll("textarea")];
+    ts.forEach((t) => (t.style.height = "auto"));
+    const h = Math.max(...ts.map((t) => t.scrollHeight)) + 2;
+    ts.forEach((t) => (t.style.height = h + "px"));
+  };
+  const fill = (name) => { $("#state").value = JSON.stringify(EXAMPLES[name].state, null, 2); $("#questions").value = JSON.stringify(EXAMPLES[name].questions, null, 2); fit(); };
+  const slide = () => { const b = $("#examples button.on"), i = $("#examples i");
+    i.style.width = b.offsetWidth + "px"; i.style.transform = `translateX(${b.offsetLeft}px)`; };
+  $("#examples").onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
+    document.querySelectorAll("#examples button").forEach((x) => x.classList.toggle("on", x === b)); slide(); fill(b.dataset.name);
+    results[b.dataset.name] ? restore(results[b.dataset.name]) : reset(); };
+  addEventListener("resize", slide); slide();
+  document.querySelectorAll("textarea").forEach((t) => t.addEventListener("input", fit));
+  document.querySelector("details").addEventListener("toggle", fit);
+
+  const clock = (sec, cap) => {
     const el = sec.querySelector(".clock span"), t0 = performance.now(); let raf;
-    const tick = () => { el.textContent = Math.round(performance.now() - t0); raf = requestAnimationFrame(tick); };
+    const tick = () => { el.textContent = Math.min(Math.round(performance.now() - t0), cap ?? Infinity); raf = requestAnimationFrame(tick); };
     tick();
-    return () => { cancelAnimationFrame(raf); const ms = Math.round(performance.now() - t0); el.textContent = ms; sec.classList.add("done"); return ms; };
+    return () => { cancelAnimationFrame(raf); const ms = cap ?? Math.round(performance.now() - t0); el.textContent = ms; sec.classList.add("done"); return ms; };
+  };
+  let last = null;
+  const results = {};
+  const reset = () => {
+    for (const id of ["gen", "jev"]) { const sec = $("#" + id); sec.classList.remove("done"); sec.querySelector(".clock span").textContent = "0"; }
+    $("#gen-out").textContent = ""; $("#jev-out").innerHTML = "";
+    $("#gen-foot").textContent = "Waiting to run."; $("#jev-foot").textContent = "Waiting to run.";
+    $("#verdict").textContent = "Run to compare."; $("#replay").disabled = true; last = null;
+  };
+  const restore = (r) => {
+    reset(); last = r;
+    $("#gen-out").textContent = r.g.text; $("#gen").querySelector(".clock span").textContent = r.g.ms; $("#gen").classList.add("done");
+    renderAnswers(r.j.res); $("#jev").querySelector(".clock span").textContent = r.j.ms; $("#jev").classList.add("done");
+    $("#gen-foot").textContent = r.g.foot; $("#jev-foot").textContent = r.j.foot; $("#verdict").innerHTML = r.verdict; $("#replay").disabled = false;
   };
   const post = (path, body) => fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const answerOf = (a) => a.type === "noul" ? (a.noul >= 0.5 ? "yes" : "no") : a.type === "choice" ? a.choice : String(Math.round(a.score));
 
   async function runGenerate(body) {
     const sec = $("#gen"), out = $("#gen-out"); sec.classList.remove("done"); out.textContent = "";
+    $("#gen-foot").textContent = "Streaming…";
     const stop = clock(sec);
-    const reader = (await post("/v1/generate", body)).body.getReader(), dec = new TextDecoder();
-    for (;;) { const { value, done } = await reader.read(); if (done) break; out.textContent += dec.decode(value); }
+    const reader = (await post("/v1/generate", body)).body.getReader(), dec = new TextDecoder(), t0 = performance.now(), chunks = [];
+    for (;;) { const { value, done } = await reader.read(); if (done) break; const text = dec.decode(value); chunks.push([performance.now() - t0, text]); out.textContent += text; }
     const ms = stop();
     let parsed = null;
     try { parsed = JSON.parse(out.textContent.replace(/```\w*/g, "").trim()); } catch {}
-    $("#gen-foot").textContent = `${ms} ms · ${parsed ? "valid JSON" : "not valid JSON"} · no probabilities`;
-    return { ms, parsed };
+    const foot = `${parsed ? "valid JSON" : "not valid JSON"} · no probabilities`;
+    $("#gen-foot").textContent = foot;
+    return { ms, parsed, chunks, text: out.textContent, foot };
   }
 
   async function runJev(body) {
     const sec = $("#jev"), out = $("#jev-out"); sec.classList.remove("done"); out.innerHTML = "";
+    $("#jev-foot").textContent = "Scoring every option…"; $("#gen-foot").textContent = "Waits for the logits to finish.";
     const stop = clock(sec);
     const res = await (await post("/v1/systemone", body)).json();
     const ms = stop();
+    renderAnswers(res);
+    const foot = `${res.usage.input_tokens} input tokens, 0 output · a probability for every option`;
+    $("#jev-foot").textContent = foot;
+    return { ms, answers: res.answers, res, foot };
+  }
+
+  function renderAnswers(res) {
+    const out = $("#jev-out"); out.innerHTML = "";
     for (const [id, a] of Object.entries(res.answers)) {
       const probs = a.type === "noul" ? { yes: a.noul, no: +(1 - a.noul).toFixed(4) } : a.probabilities;
       const best = answerOf(a);
@@ -152,21 +233,38 @@
       out.insertAdjacentHTML("beforeend", `<div class="row"><div class="q">${id}<b class="mono">${head}</b></div><div>${opts}</div></div>`);
     }
     requestAnimationFrame(() => out.querySelectorAll(".bar i").forEach((i) => (i.style.width = i.dataset.w + "%")));
-    $("#jev-foot").textContent = `${ms} ms · ${res.usage.input_tokens} input tokens, 0 output`;
-    $("#model").textContent = res.model;
-    return { ms, answers: res.answers };
   }
+
+  async function replay() {
+    const { j, g } = last;
+    const gen = $("#gen"), jev = $("#jev"), out = $("#gen-out");
+    gen.classList.remove("done"); jev.classList.remove("done"); out.textContent = ""; $("#jev-out").innerHTML = "";
+    $("#replay").disabled = true;
+    const stopG = clock(gen, g.ms), stopJ = clock(jev, j.ms);
+    setTimeout(() => { renderAnswers(j.res); stopJ(); }, j.ms);
+    for (const [t, text] of g.chunks) setTimeout(() => (out.textContent += text), t);
+    setTimeout(() => { stopG(); $("#replay").disabled = false; }, g.ms);
+  }
+  $("#replay").onclick = replay;
 
   $("#run").onclick = async () => {
     let body;
     try { body = { state: JSON.parse($("#state").value), questions: JSON.parse($("#questions").value) }; }
-    catch { $("#verdict").textContent = "The ticket and the questions must both be valid JSON."; return; }
-    $("#run").disabled = true; $("#verdict").textContent = "";
-    const [j, g] = await Promise.all([runJev(body), runGenerate(body)]);
+    catch { $("#verdict").textContent = "The state and the questions must both be valid JSON."; return; }
+    $("#state").value = JSON.stringify(body.state, null, 2); $("#questions").value = JSON.stringify(body.questions, null, 2); fit();
+    $("#run").disabled = true; $("#replay").disabled = true; $("#verdict").textContent = "Running…";
+    for (const id of ["gen", "jev"]) { const sec = $("#" + id); sec.classList.remove("done"); sec.querySelector(".clock span").textContent = "0"; }
+    $("#gen-out").textContent = ""; $("#jev-out").innerHTML = "";
+    const j = await runJev(body);
+    const g = await runGenerate(body);
+    last = { j, g }; $("#replay").disabled = false;
+    results[$("#examples button.on").dataset.name] = last;
     const ratio = (g.ms / j.ms).toFixed(1);
-    const misses = g.parsed ? Object.entries(j.answers).filter(([id, a]) => String(g.parsed[id] ?? "").toLowerCase() !== answerOf(a)).map(([id]) => id) : [];
+    const norm = (v) => String(v ?? "").toLowerCase().trim().split(/[\s(:]/)[0];
+    const misses = g.parsed ? Object.entries(j.answers).filter(([id, a]) => norm(g.parsed[id]) !== answerOf(a)).map(([id]) => id) : [];
     $("#verdict").innerHTML = `Same weights. Reading the logits was <b>${ratio}× faster</b>` +
       (g.parsed ? (misses.length ? ` and the generated text disagreed on <span class="miss">${misses.join(", ")}</span>.` : " and both agreed on every answer.") : ", and the generated text was not valid JSON.");
+    last.verdict = $("#verdict").innerHTML;
     $("#run").disabled = false;
   };
 </script>
