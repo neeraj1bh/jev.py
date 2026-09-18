@@ -24,7 +24,11 @@ PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demo.html")
 @torch.no_grad()
 def generate(jev, state, questions):
     """Ask the model to write all answers as one JSON object; yield text as it comes."""
-    lines = [f'"{qid}": {_text(q["instructions"])} — one of {_options(q)[0]}' for qid, q in questions.items()]
+    lines = []
+    for qid, q in questions.items():
+        labels, descs = _options(q)
+        opts = ", ".join(f"{la} ({_text(d)})" if d else la for la, d in zip(labels, descs, strict=True))
+        lines.append(f'"{qid}": {_text(q["instructions"])} — one of: {opts}')
     user = (
         f"STATE:\n{_text(state)}\n\nAnswer every question as one JSON object, "
         f"keys exactly as given, values from the allowed options:\n" + "\n".join(lines)
