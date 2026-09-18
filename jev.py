@@ -2,11 +2,12 @@
 
 Jev answers typed questions (noul = yes/no, choice, score) about a state with
 probabilities instead of text. This file does the same with an ordinary chat model:
-one forward pass reads the next-token logits at the answer letters and softmaxes over
-just those. No generation, no JSON parsing, every answer is guaranteed in-schema.
+each option is scored by the probability the model gives its own words as the answer,
+and the scores are softmaxed against each other. Nothing is generated, nothing is
+parsed, and every answer is one of the options given.
 
-The shared state is prefilled once and its KV cache is broadcast to every question,
-so 20 questions cost about one prompt plus 20 short suffixes.
+The state is prefilled once and its KV cache is shared by every option of every
+question, so twenty questions cost one prompt plus short tails.
 
     python jev.py                      # self-check (CPU is fine, ~3 GB RAM)
     python jev.py serve                # TypeSafe-compatible server on :8080
@@ -27,18 +28,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 DEFAULT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
 SYSTEM = (
-    "You are a calibrated decision engine. Read the STATE, then answer the "
-    "QUESTION by choosing exactly one option. Reply with the option letter only."
+    "You are a calibrated decision engine. "
+    "Read the STATE and answer the QUESTION with exactly one of the OPTIONS."
 )
-LETTERS = [chr(c) for c in range(65, 91)]  # A..Z
-
-
-def _slots(count):
-    """Answer labels: A..Z, then AA, AB, ... (TypeSafe allows up to 255 options)."""
-    out = list(LETTERS)
-    for a in LETTERS:
-        out += [a + b for b in LETTERS]
-    return out[:count]
 
 
 def _confidence(p):
@@ -78,65 +70,69 @@ class Jev:
         dtype = dtype or (torch.bfloat16 if self.device == "cuda" or cpu_bf16 else torch.float32)
         self.tok = AutoTokenizer.from_pretrained(model_id)
         self.model = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype).to(self.device).eval()
-        # every slot label must be exactly one token so one logit row answers the question
-        self.slot_id = {}
-        for s in _slots(255):
-            ids = self.tok.encode(s, add_special_tokens=False)
-            if len(ids) == 1:
-                self.slot_id[s] = ids[0]
-        assert all(letter in self.slot_id for letter in LETTERS), "tokenizer splits single letters"
 
     def _prompt(self, state, q, labels, descs):
-        slots = [s for s in _slots(len(labels)) if s in self.slot_id][: len(labels)]
-        if len(slots) < len(labels):
-            raise ValueError(f"model tokenizer supports at most {len(slots)} options")
-        lines = []
-        for s, label, d in zip(slots, labels, descs, strict=True):
-            name = label if q["type"] != "score" else f"level {label}"
-            lines.append(f"{s}. {name}" + (f" — {_text(d)}" if d else ""))
+        """Token ids of the prompt, and of each option's answer text."""
+        names = [f"level {la}" if q["type"] == "score" else la for la in labels]
+        lines = [n + (f" — {_text(d)}" if d else "") for n, d in zip(names, descs, strict=True)]
         user = (
-            f"STATE:\n{_text(state)}\n\nQUESTION: {_text(q['instructions'])}\n"
-            f"OPTIONS:\n" + "\n".join(lines) + "\nAnswer with the letter only."
+            f"STATE:\n{_text(state)}\n\nQUESTION: {_text(q['instructions'])}\nOPTIONS:\n- "
+            + "\n- ".join(lines)
+            + "\nAnswer with one of the options."
         )
         msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]
         text = self.tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
-        return self.tok.encode(text, add_special_tokens=False), [self.slot_id[s] for s in slots]
+        prompt = self.tok.encode(text, add_special_tokens=False)
+        return prompt, [self.tok.encode(n, add_special_tokens=False) for n in names]
 
     @torch.no_grad()
-    def _last_logits(self, prompts):
-        """Last-position logits for each prompt. Shared prefix is prefilled once."""
-        n = len(prompts)
+    def _score(self, seqs):
+        """Mean log-probability of the last `k` tokens of each sequence, given the rest.
+        The prefix all sequences share is run once and its cache reused."""
+        n = len(seqs)
         pre = 0
-        while all(len(p) > pre and p[pre] == prompts[0][pre] for p in prompts):
+        cap = min(len(s) - k - 1 for s, k in seqs)  # every tail keeps its answer and one token before it
+        while pre < cap and all(s[pre] == seqs[0][0][pre] for s, _ in seqs):
             pre += 1
-        pre = max(pre - 1, 0)  # keep at least one token in every suffix
-        prefix = torch.tensor([prompts[0][:pre]], device=self.device)
         cache = None
         if pre:
-            cache = self.model(prefix, use_cache=True).past_key_values
+            cache = self.model(
+                torch.tensor([seqs[0][0][:pre]], device=self.device), use_cache=True
+            ).past_key_values
             cache.batch_repeat_interleave(n)
-        suffixes = [p[pre:] for p in prompts]
-        width = max(map(len, suffixes))
+        tails = [s[pre:] for s, _ in seqs]
+        width = max(map(len, tails))
         pad = self.tok.pad_token_id or 0
         ids = torch.full((n, width), pad, device=self.device)
         mask = torch.zeros((n, pre + width), dtype=torch.long, device=self.device)
         mask[:, :pre] = 1
-        for i, s in enumerate(suffixes):
-            ids[i, : len(s)] = torch.tensor(s, device=self.device)
-            mask[i, pre : pre + len(s)] = 1
-        out = self.model(ids, attention_mask=mask, past_key_values=cache, use_cache=True).logits
-        last = torch.tensor([len(s) - 1 for s in suffixes], device=self.device)
-        return out[torch.arange(n), last], pre + sum(map(len, suffixes))
+        for i, t in enumerate(tails):
+            ids[i, : len(t)] = torch.tensor(t, device=self.device)
+            mask[i, pre : pre + len(t)] = 1
+        hidden = self.model.model(
+            ids, attention_mask=mask, past_key_values=cache, use_cache=True
+        ).last_hidden_state
+        scores = []
+        for i, (t, k) in enumerate(zip(tails, [k for _, k in seqs], strict=True)):
+            pos = torch.arange(len(t) - k - 1, len(t) - 1, device=self.device)
+            logp = torch.log_softmax(self.model.lm_head(hidden[i, pos]).float(), -1)
+            tok = torch.tensor(t[len(t) - k :], device=self.device)
+            scores.append(logp[torch.arange(k), tok].mean().item())
+        return scores, pre + sum(map(len, tails))
 
     def ask(self, state, questions):
         """TypeSafe request → TypeSafe response (dict)."""
         ids = list(questions)
         parsed = [_options(questions[i]) for i in ids]
-        built = [self._prompt(state, questions[i], *p) for i, p in zip(ids, parsed, strict=True)]
-        logits, n_tokens = self._last_logits([b[0] for b in built])
+        seqs, spans = [], []
+        for qid, (labels, descs) in zip(ids, parsed, strict=True):
+            prompt, cands = self._prompt(state, questions[qid], labels, descs)
+            spans.append((len(seqs), len(seqs) + len(cands)))
+            seqs += [(prompt + c, len(c)) for c in cands]
+        scores, n_tokens = self._score(seqs)
         answers = {}
-        for k, (qid, (labels, descs), (_, slot_ids)) in enumerate(zip(ids, parsed, built, strict=True)):
-            p = torch.softmax(logits[k, slot_ids].float(), -1).tolist()
+        for qid, (labels, descs), (a, b) in zip(ids, parsed, spans, strict=True):
+            p = torch.softmax(torch.tensor(scores[a:b]), -1).tolist()
             p = [round(x, 4) for x in p]
             q = questions[qid]
             if q["type"] == "noul":
@@ -163,8 +159,8 @@ class Jev:
         }
 
 
-def serve(model_id=DEFAULT_MODEL, port=8080):
-    jev = Jev(model_id)
+def serve(model_id=DEFAULT_MODEL, port=8080, jev=None):
+    jev = jev or Jev(model_id)
 
     class H(BaseHTTPRequestHandler):
         def do_POST(self):
@@ -186,13 +182,13 @@ def serve(model_id=DEFAULT_MODEL, port=8080):
         def log_message(self, fmt, *a):
             sys.stderr.write(f"{self.command} {self.path} {a[1] if len(a) > 1 else ''}\n")
 
-    print(f"jev.py serving {model_id} on http://localhost:{port}/v1/systemone ({jev.device})")
+    print(f"jev.py serving {jev.model_id} on http://localhost:{port}/v1/systemone ({jev.device})")
     ThreadingHTTPServer(("", port), H).serve_forever()
 
 
-def demo(model_id=DEFAULT_MODEL):
+def demo(model_id=DEFAULT_MODEL, jev=None):
     """Runnable self-check: the shapes are right and the tiny model gets easy cases right."""
-    jev = Jev(model_id)
+    jev = jev or Jev(model_id)
     state = {
         "ticket": "I was charged twice for order #4411 and I want my money back. "
         "This is the third time I've written, I'm done with you people.",
@@ -230,7 +226,7 @@ def demo(model_id=DEFAULT_MODEL):
     assert set(a["frustration"]["probabilities"]) == {"0", "1", "2"}
     print(
         f"\nOK  {len(questions)} questions, {res['usage']['input_tokens']} input tokens, "
-        f"{ms:.0f} ms on {jev.device} with {model_id}"
+        f"{ms:.0f} ms on {jev.device} with {jev.model_id}"
     )
 
 
