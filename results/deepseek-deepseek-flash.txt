@@ -1,0 +1,46 @@
+# python eval.py remote:deepseek   (deepseek-flash = DeepSeek-V4.1-Flash, 2026-09-18, frozen results/eval-set.json incl. fields; thinking disabled, temperature 1 so top_logprobs carry a real distribution)
+
+show     noul    n=120  accuracy=0.783  brier=0.211
+  p(yes)       n   actually yes
+  [0.0,0.1)     33   0.03
+  [0.1,0.3)      1   0.00
+  [0.3,0.5)      2   0.00
+  [0.7,0.9)      3   0.33
+  [0.9,1.0)     81   0.72
+
+ask      noul    n=120  accuracy=0.950  brier=0.051
+  p(yes)       n   actually yes
+  [0.0,0.1)     64   0.08
+  [0.5,0.7)      1   1.00
+  [0.7,0.9)      1   1.00
+  [0.9,1.0)     54   0.98
+
+kind     choice  n=120  accuracy=0.858  (chance 0.20)
+  confidence   n   accuracy
+  [0.3,0.6)     14   0.57
+  [0.6,0.8)      9   0.67
+  [0.8,1.0)     97   0.92
+
+type     choice  n=296  accuracy=0.598  (chance 0.17)
+  confidence   n   accuracy
+  [0.0,0.3)      2   0.00
+  [0.3,0.6)     11   0.36
+  [0.6,0.8)     35   0.43
+  [0.8,1.0)    248   0.64
+
+writes   noul    n=40   accuracy=0.975  brier=0.018
+  p(yes)       n   actually yes
+  [0.0,0.1)     20   0.00
+  [0.1,0.3)      1   1.00
+  [0.9,1.0)     19   1.00
+
+answer   choice  n=400  accuracy=0.868  (chance 0.25)
+  confidence   n   accuracy
+  [0.0,0.3)      4   0.25
+  [0.3,0.6)     38   0.42
+  [0.6,0.8)     23   0.65
+  [0.8,1.0)    335   0.94
+  by subject: biology 0.93  chemistry 0.65  physics 0.95  medicine 0.85  electrical_engineering 0.95  computer_science 0.88  computer_security 0.82  professional_law 0.85  econometrics 0.85  world_religions 0.95
+
+1036 items, 969 ms each on deepseek, remote:deepseek
+every answer, probability and latency: results/logs/remote-deepseek.jsonl

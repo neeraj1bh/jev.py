@@ -1,43 +1,52 @@
-# python eval.py Qwen/Qwen2.5-1.5B-Instruct   (2026-09-18, AMD Ryzen 7 7700X, CPU, bf16)
+# python eval.py Qwen/Qwen2.5-1.5B-Instruct   (2026-09-18, Ryzen 7 7700X, CPU, bf16, frozen results/eval-set.json incl. fields)
 
-show     noul    n=120  accuracy=0.642  brier=0.340
+show     noul    n=120  accuracy=0.608  brier=0.316
   p(yes)       n   actually yes
-  [0.0,0.1)     11   0.09
-  [0.1,0.3)      6   0.33
-  [0.3,0.5)      5   0.00
-  [0.5,0.7)      7   0.57
-  [0.7,0.9)      9   0.56
-  [0.9,1.0)     82   0.59
+  [0.0,0.1)      8   0.12
+  [0.1,0.3)     10   0.20
+  [0.3,0.5)      2   0.50
+  [0.5,0.7)      6   0.33
+  [0.7,0.9)     21   0.29
+  [0.9,1.0)     73   0.66
 
-ask      noul    n=120  accuracy=0.775  brier=0.167
+ask      noul    n=120  accuracy=0.900  brier=0.099
   p(yes)       n   actually yes
-  [0.0,0.1)     70   0.16
-  [0.1,0.3)      6   1.00
-  [0.3,0.5)      9   1.00
-  [0.5,0.7)      5   1.00
-  [0.7,0.9)      6   1.00
+  [0.0,0.1)     54   0.13
+  [0.1,0.3)      9   0.11
+  [0.3,0.5)      7   0.43
+  [0.5,0.7)      7   1.00
+  [0.7,0.9)     19   1.00
   [0.9,1.0)     24   0.96
 
-kind     choice  n=120  accuracy=0.567  (chance 0.20)
+kind     choice  n=120  accuracy=0.650  (chance 0.20)
   confidence   n   accuracy
-  [0.3,0.6)      3   0.67
-  [0.6,0.8)      4   0.50
-  [0.8,1.0)    113   0.57
+  [0.3,0.6)      3   0.00
+  [0.6,0.8)      4   0.25
+  [0.8,1.0)    113   0.68
 
-type     choice  n=296  accuracy=0.311  (chance 0.17)
+type     choice  n=296  accuracy=0.264  (chance 0.17)
   confidence   n   accuracy
-  [0.0,0.3)      1   1.00
-  [0.3,0.6)     27   0.19
-  [0.6,0.8)     49   0.29
-  [0.8,1.0)    219   0.33
+  [0.0,0.3)      5   0.20
+  [0.3,0.6)     91   0.16
+  [0.6,0.8)     79   0.22
+  [0.8,1.0)    121   0.37
 
-writes   noul    n=40   accuracy=0.675  brier=0.276
+writes   noul    n=40   accuracy=0.650  brier=0.241
   p(yes)       n   actually yes
-  [0.0,0.1)     29   0.31
-  [0.1,0.3)      4   1.00
-  [0.5,0.7)      1   1.00
+  [0.0,0.1)     20   0.25
+  [0.1,0.3)     10   0.50
+  [0.3,0.5)      3   1.00
+  [0.5,0.7)      3   1.00
   [0.7,0.9)      1   1.00
-  [0.9,1.0)      5   1.00
+  [0.9,1.0)      3   1.00
 
-636 items, 760 ms each on cpu, Qwen/Qwen2.5-1.5B-Instruct
+answer   choice  n=400  accuracy=0.497  (chance 0.25)
+  confidence   n   accuracy
+  [0.0,0.3)    315   0.41
+  [0.3,0.6)     44   0.70
+  [0.6,0.8)     25   0.96
+  [0.8,1.0)     16   0.94
+  by subject: biology 0.57  chemistry 0.35  physics 0.40  medicine 0.53  electrical_engineering 0.62  computer_science 0.40  computer_security 0.78  professional_law 0.33  econometrics 0.28  world_religions 0.72
 
+1036 items, 974 ms each on cpu, Qwen/Qwen2.5-1.5B-Instruct
+every answer, probability and latency: results/logs/Qwen-Qwen2.5-1.5B-Instruct.jsonl

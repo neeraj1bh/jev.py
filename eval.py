@@ -8,8 +8,11 @@
              type    choice  fix/feat/docs/refactor/test/chore   truth: the prefix, removed first
   shell    one shell command per call, 40 hand-labelled
              writes  noul    does it modify or delete anything?   truth: labelled by hand
+  fields   one exam question per call, 40 each from ten MMLU subjects
+             answer  choice  four answers, biology to law        truth: the exam key
 
-Prints accuracy, Brier score and a reliability table (how often a 0.9 was actually a yes).
+Prints accuracy, Brier score and a reliability table (how often a 0.9 was actually a yes), and
+writes every answer with its probabilities and latency to results/logs/<model>.jsonl for later comparison.
 
     python eval.py [model_id] [n]        # n per class, default 60
 
@@ -51,6 +54,18 @@ KIND_DESC = {
     "news": "a news article",
 }
 COMMIT_REPOS = ["vitejs/vite", "angular/angular", "nestjs/nest"]
+SUBJECTS = [
+    "college_biology",
+    "college_chemistry",
+    "college_physics",
+    "college_medicine",
+    "electrical_engineering",
+    "college_computer_science",
+    "computer_security",
+    "professional_law",
+    "econometrics",
+    "world_religions",
+]
 COMMIT_TYPES = {
     "fix": "fixes a bug",
     "feat": "adds a feature",
@@ -162,17 +177,52 @@ def report(name, pairs, kind):
                 print(f"  [{lo:.1f},{min(hi, 1):.1f})   {len(b):>4}   {sum(b) / len(b):.2f}")
 
 
+def field_rows(n):
+    rows = []
+    for subject in SUBJECTS:
+        url = (
+            "https://datasets-server.huggingface.co/rows?dataset=cais/mmlu"
+            f"&config={subject}&split=test&offset=0&length={n}"
+        )
+        for r in get(url)["rows"]:
+            q = r["row"]
+            rows.append((subject, q["question"], q["choices"], q["choices"][q["answer"]]))
+    return rows
+
+
 def load_set(n):
     """Fetch the items once and keep them, so every model is scored on the same set."""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", "eval-set.json")
+    data = {}
     if os.path.exists(path):
         with open(path) as f:
-            return json.load(f)
-    data = {"hn": hn_rows(n), "commits": commit_rows(n), "shell": SHELL}
+            data = json.load(f)
+    if all(k in data for k in ("hn", "commits", "shell", "fields")):
+        return data
+    makers = {
+        "hn": lambda: hn_rows(n),
+        "commits": lambda: commit_rows(n),
+        "shell": lambda: SHELL,
+        "fields": lambda: field_rows(min(n, 40)),
+    }
+    for key, make in makers.items():
+        if key not in data:
+            data[key] = make()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(data, f, indent=1)
     return data
+
+
+def record(log, jev, task, state, questions, truth):
+    """Ask, time it, and append one line per question with everything the model returned."""
+    t = time.time()
+    answers = jev.ask(state, questions)["answers"]
+    ms = round((time.time() - t) * 1000)
+    for qid, a in answers.items():
+        row = {"task": task, "question": qid, "state": state, "truth": truth.get(qid), "ms": ms, **a}
+        log.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return answers
 
 
 def main(model=DEFAULT_MODEL, n=60):
@@ -184,6 +234,13 @@ def main(model=DEFAULT_MODEL, n=60):
     else:
         jev = Jev(model)
     t0, total, res = time.time(), 0, {}
+    here = os.path.dirname(os.path.abspath(__file__))
+    slug = (getattr(jev, "backend", "") + "-" if hasattr(jev, "backend") else "") + jev.model_id.split("/")[
+        -1
+    ].lower()
+    os.makedirs(os.path.join(here, "results", "logs"), exist_ok=True)
+    log = open(os.path.join(here, "results", "logs", slug + ".jsonl"), "w")
+
     hn_q = {
         "show": {"type": "noul", "instructions": "Is the author showing off something they built or made?"},
         "ask": {"type": "noul", "instructions": "Is the author asking the community a question?"},
@@ -194,14 +251,17 @@ def main(model=DEFAULT_MODEL, n=60):
         },
     }
     for title, truth in data["hn"]:
-        a = jev.ask({"hacker_news_post_title": title}, hn_q)["answers"]
+        a = record(log, jev, "hn", {"hacker_news_post_title": title}, hn_q, truth)
         for k, y in truth.items():
             res.setdefault(k, []).append(
                 (a[k]["noul"], y) if k != "kind" else (a[k]["choice"], y, a[k]["confidence"])
             )
         total += 1
     for msg, truth in data["commits"]:
-        a = jev.ask(
+        a = record(
+            log,
+            jev,
+            "commits",
             {"commit_message": msg},
             {
                 "type": {
@@ -210,11 +270,15 @@ def main(model=DEFAULT_MODEL, n=60):
                     "instructions": "What kind of change is this commit?",
                 }
             },
-        )["answers"]
+            truth,
+        )
         res.setdefault("type", []).append((a["type"]["choice"], truth["type"], a["type"]["confidence"]))
         total += 1
     for cmd, y in data["shell"]:
-        a = jev.ask(
+        a = record(
+            log,
+            jev,
+            "shell",
             {"shell_command": cmd},
             {
                 "writes": {
@@ -223,8 +287,27 @@ def main(model=DEFAULT_MODEL, n=60):
                     "any file, process, package or setting?",
                 }
             },
-        )["answers"]
+            {"writes": y},
+        )
         res.setdefault("writes", []).append((a["writes"]["noul"], y))
+        total += 1
+    for subject, question, choices, truth in data["fields"]:
+        a = record(
+            log,
+            jev,
+            "fields",
+            {"subject": subject.replace("_", " "), "question": question},
+            {
+                "answer": {
+                    "type": "choice",
+                    "instructions": "Which answer is correct?",
+                    "criteria": dict.fromkeys(choices),
+                }
+            },
+            {"answer": truth},
+        )
+        res.setdefault("answer", []).append((a["answer"]["choice"], truth, a["answer"]["confidence"]))
+        res.setdefault(subject, []).append(a["answer"]["choice"] == truth)
         total += 1
     for name, kind in (
         ("show", "noul"),
@@ -232,9 +315,16 @@ def main(model=DEFAULT_MODEL, n=60):
         ("kind", len(KIND_DESC)),
         ("type", len(COMMIT_TYPES)),
         ("writes", "noul"),
+        ("answer", 4),
     ):
         report(name, res[name], kind)
+    print(
+        "  by subject: "
+        + "  ".join(f"{s.replace('college_', '')} {sum(res[s]) / len(res[s]):.2f}" for s in SUBJECTS)
+    )
+    log.close()
     print(f"\n{total} items, {(time.time() - t0) / total * 1000:.0f} ms each on {jev.device}, {model}")
+    print(f"every answer, probability and latency: {os.path.relpath(log.name, here)}")
 
 
 if __name__ == "__main__":
