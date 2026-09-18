@@ -15,14 +15,16 @@ import json
 import math
 import os
 import sys
+import time
+import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 from jev import _confidence, _options, _text, demo, serve
 
 BACKENDS = {
-    "deepseek": ("DEEPSEEK_API_KEY", "https://api.deepseek.com/chat/completions", "deepseek-chat"),
-    "moonshot": ("MOONSHOT_API_KEY", "https://api.moonshot.ai/v1/chat/completions", "kimi-latest"),
+    "deepseek": ("DEEPSEEK_API_KEY", "https://api.deepseek.com/chat/completions", "deepseek-flash"),
+    "moonshot": ("MOONSHOT_API_KEY", "https://api.moonshot.ai/v1/chat/completions", "kimi-k2.6"),
     "openrouter": (
         "OPENROUTER_API_KEY",
         "https://openrouter.ai/api/v1/chat/completions",
@@ -31,6 +33,12 @@ BACKENDS = {
     "openai": ("OPENAI_API_KEY", "https://api.openai.com/v1/chat/completions", "gpt-4o-mini"),
     "typesafe": ("TYPESAFE_API_KEY", "https://api.typesafe.ai/v1/systemone", "jev-latest"),
 }
+# thinking must be off (else the first token is reasoning); each provider's accepted temperature
+EXTRAS = {
+    "deepseek": {"thinking": {"type": "disabled"}, "temperature": 1},
+    "moonshot": {"thinking": {"type": "disabled"}, "temperature": 0.6},
+}
+CONCURRENCY = {"moonshot": 2}
 LETTERS = [chr(c) for c in range(65, 91)]
 
 
@@ -52,8 +60,15 @@ def post(url, key, body):
         data=json.dumps(body).encode(),
         headers={"authorization": f"Bearer {key}", "content-type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.load(r)
+    for attempt in range(6):
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                return json.load(r)
+        except (urllib.error.URLError, TimeoutError) as e:
+            rate_limited = isinstance(e, urllib.error.HTTPError) and e.code == 429
+            if (isinstance(e, urllib.error.HTTPError) and not rate_limited) or attempt == 5:
+                raise
+            time.sleep(2**attempt)  # rate limited or slow: 1, 2, 4, 8, 16 s
 
 
 class Remote:
@@ -67,7 +82,7 @@ class Remote:
     def ask(self, state, questions):
         if self.backend == "typesafe":
             return post(self.url, self.key, {"model": self.model_id, "state": state, "questions": questions})
-        with ThreadPoolExecutor(8) as pool:
+        with ThreadPoolExecutor(CONCURRENCY.get(self.backend, 8)) as pool:
             probs = list(pool.map(lambda q: self._one(state, q), questions.values()))
         answers, tokens = {}, 0
         for qid, (labels, descs), (p, used) in zip(
@@ -122,13 +137,16 @@ class Remote:
                     {"role": "user", "content": user},
                 ],
                 "max_tokens": 1,
-                "temperature": 0,
                 "logprobs": True,
                 "top_logprobs": 20,
+                **EXTRAS.get(self.backend, {"temperature": 0}),
             },
         )
         top = res["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
-        seen = {t["token"].strip().upper(): t["logprob"] for t in top}
+        seen = {}
+        for t in top:  # "A", " A" and "a" all mean A; keep the most likely spelling
+            key = t["token"].strip().upper()
+            seen[key] = max(seen.get(key, -1e9), t["logprob"])
         lp = [seen.get(letter, -30.0) for letter in LETTERS[: len(labels)]]
         z = max(lp)
         w = [math.exp(x - z) for x in lp]
