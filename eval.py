@@ -177,7 +177,12 @@ def load_set(n):
 
 def main(model=DEFAULT_MODEL, n=60):
     data = load_set(n)
-    jev = Jev(model)
+    if model.startswith("remote:"):
+        from remote import Remote
+
+        jev = Remote(model.split(":", 1)[1])
+    else:
+        jev = Jev(model)
     t0, total, res = time.time(), 0, {}
     hn_q = {
         "show": {"type": "noul", "instructions": "Is the author showing off something they built or made?"},
