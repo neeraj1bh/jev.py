@@ -239,11 +239,14 @@
     const { j, g } = last;
     const gen = $("#gen"), jev = $("#jev"), out = $("#gen-out");
     gen.classList.remove("done"); jev.classList.remove("done"); out.textContent = ""; $("#jev-out").innerHTML = "";
-    $("#replay").disabled = true;
+    $("#replay").disabled = true; $("#run").disabled = true;
+    const verdict = $("#verdict").innerHTML; $("#verdict").textContent = "Replaying the recorded run, both at once…";
+    $("#jev-foot").textContent = "Scoring every option…"; $("#gen-foot").textContent = "Streaming…";
     const stopG = clock(gen, g.ms), stopJ = clock(jev, j.ms);
-    setTimeout(() => { renderAnswers(j.res); stopJ(); }, j.ms);
+    setTimeout(() => { renderAnswers(j.res); stopJ(); $("#jev-foot").textContent = j.foot; }, j.ms);
     for (const [t, text] of g.chunks) setTimeout(() => (out.textContent += text), t);
-    setTimeout(() => { stopG(); $("#replay").disabled = false; }, g.ms);
+    setTimeout(() => { stopG(); $("#gen-foot").textContent = g.foot; $("#verdict").innerHTML = verdict;
+      $("#replay").disabled = false; $("#run").disabled = false; }, g.ms);
   }
   $("#replay").onclick = replay;
 
