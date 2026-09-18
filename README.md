@@ -3,7 +3,7 @@
 Typed decisions from any local language model, in one file.
 
 Ask a yes/no, pick-one or rate-on-a-scale question about some text and get a probability
-back instead of prose. No GPU needed, no API key, no text generation. About 200 lines.
+back instead of prose. No GPU needed, no API key, no text generation. About 250 lines.
 
 ```console
 $ uv run jev.py
@@ -15,10 +15,11 @@ $ uv run jev.py
   "frustration":      { "type": "score",  "score": 2.0, "confidence": 0.99,
                         "probabilities": { "0": 0.0, "1": 0.0, "2": 1.0 } }
 }
-OK  4 questions, 257 input tokens, 1833 ms on cpu with Qwen/Qwen2.5-1.5B-Instruct
+OK  4 questions, 567 input tokens, 1813 ms on cpu with Qwen/Qwen2.5-1.5B-Instruct
 ```
 
-One support ticket, four questions, one forward pass, a laptop CPU.
+One support ticket, four questions, one pass over the state, a laptop CPU. The 1.0s are a
+small model's overconfidence; see Verify.
 
 ## Why
 
@@ -63,7 +64,7 @@ needs a base URL change.
 | type | you give | you get |
 |---|---|---|
 | `noul` | a yes/no question | `noul`, probability of yes |
-| `choice` | up to 255 named options, descriptions optional | `choice`, `probabilities`, `confidence` |
+| `choice` | up to 255 named options (26 on hosted backends), descriptions optional | `choice`, `probabilities`, `confidence` |
 | `score` | 2–10 ordered level descriptions | `score` on the level line, `probabilities`, `legend`, `confidence` |
 
 State is any text or JSON. All questions in a request see the same state and are answered in
@@ -112,7 +113,7 @@ text; the truth comes from the item itself:
 | show, ask | noul | a Hacker News title, prefix removed | the "Show HN:" / "Ask HN:" prefix |
 | kind | choice, 5 | a Hacker News title | the link's domain: code / paper / video / reference / news |
 | type | choice, 6 | a commit message, prefix removed | its conventional-commit prefix: fix / feat / docs / … |
-| writes | noul | a shell command | 40 commands labelled by hand |
+| writes | noul | a shell command | 40 commands labelled by hand — too few to separate the local models |
 | fields | choice, 4 | an exam question with four answers | the exam key, 40 questions from each of ten MMLU subjects |
 | sentiment | noul | a movie review sentence | SST-2 label |
 | phishing | noul | an email | a public phishing-email set |
@@ -127,7 +128,11 @@ The last seven are 100 items each, fetched from the Hugging Face Hub's JSON rows
 It prints accuracy, Brier score and a reliability table — how often a 0.9 was actually a yes —
 and writes every answer with its probabilities and latency to `results/logs/<model>.jsonl`. The item
 set is saved on first run and reused, so every model is scored on the same items. Summaries
-are kept in [`results/`](results/), one file per model.
+are kept in [`results/`](results/), one file per model; they call the `fields` task `answer`.
+A yes/no counts as correct when its probability is above 0.5. Each Hacker News item carries
+three questions, so two of its three `.jsonl` rows have no truth. The item set contains
+samples of third-party text: HN titles, commit messages from three public repos, and rows from
+six public datasets, including toxic comments and phishing emails.
 
 | task | chance | Qwen2.5-1.5B | Qwen2.5-3B | DeepSeek V4.1-Flash, hosted |
 |---|---|---|---|---|
@@ -136,7 +141,7 @@ are kept in [`results/`](results/), one file per model.
 | kind | 0.20 | 0.65 | 0.65 | **0.84** |
 | type | 0.17 | 0.26 | 0.41 | **0.60** |
 | writes | 0.50 | 0.65 — calls 5 of 20 write commands read-only at p < 0.1 | 0.70 | **0.975** — Brier 0.02 |
-| fields | 0.25 | 0.50 — from 0.28 (econometrics) to 0.78 (computer security) | 0.57 — from 0.30 (law) to 0.80 (world religions) | **0.87** — from 0.65 (chemistry) to 0.95 (physics, biology, engineering) |
+| fields | 0.25 | 0.50 — from 0.28 (econometrics) to 0.78 (computer security) | 0.57 — from 0.30 (law) to 0.80 (world religions) | **0.87** — from 0.65 (chemistry) to 0.95 (electrical engineering, world religions) |
 | sentiment | 0.50 | 0.95 | 0.95 | **0.99** — Brier 0.01 |
 | phishing | 0.50 | 0.81 | 0.77 | **0.93** |
 | entails | 0.50 | 0.76 | 0.70 | **0.89** |
