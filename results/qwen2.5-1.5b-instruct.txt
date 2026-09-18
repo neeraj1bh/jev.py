@@ -1,0 +1,43 @@
+# python eval.py Qwen/Qwen2.5-1.5B-Instruct   (2026-09-18, AMD Ryzen 7 7700X, CPU, bf16)
+
+show     noul    n=120  accuracy=0.642  brier=0.340
+  p(yes)       n   actually yes
+  [0.0,0.1)     11   0.09
+  [0.1,0.3)      6   0.33
+  [0.3,0.5)      5   0.00
+  [0.5,0.7)      7   0.57
+  [0.7,0.9)      9   0.56
+  [0.9,1.0)     82   0.59
+
+ask      noul    n=120  accuracy=0.775  brier=0.167
+  p(yes)       n   actually yes
+  [0.0,0.1)     70   0.16
+  [0.1,0.3)      6   1.00
+  [0.3,0.5)      9   1.00
+  [0.5,0.7)      5   1.00
+  [0.7,0.9)      6   1.00
+  [0.9,1.0)     24   0.96
+
+kind     choice  n=120  accuracy=0.567  (chance 0.20)
+  confidence   n   accuracy
+  [0.3,0.6)      3   0.67
+  [0.6,0.8)      4   0.50
+  [0.8,1.0)    113   0.57
+
+type     choice  n=296  accuracy=0.311  (chance 0.17)
+  confidence   n   accuracy
+  [0.0,0.3)      1   1.00
+  [0.3,0.6)     27   0.19
+  [0.6,0.8)     49   0.29
+  [0.8,1.0)    219   0.33
+
+writes   noul    n=40   accuracy=0.675  brier=0.276
+  p(yes)       n   actually yes
+  [0.0,0.1)     29   0.31
+  [0.1,0.3)      4   1.00
+  [0.5,0.7)      1   1.00
+  [0.7,0.9)      1   1.00
+  [0.9,1.0)      5   1.00
+
+636 items, 760 ms each on cpu, Qwen/Qwen2.5-1.5B-Instruct
+

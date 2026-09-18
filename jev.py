@@ -15,15 +15,21 @@ so 20 questions cost about one prompt plus 20 short suffixes.
 Point any TypeSafe client at http://localhost:8080/v1/systemone.
 Request and response shapes follow https://docs.typesafe.ai/api.
 """
-import json, math, sys, time
+
+import json
+import math
+import sys
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 DEFAULT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
-SYSTEM = ("You are a calibrated decision engine. Read the STATE, then answer the "
-          "QUESTION by choosing exactly one option. Reply with the option letter only.")
+SYSTEM = (
+    "You are a calibrated decision engine. Read the STATE, then answer the "
+    "QUESTION by choosing exactly one option. Reply with the option letter only."
+)
 LETTERS = [chr(c) for c in range(65, 91)]  # A..Z
 
 
@@ -64,8 +70,9 @@ def _options(q):
 class Jev:
     def __init__(self, model_id=DEFAULT_MODEL, device=None, dtype=None):
         self.model_id = model_id
-        self.device = device or ("cuda" if torch.cuda.is_available() else
-                                 "mps" if torch.backends.mps.is_available() else "cpu")
+        self.device = device or (
+            "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+        )
         # bf16 is ~3x faster than fp32 on CPUs with native bf16 (AVX512-BF16); emulated it is slower
         cpu_bf16 = getattr(torch.cpu, "_is_avx512_bf16_supported", lambda: False)()
         dtype = dtype or (torch.bfloat16 if self.device == "cuda" or cpu_bf16 else torch.float32)
@@ -77,18 +84,20 @@ class Jev:
             ids = self.tok.encode(s, add_special_tokens=False)
             if len(ids) == 1:
                 self.slot_id[s] = ids[0]
-        assert all(l in self.slot_id for l in LETTERS), "tokenizer splits single letters"
+        assert all(letter in self.slot_id for letter in LETTERS), "tokenizer splits single letters"
 
     def _prompt(self, state, q, labels, descs):
         slots = [s for s in _slots(len(labels)) if s in self.slot_id][: len(labels)]
         if len(slots) < len(labels):
             raise ValueError(f"model tokenizer supports at most {len(slots)} options")
         lines = []
-        for s, l, d in zip(slots, labels, descs):
-            name = l if q["type"] != "score" else f"level {l}"
+        for s, label, d in zip(slots, labels, descs, strict=True):
+            name = label if q["type"] != "score" else f"level {label}"
             lines.append(f"{s}. {name}" + (f" — {_text(d)}" if d else ""))
-        user = (f"STATE:\n{_text(state)}\n\nQUESTION: {_text(q['instructions'])}\n"
-                f"OPTIONS:\n" + "\n".join(lines) + "\nAnswer with the letter only.")
+        user = (
+            f"STATE:\n{_text(state)}\n\nQUESTION: {_text(q['instructions'])}\n"
+            f"OPTIONS:\n" + "\n".join(lines) + "\nAnswer with the letter only."
+        )
         msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]
         text = self.tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
         return self.tok.encode(text, add_special_tokens=False), [self.slot_id[s] for s in slots]
@@ -123,24 +132,35 @@ class Jev:
         """TypeSafe request → TypeSafe response (dict)."""
         ids = list(questions)
         parsed = [_options(questions[i]) for i in ids]
-        built = [self._prompt(state, questions[i], *p) for i, p in zip(ids, parsed)]
+        built = [self._prompt(state, questions[i], *p) for i, p in zip(ids, parsed, strict=True)]
         logits, n_tokens = self._last_logits([b[0] for b in built])
         answers = {}
-        for k, (qid, (labels, descs), (_, slot_ids)) in enumerate(zip(ids, parsed, built)):
+        for k, (qid, (labels, descs), (_, slot_ids)) in enumerate(zip(ids, parsed, built, strict=True)):
             p = torch.softmax(logits[k, slot_ids].float(), -1).tolist()
             p = [round(x, 4) for x in p]
             q = questions[qid]
             if q["type"] == "noul":
                 answers[qid] = {"type": "noul", "noul": p[0]}
             elif q["type"] == "choice":
-                answers[qid] = {"type": "choice", "choice": labels[p.index(max(p))],
-                                "probabilities": dict(zip(labels, p)), "confidence": _confidence(p)}
+                answers[qid] = {
+                    "type": "choice",
+                    "choice": labels[p.index(max(p))],
+                    "probabilities": dict(zip(labels, p, strict=True)),
+                    "confidence": _confidence(p),
+                }
             else:
-                answers[qid] = {"type": "score", "score": round(sum(i * x for i, x in enumerate(p)), 4),
-                                "probabilities": dict(zip(labels, p)), "legend": dict(zip(labels, descs)),
-                                "confidence": _confidence(p)}
-        return {"model": self.model_id, "answers": answers,
-                "usage": {"input_tokens": n_tokens, "output_tokens": 0}}
+                answers[qid] = {
+                    "type": "score",
+                    "score": round(sum(i * x for i, x in enumerate(p)), 4),
+                    "probabilities": dict(zip(labels, p, strict=True)),
+                    "legend": dict(zip(labels, descs, strict=True)),
+                    "confidence": _confidence(p),
+                }
+        return {
+            "model": self.model_id,
+            "answers": answers,
+            "usage": {"input_tokens": n_tokens, "output_tokens": 0},
+        }
 
 
 def serve(model_id=DEFAULT_MODEL, port=8080):
@@ -173,20 +193,29 @@ def serve(model_id=DEFAULT_MODEL, port=8080):
 def demo(model_id=DEFAULT_MODEL):
     """Runnable self-check: the shapes are right and the tiny model gets easy cases right."""
     jev = Jev(model_id)
-    state = {"ticket": "I was charged twice for order #4411 and I want my money back. "
-                       "This is the third time I've written, I'm done with you people.",
-             "customer_since": "2019"}
+    state = {
+        "ticket": "I was charged twice for order #4411 and I want my money back. "
+        "This is the third time I've written, I'm done with you people.",
+        "customer_since": "2019",
+    }
     questions = {
         "refund_requested": {"type": "noul", "instructions": "Is the customer asking for a refund?"},
         "is_spam": {"type": "noul", "instructions": "Is this message spam or an advertisement?"},
-        "department": {"type": "choice", "instructions": "Which team should handle this ticket?",
-                       "criteria": {"billing": "charges, refunds, invoices",
-                                    "shipping": "delivery, tracking, lost parcels",
-                                    "returns": "returning or exchanging an item",
-                                    "other": None}},
-        "frustration": {"type": "score", "instructions": "How frustrated is the customer?",
-                        "criteria": ["calm and polite", "annoyed but civil",
-                                     "angry, threatening to leave"]},
+        "department": {
+            "type": "choice",
+            "instructions": "Which team should handle this ticket?",
+            "criteria": {
+                "billing": "charges, refunds, invoices",
+                "shipping": "delivery, tracking, lost parcels",
+                "returns": "returning or exchanging an item",
+                "other": None,
+            },
+        },
+        "frustration": {
+            "type": "score",
+            "instructions": "How frustrated is the customer?",
+            "criteria": ["calm and polite", "annoyed but civil", "angry, threatening to leave"],
+        },
     }
     t = time.time()
     res = jev.ask(state, questions)
@@ -199,8 +228,10 @@ def demo(model_id=DEFAULT_MODEL):
     assert abs(sum(a["department"]["probabilities"].values()) - 1) < 1e-3
     assert a["frustration"]["score"] > 1.0, "'I'm done with you people' is not calm"
     assert set(a["frustration"]["probabilities"]) == {"0", "1", "2"}
-    print(f"\nOK  {len(questions)} questions, {res['usage']['input_tokens']} input tokens, "
-          f"{ms:.0f} ms on {jev.device} with {model_id}")
+    print(
+        f"\nOK  {len(questions)} questions, {res['usage']['input_tokens']} input tokens, "
+        f"{ms:.0f} ms on {jev.device} with {model_id}"
+    )
 
 
 if __name__ == "__main__":
@@ -209,7 +240,13 @@ if __name__ == "__main__":
         serve(*(a for a in args[1:2]), **({"port": int(args[2])} if len(args) > 2 else {}))
     elif args and args[0].endswith(".json"):
         req = json.load(open(args[0]))
-        print(json.dumps(Jev(req.get("model") if req.get("model", "").count("/") else DEFAULT_MODEL)
-                         .ask(req["state"], req["questions"]), indent=1))
+        print(
+            json.dumps(
+                Jev(req.get("model") if req.get("model", "").count("/") else DEFAULT_MODEL).ask(
+                    req["state"], req["questions"]
+                ),
+                indent=1,
+            )
+        )
     else:
         demo(*args[:1])

@@ -1,0 +1,350 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>jev.py</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #12151a;
+    --line: #232830;
+    --fg: #e6e8eb;
+    --dim: #7d8590;
+    --ok: #3fb950;
+    --warm: #f0883e;
+    --bar: #2f81f7;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f7f9;
+      --panel: #fff;
+      --line: #e3e6ea;
+      --fg: #15181c;
+      --dim: #68717d;
+      --ok: #1a7f37;
+      --warm: #b35900;
+      --bar: #0969da;
+    }
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font:
+      14px/1.45 ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      Consolas,
+      monospace;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding: 18px 24px 10px;
+  }
+  header h1 {
+    font-size: 16px;
+    margin: 0;
+    font-weight: 600;
+  }
+  header .dim {
+    color: var(--dim);
+  }
+  #inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 0 24px 12px;
+  }
+  textarea {
+    width: 100%;
+    height: 150px;
+    background: var(--panel);
+    color: var(--fg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px;
+    font: 12px/1.4 inherit;
+    resize: vertical;
+  }
+  label {
+    display: block;
+    color: var(--dim);
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  #edit { padding: 0 24px 12px; color: var(--dim); font-size: 12px; }
+  #edit summary { cursor: pointer; margin-bottom: 8px; }
+  #run {
+    margin: 0 24px 14px;
+    padding: 8px 18px;
+    background: var(--fg);
+    color: var(--bg);
+    border: 0;
+    border-radius: 6px;
+    font: 600 14px inherit;
+    cursor: pointer;
+  }
+  #run:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 0 24px 24px;
+  }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+  }
+  section h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--dim);
+  }
+  .clock {
+    font-size: 44px;
+    font-weight: 700;
+    margin: 6px 0 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .clock small {
+    font-size: 16px;
+    color: var(--dim);
+    font-weight: 400;
+  }
+  .done .clock {
+    color: var(--ok);
+  }
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    flex: 1;
+    color: var(--warm);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 10px;
+    padding: 7px 0;
+    border-top: 1px solid var(--line);
+    align-items: center;
+  }
+  .row .id {
+    color: var(--dim);
+  }
+  .opt {
+    display: grid;
+    grid-template-columns: 90px 1fr 52px;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+  }
+  .opt .bar {
+    height: 8px;
+    background: var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .opt .bar i {
+    display: block;
+    height: 100%;
+    background: var(--bar);
+  }
+  .opt.top {
+    color: var(--fg);
+  }
+  .opt.top .bar i {
+    background: var(--ok);
+  }
+  .opt:not(.top) {
+    color: var(--dim);
+  }
+  .foot {
+    margin-top: auto;
+    padding-top: 10px;
+    color: var(--dim);
+    font-size: 12px;
+    border-top: 1px solid var(--line);
+  }
+  @media (max-width: 900px) {
+    #inputs,
+    main {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<header>
+  <h1>jev.py</h1>
+  <span class="dim"
+    >same model, same state, same questions — generate text vs. one forward
+    pass</span
+  ><span class="dim" id="model" style="margin-left: auto"></span>
+</header>
+
+<details id="edit"><summary>edit state and questions</summary>
+<div id="inputs">
+  <div>
+    <label>state</label
+    ><textarea id="state">
+{ "ticket": "I was charged twice for order #4411 and I want my money back. This is the third time I've written, I'm done with you people.",
+  "customer_since": "2019" }</textarea
+    >
+  </div>
+  <div>
+    <label>questions</label
+    ><textarea id="questions">
+{ "refund_requested": { "type": "noul", "instructions": "Is the customer asking for a refund?" },
+  "is_spam": { "type": "noul", "instructions": "Is this message spam or an advertisement?" },
+  "department": { "type": "choice", "instructions": "Which team should handle this ticket?",
+    "criteria": { "billing": "charges, refunds, invoices", "shipping": "delivery, tracking, lost parcels", "returns": "returning or exchanging an item", "other": null } },
+  "frustration": { "type": "score", "instructions": "How frustrated is the customer?",
+    "criteria": ["calm and polite", "annoyed but civil", "angry, threatening to leave"] } }</textarea
+    >
+  </div>
+</div>
+</details>
+<button id="run">Run both</button>
+
+<main>
+  <section id="gen">
+    <h2>generate the answers as JSON</h2>
+    <div class="clock"><span>0</span><small> ms</small></div>
+    <pre id="gen-out"></pre>
+    <div class="foot" id="gen-foot">
+      token by token, then parse the text and hope it is valid
+    </div>
+  </section>
+  <section id="jev">
+    <h2>read the decisions off the logits</h2>
+    <div class="clock"><span>0</span><small> ms</small></div>
+    <div id="jev-out"></div>
+    <div class="foot" id="jev-foot">
+      one pass, probabilities for every option, nothing to parse
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const clock = (sec) => {
+    const el = sec.querySelector(".clock span");
+    const t0 = performance.now();
+    let raf;
+    const tick = () => {
+      el.textContent = Math.round(performance.now() - t0);
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => {
+      cancelAnimationFrame(raf);
+      const ms = Math.round(performance.now() - t0);
+      el.textContent = ms;
+      sec.classList.add("done");
+      return ms;
+    };
+  };
+  const post = (path, body) =>
+    fetch(path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  async function runGenerate(body) {
+    const sec = $("#gen"),
+      out = $("#gen-out");
+    sec.classList.remove("done");
+    out.textContent = "";
+    const stop = clock(sec);
+    const r = await post("/v1/generate", body);
+    const reader = r.body.getReader(),
+      dec = new TextDecoder();
+    let n = 0;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      out.textContent += dec.decode(value);
+      n++;
+    }
+    const ms = stop();
+    let parsed = "not valid JSON";
+    try {
+      JSON.parse(out.textContent.replace(/^```\w*|```$/g, ""));
+      parsed = "valid JSON";
+    } catch {}
+    $("#gen-foot").textContent =
+      `${ms} ms · ~${n} pieces streamed · ${parsed} · no probabilities`;
+  }
+
+  async function runJev(body) {
+    const sec = $("#jev"),
+      out = $("#jev-out");
+    sec.classList.remove("done");
+    out.innerHTML = "";
+    const stop = clock(sec);
+    const res = await (await post("/v1/systemone", body)).json();
+    const ms = stop();
+    for (const [id, a] of Object.entries(res.answers)) {
+      const probs =
+        a.type === "noul"
+          ? { yes: a.noul, no: +(1 - a.noul).toFixed(4) }
+          : a.probabilities;
+      const best =
+        a.type === "noul"
+          ? a.noul >= 0.5
+            ? "yes"
+            : "no"
+          : a.type === "choice"
+            ? a.choice
+            : String(Math.round(a.score));
+      const head =
+        a.type === "score"
+          ? `score ${a.score.toFixed(2)}`
+          : a.type === "noul"
+            ? `p(yes) ${a.noul.toFixed(2)}`
+            : a.choice;
+      const opts = Object.entries(probs)
+        .map(
+          ([k, p]) =>
+            `<div class="opt ${k === best ? "top" : ""}"><span>${a.type === "score" ? "level " + k : k}</span><span class="bar"><i style="width:${(p * 100).toFixed(1)}%"></i></span><span>${p.toFixed(2)}</span></div>`,
+        )
+        .join("");
+      out.insertAdjacentHTML(
+        "beforeend",
+        `<div class="row"><span class="id">${id}<br><b style="color:var(--fg)">${head}</b></span><div>${opts}</div></div>`,
+      );
+    }
+    $("#jev-foot").textContent =
+      `${ms} ms · ${res.usage.input_tokens} input tokens, 0 output · ${Object.keys(res.answers).length} answers with probabilities`;
+    $("#model").textContent = res.model;
+  }
+
+  $("#run").onclick = async () => {
+    let body;
+    try {
+      body = {
+        state: JSON.parse($("#state").value),
+        questions: JSON.parse($("#questions").value),
+      };
+    } catch (e) {
+      alert("state and questions must be valid JSON");
+      return;
+    }
+    $("#run").disabled = true;
+    await Promise.all([runJev(body), runGenerate(body)]);
+    $("#run").disabled = false;
+  };
+</script>

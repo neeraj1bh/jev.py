@@ -1,0 +1,14 @@
+[project]
+name = "jev"
+version = "0.1.0"
+description = "Typed decisions from any local language model, in one file."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = ["torch>=2.4", "transformers>=4.45"]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
