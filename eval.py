@@ -10,6 +10,14 @@
              writes  noul    does it modify or delete anything?   truth: labelled by hand
   fields   one exam question per call, 40 each from ten MMLU subjects
              answer  choice  four answers, biology to law        truth: the exam key
+  public   100 items each from seven labelled datasets on the Hugging Face Hub
+             sentiment  noul    is the review positive?            SST-2
+             phishing   noul    is the email a phishing attempt?   phishing-email-dataset
+             entails    noul    does A entail B?                   GLUE RTE
+             snli       choice  entail / neutral / contradict      SNLI
+             topic      choice  world / sports / business / tech   AG News
+             intent     choice  27 support intents                 Bitext customer support
+             toxicity   score   four levels                        Civil Comments (human scores)
 
 Prints accuracy, Brier score and a reliability table (how often a 0.9 was actually a yes), and
 writes every answer with its probabilities and latency to results/logs/<model>.jsonl for later comparison.
@@ -25,6 +33,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -33,8 +42,14 @@ from jev import DEFAULT_MODEL, Jev
 
 def get(url):
     req = urllib.request.Request(url, headers={"User-Agent": "jev.py eval"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.load(r)
+    for attempt in range(8):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if (e.code != 429 and e.code < 500) or attempt == 7:
+                raise
+            time.sleep(min(2**attempt, 60))  # rate limited or a passing server error
 
 
 HN = "https://hn.algolia.com/api/v1/{}?tags=story&hitsPerPage=300&query={}"
@@ -158,6 +173,12 @@ def commit_rows(n):
 
 
 def report(name, pairs, kind):
+    if kind == "score":
+        off = [abs(score - truth) for score, truth, _ in pairs]
+        exact = sum(round(score) == truth for score, truth, _ in pairs) / len(pairs)
+        mae = sum(off) / len(off)
+        print(f"\n{name:<8} score   n={len(pairs):<4} exact level={exact:.3f}  mean level error={mae:.2f}")
+        return
     if kind == "noul":
         acc = sum((p > 0.5) == y for p, y in pairs) / len(pairs)
         brier = sum((p - y) ** 2 for p, y in pairs) / len(pairs)
@@ -175,6 +196,67 @@ def report(name, pairs, kind):
             b = [c == y for c, y, conf in pairs if lo <= conf < hi]
             if b:
                 print(f"  [{lo:.1f},{min(hi, 1):.1f})   {len(b):>4}   {sum(b) / len(b):.2f}")
+
+
+HUB = "https://datasets-server.huggingface.co/rows?dataset={}&config={}&split={}&offset={}&length=100"
+
+
+def hub(dataset, config, split, offsets=(0,)):
+    rows = []
+    for o in offsets:
+        rows += [r["row"] for r in get(HUB.format(dataset, config, split, o))["rows"]]
+        time.sleep(1)  # the Hub's rows endpoint is rate limited
+    return rows
+
+
+AG = ["world", "sports", "business", "science and technology"]
+NLI = ["entailment", "neutral", "contradiction"]
+TOX = ["not toxic", "mildly toxic", "toxic", "severely toxic"]
+
+
+def public_rows(n):
+    d = {}
+    d["sentiment"] = [
+        (r["sentence"], r["label"] == 1) for r in hub("stanfordnlp/sst2", "default", "validation")
+    ][:n]
+    d["phishing"] = [
+        (r["Email Text"][:1500], r["Email Type"] == "Phishing Email")
+        for r in hub("zefang-liu/phishing-email-dataset", "default", "train", (0, 9000))
+        if isinstance(r["Email Text"], str) and len(r["Email Text"]) > 40
+    ][:n]
+    d["entails"] = [
+        ((r["sentence1"], r["sentence2"]), r["label"] == 0) for r in hub("nyu-mll/glue", "rte", "validation")
+    ][:n]
+    d["snli"] = [
+        ((r["premise"], r["hypothesis"]), NLI[r["label"]])
+        for r in hub("stanfordnlp/snli", "plain_text", "test", (0, 5000))
+        if r["label"] >= 0
+    ][:n]
+    d["topic"] = [(r["text"], AG[r["label"]]) for r in hub("fancyzhx/ag_news", "default", "test", (0, 3000))][
+        :n
+    ]
+    # the file is sorted by intent, about a thousand rows each: one page per thousand covers all 27
+    bitext = hub(
+        "bitext/Bitext-customer-support-llm-chatbot-training-dataset",
+        "default",
+        "train",
+        tuple(range(0, 26000, 1000)),
+    )
+    intents = sorted({r["intent"] for r in bitext})
+    d["intent"] = ([(r["instruction"], r["intent"]) for r in bitext[:: len(bitext) // n]][:n], intents)
+
+    def level(t):
+        return 0 if t < 0.1 else 1 if t < 0.5 else 2 if t < 0.8 else 3
+
+    calm, harsh, offset = [], [], 0
+    while (len(calm) < n // 2 or len(harsh) < n // 2) and offset < 5000:  # toxic comments are rare
+        for r in hub("google/civil_comments", "default", "test", (offset,)):
+            bucket = calm if r["toxicity"] < 0.1 else harsh if r["toxicity"] >= 0.5 else None
+            if bucket is not None and len(bucket) < n // 2:
+                bucket.append((r["text"][:800], level(r["toxicity"])))
+        offset += 100
+    d["toxicity"] = calm + harsh
+    return d
 
 
 def field_rows(n):
@@ -197,13 +279,14 @@ def load_set(n):
     if os.path.exists(path):
         with open(path) as f:
             data = json.load(f)
-    if all(k in data for k in ("hn", "commits", "shell", "fields")):
+    if all(k in data for k in ("hn", "commits", "shell", "fields", "public")):
         return data
     makers = {
         "hn": lambda: hn_rows(n),
         "commits": lambda: commit_rows(n),
         "shell": lambda: SHELL,
         "fields": lambda: field_rows(min(n, 40)),
+        "public": lambda: public_rows(100),
     }
     for key, make in makers.items():
         if key not in data:
@@ -309,6 +392,70 @@ def main(model=DEFAULT_MODEL, n=60):
         res.setdefault("answer", []).append((a["answer"]["choice"], truth, a["answer"]["confidence"]))
         res.setdefault(subject, []).append(a["answer"]["choice"] == truth)
         total += 1
+    pub = data["public"]
+    for task, ask_q, state_of in (
+        ("sentiment", {"type": "noul", "instructions": "Is this review positive?"}, lambda x: {"review": x}),
+        (
+            "phishing",
+            {"type": "noul", "instructions": "Is this email a phishing attempt?"},
+            lambda x: {"email": x},
+        ),
+        (
+            "entails",
+            {"type": "noul", "instructions": "Does sentence A entail sentence B?"},
+            lambda x: {"A": x[0], "B": x[1]},
+        ),
+        (
+            "snli",
+            {
+                "type": "choice",
+                "instructions": "How does the hypothesis relate to the premise?",
+                "criteria": dict.fromkeys(NLI),
+            },
+            lambda x: {"premise": x[0], "hypothesis": x[1]},
+        ),
+        (
+            "topic",
+            {
+                "type": "choice",
+                "instructions": "Which section does this news belong to?",
+                "criteria": dict.fromkeys(AG),
+            },
+            lambda x: {"news": x},
+        ),
+        (
+            "toxicity",
+            {"type": "score", "instructions": "How toxic is this comment?", "criteria": TOX},
+            lambda x: {"comment": x},
+        ),
+    ):
+        for x, truth in pub[task]:
+            a = record(log, jev, task, state_of(x), {task: ask_q}, {task: truth})[task]
+            if ask_q["type"] == "noul":
+                res.setdefault(task, []).append((a["noul"], int(truth)))
+            elif ask_q["type"] == "choice":
+                res.setdefault(task, []).append((a["choice"], truth, a["confidence"]))
+            else:
+                res.setdefault(task, []).append((a["score"], truth, a["confidence"]))
+            total += 1
+    items, intents = pub["intent"]
+    for x, truth in items:
+        a = record(
+            log,
+            jev,
+            "intent",
+            {"message": x},
+            {
+                "intent": {
+                    "type": "choice",
+                    "instructions": "What does the customer want?",
+                    "criteria": dict.fromkeys(intents),
+                }
+            },
+            {"intent": truth},
+        )["intent"]
+        res.setdefault("intent", []).append((a["choice"], truth, a["confidence"]))
+        total += 1
     for name, kind in (
         ("show", "noul"),
         ("ask", "noul"),
@@ -316,6 +463,13 @@ def main(model=DEFAULT_MODEL, n=60):
         ("type", len(COMMIT_TYPES)),
         ("writes", "noul"),
         ("answer", 4),
+        ("sentiment", "noul"),
+        ("phishing", "noul"),
+        ("entails", "noul"),
+        ("snli", 3),
+        ("topic", 4),
+        ("intent", len(intents)),
+        ("toxicity", "score"),
     ):
         report(name, res[name], kind)
     print(
