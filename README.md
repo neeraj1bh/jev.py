@@ -76,23 +76,31 @@ per call, as many questions about it as you like.
 
 ```python
 from jev import Jev
-Jev().ask(state, questions)["answers"]["refund"]["noul"]   # 1.0
+
+Jev().ask(state, questions)["answers"]["refund"]["noul"]  # 1.0
 ```
 
 ## How
 
 ```
-state ──prefill once──▶ KV cache ──shared──▶ [q1 + "yes"]      ─▶ log p ─┐
-                                          ▶ [q1 + "no"]       ─▶ log p ─┴▶ softmax ─▶ noul   1.0
-                                          ▶ [q2 + "billing"]  ─▶ log p ─┐
-                                          ▶ [q2 + "shipping"] ─▶ log p ─┼▶ softmax ─▶ choice billing
-                                          ▶ [q2 + "other"]    ─▶ log p ─┘
+                       ┌─ "Is the customer asking for a refund?"  yes ─┐
+                       │                                          no  ─┤─ softmax ─▶ noul   1.00
+                       │
+ state ─▶ model ─▶ cache ─┼─ "Which team should handle this?"     billing  ─┐
+   (run once)          │                                          shipping ─┼─ softmax ─▶ choice billing
+                       │                                          other    ─┘
+                       │
+                       └─ "How frustrated is the customer?"       level 0 ─┐
+                                                                  level 1 ─┼─ softmax ─▶ score  2.00
+                                                                  level 2 ─┘
 ```
 
-The state is run through the model once. Its key/value cache is shared by every option of
-every question; each adds only the question and the option's own words. The model's
-log-probability for those words, given everything before them, is the option's score, and the
-scores of one question are softmaxed against each other. Nothing is generated.
+1. The state goes through the model once; its key/value cache is kept.
+2. For every option of every question, the question and the option's own words are appended
+   and scored: the model's log-probability for those words, given everything before them.
+3. The scores of one question are softmaxed against each other. That is the answer.
+
+Nothing is generated, so nothing needs parsing and no answer can fall outside the options.
 
 ## Verify
 
@@ -106,6 +114,15 @@ text; the truth comes from the item itself:
 | type | choice, 6 | a commit message, prefix removed | its conventional-commit prefix: fix / feat / docs / … |
 | writes | noul | a shell command | 40 commands labelled by hand |
 | fields | choice, 4 | an exam question with four answers | the exam key, 40 questions from each of ten MMLU subjects |
+| sentiment | noul | a movie review sentence | SST-2 label |
+| phishing | noul | an email | a public phishing-email set |
+| entails | noul | two sentences: does A entail B | GLUE RTE |
+| snli | choice, 3 | premise and hypothesis | SNLI: entailment / neutral / contradiction |
+| topic | choice, 4 | a news snippet | AG News section |
+| intent | choice, 26 | a customer message | Bitext customer-support intent |
+| toxicity | score, 4 levels | a comment | Civil Comments human toxicity score, binned |
+
+The last seven are 100 items each, fetched from the Hugging Face Hub's JSON rows endpoint.
 
 It prints accuracy, Brier score and a reliability table — how often a 0.9 was actually a yes —
 and writes every answer with its probabilities and latency to `results/logs/<model>.jsonl`. The item
@@ -116,30 +133,59 @@ are kept in [`results/`](results/), one file per model.
 |---|---|---|---|---|
 | ask | 0.50 | 0.90 | 0.92 | **0.95** — Brier 0.05 |
 | show | 0.50 | 0.61 | 0.77 | 0.77 |
-| kind | 0.20 | 0.65 | 0.65 | **0.85** |
+| kind | 0.20 | 0.65 | 0.65 | **0.84** |
 | type | 0.17 | 0.26 | 0.41 | **0.60** |
 | writes | 0.50 | 0.65 — calls 5 of 20 write commands read-only at p < 0.1 | 0.70 | **0.975** — Brier 0.02 |
 | fields | 0.25 | 0.50 — from 0.28 (econometrics) to 0.78 (computer security) | 0.57 — from 0.30 (law) to 0.80 (world religions) | **0.87** — from 0.65 (chemistry) to 0.95 (physics, biology, engineering) |
-| ms / item | | 970 on CPU | 1,800 on CPU | 970 over the network |
+| sentiment | 0.50 | 0.95 | 0.95 | **0.99** — Brier 0.01 |
+| phishing | 0.50 | 0.81 | 0.77 | **0.93** |
+| entails | 0.50 | 0.76 | 0.70 | **0.89** |
+| snli | 0.33 | 0.76 | **0.91** | 0.82 |
+| topic | 0.25 | **0.82** | 0.79 | 0.79 |
+| intent (26-way) | 0.04 | 0.66 | 0.71 | **0.94** |
+| toxicity, mean level error (0–3 scale) | | 1.13 — calls nearly everything toxic | 1.36 | **0.74** — right order, compressed toward the middle |
+| ms / item | | 860 on CPU | 1,620 on CPU | 1,010 over the network |
 
-Read that as: the interface is right, and judgment scales with the model. The small local
-models are not yet trustworthy on the questions an agent gate would ask, and their probabilities
-run hot; a hosted frontier model through `remote.py` gets those same questions almost entirely
-right with calibrated numbers. Judgment quality is the model's — the 0.5B fails the self-check, the 1.5B
-passes it, the 3B is clearly better, larger still is better again. Do not gate anything destructive on a
-small model's "no". Probabilities are softmaxed logits, not measured outcomes: treat 0.9 as a
-strong lean until the reliability table for your model and your questions says otherwise.
+Read that as:
+
+- the readout works on every model tried — 1,736 items, three question types, twelve tasks;
+- judgment scales with the model: 1.5B → 3B → a hosted frontier model goes from unreliable to
+  trustworthy on the questions an agent would gate on (shell `writes`: 0.65 → 0.70 → 0.975);
+- small models run hot — they say 0.9 far more often than they are right, and neither can grade
+  toxicity — so use them for demos and bulk triage, not for gating destructive actions;
+- probabilities are softmaxed log-probs, not measured outcomes: read the reliability table for
+  your model and your questions before choosing a threshold.
 
 ## Demo
 
 `uv run demo.py`, then open <http://localhost:8080>. The same model answers the same
-questions two ways, side by side, with a live clock on each:
+questions two ways, timed one after the other, then replayed side by side:
 
 - **left** — asked to write the answers as JSON, streamed token by token, then parsed
-- **right** — one forward pass, a probability bar for every option, nothing to parse
+- **right** — one pass over the state, a probability bar for every option, nothing to parse
+
+Four examples are built in — a support ticket, a shell command, an inbox email, a pull
+request — and both boxes are editable. The line above the columns states the speed ratio and
+where the two answers differed, computed from the run.
 
 On the example ticket the 1.5B, generating text, routes the double charge to `returns`;
 reading the logits it says `billing` at 1.00. Same weights. That gap is the point.
+
+## Hosted models
+
+`remote.py` answers the same requests from a hosted model through its chat API's
+log-probabilities — DeepSeek, Kimi, OpenRouter or OpenAI — and passes straight through to the
+TypeSafe API when that key is present. Keys go in `.env` (copy `.env.example`).
+
+```sh
+uv run remote.py deepseek            # self-check
+uv run remote.py deepseek serve      # the same server, backed by DeepSeek
+uv run eval.py remote:deepseek       # the same eval on a hosted model
+```
+
+Thinking is turned off per provider (otherwise the first token is reasoning, not the answer)
+and the temperature set to what each accepts. A provider must return log-probabilities to be
+usable this way; Anthropic's API does not, and Kimi K3 cannot stop reasoning first.
 
 ## Files
 
@@ -148,6 +194,7 @@ reading the logits it says `billing` at 1.00. Same weights. That gap is the poin
 | `jev.py` | the model wrapper, the HTTP server and the self-check — the whole idea |
 | `eval.py` | public evaluation, results in `results/` |
 | `demo.py`, `demo.html` | the side-by-side page |
+| `remote.py`, `.env.example` | hosted backends and where their keys go |
 
 `pyproject.toml` carries the two dependencies and the ruff config; `uvx ruff format . && uvx ruff check .` keeps it clean.
 
