@@ -1,0 +1,87 @@
+# python eval.py remote:llamacpp:qwen2.5-14b-q4   (2026-09-19, llama.cpp Vulkan on RX 6700 XT 12 GB, letter readout, frozen results/eval-set.json: 3,101 items + TypeSafe public eval; summary rebuilt 2026-09-21 from the saved answers, TypeSafe from its complete rerun)
+
+
+show     noul    n=120  accuracy=0.775  brier=0.213
+  p(yes)       n   actually yes
+  [0.0,0.1)     50   0.16
+  [0.3,0.5)      3   0.67
+  [0.9,1.0)     67   0.75
+
+ask      noul    n=120  accuracy=0.942  brier=0.058
+  p(yes)       n   actually yes
+  [0.0,0.1)     62   0.08
+  [0.1,0.3)      1   0.00
+  [0.9,1.0)     57   0.96
+
+kind     choice  n=120  accuracy=0.775  (chance 0.20)
+  confidence   n   accuracy
+  [0.3,0.6)      4   0.50
+  [0.6,0.8)      1   0.00
+  [0.8,1.0)    115   0.79
+
+type     choice  n=296  accuracy=0.422  (chance 0.17)
+  confidence   n   accuracy
+  [0.3,0.6)      3   0.00
+  [0.6,0.8)     23   0.30
+  [0.8,1.0)    270   0.44
+
+writes   noul    n=40   accuracy=0.925  brier=0.078
+  p(yes)       n   actually yes
+  [0.0,0.1)     23   0.13
+  [0.7,0.9)      2   1.00
+  [0.9,1.0)     15   1.00
+
+answer   choice  n=400  accuracy=0.695  (chance 0.25)
+  confidence   n   accuracy
+  [0.0,0.3)      1   0.00
+  [0.3,0.6)     27   0.22
+  [0.6,0.8)     18   0.28
+  [0.8,1.0)    354   0.75
+
+sentiment noul    n=300  accuracy=0.947  brier=0.051
+  p(yes)       n   actually yes
+  [0.0,0.1)    152   0.07
+  [0.3,0.5)      1   1.00
+  [0.5,0.7)      1   1.00
+  [0.9,1.0)    146   0.97
+
+phishing noul    n=291  accuracy=0.869  brier=0.125
+  p(yes)       n   actually yes
+  [0.0,0.1)    215   0.16
+  [0.1,0.3)      1   1.00
+  [0.3,0.5)      1   1.00
+  [0.7,0.9)      3   0.67
+  [0.9,1.0)     71   0.99
+
+entails  noul    n=277  accuracy=0.819  brier=0.176
+  p(yes)       n   actually yes
+  [0.0,0.1)    117   0.15
+  [0.1,0.3)      1   0.00
+  [0.3,0.5)      1   1.00
+  [0.5,0.7)      1   0.00
+  [0.7,0.9)      1   1.00
+  [0.9,1.0)    156   0.81
+
+snli     choice  n=297  accuracy=0.889  (chance 0.33)
+  confidence   n   accuracy
+  [0.3,0.6)      6   0.67
+  [0.6,0.8)      5   0.20
+  [0.8,1.0)    286   0.91
+
+topic    choice  n=300  accuracy=0.787  (chance 0.25)
+  confidence   n   accuracy
+  [0.3,0.6)      4   0.75
+  [0.6,0.8)      4   0.25
+  [0.8,1.0)    292   0.79
+
+intent   choice  n=300  accuracy=0.837  (chance 0.04)
+  confidence   n   accuracy
+  [0.6,0.8)     13   0.23
+  [0.8,1.0)    287   0.86
+
+toxicity score   n=300  exact level=0.447  mean level error=0.79
+typesafe  354 questions  accuracy vs consensus=0.751
+  by subject: biology 0.88  chemistry 0.47  physics 0.65  medicine 0.80  electrical_engineering 0.72  computer_science 0.70  computer_security 0.82  professional_law 0.47  econometrics 0.55  world_religions 0.88
+
+3146 items, 4715 ms each on llamacpp, remote:llamacpp:qwen2.5-14b-q4
+every answer, probability and latency: results/logs/llamacpp-qwen2.5-14b-q4.jsonl
