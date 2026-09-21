@@ -19,6 +19,8 @@ export interface Backend {
   max?: number | null;
   /** For gateway models: who made the model, e.g. "qwen". */
   provider?: string;
+  created?: number;
+  free?: boolean;
 }
 
 export interface Dataset {

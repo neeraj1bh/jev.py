@@ -254,7 +254,8 @@ export default function App() {
       return;
     }
     if (!backend.ready) {
-      askForKey(id, false);
+      if (backend.group === "gateway") askForKey("remote:openrouter", false, id);
+      else askForKey(id, false);
       return;
     }
     setGenerateModel(id);

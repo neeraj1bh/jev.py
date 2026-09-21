@@ -24,6 +24,7 @@ export function pickerSubtitle(backend?: Backend) {
   if (backend.group === "local") {
     return `${backend.device}${backend.gb ? ` · ${backend.gb} GB` : ""}${backend.ready ? "" : " · download"}`;
   }
+  if (backend.group === "gateway") return "via OpenRouter";
   return backend.group === "server" ? (backend.ready ? "running" : "not running") : "hosted";
 }
 

@@ -437,6 +437,8 @@ def gateway():
             "ready": ready,
             "key": var,
             "max": 26,
+            "created": m.get("created", 0),
+            "free": m["id"].endswith(":free"),  # OpenRouter marks its free variants this way
         }
         for m in GATEWAY["models"]
     ]
