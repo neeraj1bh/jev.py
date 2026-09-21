@@ -17,6 +17,7 @@ function confidence(answer: Answer) {
 }
 
 function ModelHeading({ name, state }: { name: string; state: PanelState }) {
+  const written = name.endsWith("· text");
   const ms = useElapsed(state);
   return (
     <th className={cn(tableHead, "min-w-[150px] align-bottom")}>
@@ -29,11 +30,25 @@ function ModelHeading({ name, state }: { name: string; state: PanelState }) {
       >
         {state.status === "idle" ? "\u00a0" : `${ms} ms`}
       </span>
+      {written && (
+        <span className="ml-2 text-xs font-normal text-dim">written, no probabilities</span>
+      )}
     </th>
   );
 }
 
-function AnswerCell({ state, id, truth }: { state: PanelState; id: string; truth?: string }) {
+function AnswerCell({
+  state,
+  id,
+  truth,
+  written,
+}: {
+  state: PanelState;
+  id: string;
+  truth?: string;
+  /** A written answer has no probabilities to show. */
+  written: boolean;
+}) {
   const cell = "border-b border-rule px-2 py-2 align-top";
   if (state.status === "running" && !state.response) {
     return (
@@ -55,7 +70,7 @@ function AnswerCell({ state, id, truth }: { state: PanelState; id: string; truth
   }
   const label = answerLabel(answer);
   const shown = answer.type === "score" ? answer.score.toFixed(2) : label;
-  const probability = confidence(answer);
+  const probability = written ? null : confidence(answer);
   const correct = truth === undefined ? null : matchesLabel(label, truth);
   return (
     <td className={cell}>
@@ -73,7 +88,7 @@ function AnswerCell({ state, id, truth }: { state: PanelState; id: string; truth
           <span className="ml-auto flex flex-none items-center gap-2">
             <span className="h-1 w-12 overflow-hidden rounded-full bg-bar">
               <span
-                className="block h-full rounded-full bg-dim"
+                className="block h-full rounded-full bg-ink/70"
                 style={{ width: `${probability * 100}%` }}
               />
             </span>
@@ -87,8 +102,9 @@ function AnswerCell({ state, id, truth }: { state: PanelState; id: string; truth
   );
 }
 
-function OptionBreakdown({ answer }: { answer?: Answer }) {
+function OptionBreakdown({ answer, written }: { answer?: Answer; written: boolean }) {
   if (!answer) return <span className="text-dim">–</span>;
+  if (written) return null;
   const probabilities =
     answer.type === "noul"
       ? { yes: answer.noul, no: 1 - answer.noul }
@@ -111,7 +127,10 @@ function OptionBreakdown({ answer }: { answer?: Answer }) {
           </span>
           <span className="h-1 overflow-hidden rounded-full bg-bar">
             <span
-              className={cn("block h-full rounded-full", option === best ? "bg-good" : "bg-dim")}
+              className={cn(
+                "block h-full rounded-full",
+                option === best ? "bg-ink/70" : "bg-dim/60",
+              )}
               style={{ width: `${probability * 100}%` }}
             />
           </span>
@@ -153,78 +172,89 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
   });
 
   return (
-    <div className={cn(!bare && panelBox, "animate-fade overflow-x-auto")}>
+    <div className={cn(!bare && panelBox, "animate-fade")}>
       {hasAnswers && (
         <div className="flex justify-end pb-1">
           <button
             type="button"
             onClick={() => setOpen(allOpen ? [] : questionIds)}
-            className="inline-flex items-center gap-1 rounded-sm border-0 bg-transparent p-0 text-[13px] text-dim transition-colors hover:text-ink"
+            className="inline-flex items-center gap-1 rounded-md border-0 bg-transparent px-1.5 py-0.5 text-[13px] text-dim transition-colors hover:text-ink"
           >
             <Icon icon={allOpen ? ChevronsDownUp : ChevronsUpDown} size={14} />
             {allOpen ? "Hide all options" : "Show all options"}
           </button>
         </div>
       )}
-      <table className="w-full border-collapse text-[13px]">
-        <thead>
-          <tr>
-            <th className={cn(tableHead, "align-bottom")}>Question</th>
-            {truth && <th className={cn(tableHead, "align-bottom")}>Label</th>}
-            {names.map((name, k) => (
-              <ModelHeading key={name} name={name} state={panels[k] ?? idle} />
-            ))}
-          </tr>
-        </thead>
-        <tbody className="[&>tr:last-child>td]:border-b-0">
-          {questionIds.map((id) => {
-            const isOpen = open.includes(id);
-            return (
-              <Fragment key={id}>
-                <tr className="transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md">
-                  <td className={cn(rowCell, "text-ink")}>
-                    {hasAnswers ? (
-                      <button
-                        type="button"
-                        aria-expanded={isOpen}
-                        onClick={() => toggle(id)}
-                        className="inline-flex items-center gap-1 rounded-sm border-0 bg-transparent p-0 text-left text-ink"
-                      >
-                        <Icon
-                          icon={ChevronRight}
-                          size={14}
-                          className={cn(
-                            "text-dim transition-transform duration-150",
-                            isOpen && "rotate-90",
-                          )}
-                        />
-                        {id}
-                      </button>
-                    ) : (
-                      id
-                    )}
-                  </td>
-                  {truth && <td className={cn(rowCell, "text-dim")}>{truth[id] ?? "–"}</td>}
-                  {names.map((name, k) => (
-                    <AnswerCell key={name} state={panels[k] ?? idle} id={id} truth={truth?.[id]} />
-                  ))}
-                </tr>
-                {isOpen && (
-                  <tr className="animate-fade motion-reduce:animate-none">
-                    <td className={rowCell} />
-                    {truth && <td className={rowCell} />}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-[13px]">
+          <thead>
+            <tr>
+              <th className={cn(tableHead, "align-bottom")}>Question</th>
+              {truth && <th className={cn(tableHead, "align-bottom")}>Label</th>}
+              {names.map((name, k) => (
+                <ModelHeading key={name} name={name} state={panels[k] ?? idle} />
+              ))}
+            </tr>
+          </thead>
+          <tbody className="[&>tr:last-child>td]:border-b-0">
+            {questionIds.map((id) => {
+              const isOpen = open.includes(id);
+              return (
+                <Fragment key={id}>
+                  <tr className="transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md">
+                    <td className={cn(rowCell, "text-ink")}>
+                      {hasAnswers ? (
+                        <button
+                          type="button"
+                          aria-expanded={isOpen}
+                          onClick={() => toggle(id)}
+                          className="inline-flex items-center gap-1 rounded-sm border-0 bg-transparent p-0 text-left text-ink"
+                        >
+                          <Icon
+                            icon={ChevronRight}
+                            size={14}
+                            className={cn(
+                              "text-dim transition-transform duration-150",
+                              isOpen && "rotate-90",
+                            )}
+                          />
+                          {id}
+                        </button>
+                      ) : (
+                        id
+                      )}
+                    </td>
+                    {truth && <td className={cn(rowCell, "text-dim")}>{truth[id] ?? "–"}</td>}
                     {names.map((name, k) => (
-                      <td key={name} className={cn(rowCell, "pb-3")}>
-                        <OptionBreakdown answer={panels[k]?.response?.answers[id]} />
-                      </td>
+                      <AnswerCell
+                        key={name}
+                        state={panels[k] ?? idle}
+                        id={id}
+                        truth={truth?.[id]}
+                        written={name.endsWith("· text")}
+                      />
                     ))}
                   </tr>
-                )}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+                  {isOpen && (
+                    <tr className="animate-fade motion-reduce:animate-none">
+                      <td className={rowCell} />
+                      {truth && <td className={rowCell} />}
+                      {names.map((name, k) => (
+                        <td key={name} className={cn(rowCell, "pb-3")}>
+                          <OptionBreakdown
+                            answer={panels[k]?.response?.answers[id]}
+                            written={name.endsWith("· text")}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       <p className={cn(labelText, "mt-3 mb-0", (bare || !hasResults) && "hidden")}>
         Green marks the fastest model{truth ? " and answers that match the label" : ""}. The bar is
         how sure the model was; open a question to see every option.

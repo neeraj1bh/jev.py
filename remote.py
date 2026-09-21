@@ -22,6 +22,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 from jev import LETTERS, _confidence, _options, _text, demo, serve
 
+
+class NoProbabilities(ValueError):
+    """The provider answered but left out the log-probabilities a readout needs."""
+
+
 BACKENDS = {
     "deepseek": ("DEEPSEEK_API_KEY", "https://api.deepseek.com/chat/completions", "deepseek-flash"),
     "moonshot": ("MOONSHOT_API_KEY", "https://api.moonshot.ai/v1/chat/completions", "kimi-k2.6"),
@@ -177,7 +182,10 @@ class Remote:
                 **EXTRAS.get(self.backend, {"temperature": 0}),
             },
         )
-        top = res["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
+        content = (res["choices"][0].get("logprobs") or {}).get("content")
+        if not content:  # some providers accept the parameter and send nothing back
+            raise NoProbabilities(f"{self.model_id} returned no probabilities")
+        top = content[0]["top_logprobs"]
         seen = {}
         for t in top:  # "A", " A" and "a" all mean A; keep the most likely spelling
             key = t["token"].strip().upper()

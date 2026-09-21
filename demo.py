@@ -29,7 +29,7 @@ from huggingface_hub.constants import HF_HUB_CACHE
 from transformers import TextIteratorStreamer
 
 from jev import DEFAULT_MODEL, SYSTEM, Jev, _options, _text
-from remote import BACKENDS, EXTRAS, Remote, env
+from remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(HERE, "web", "dist")  # the built page; see web/
@@ -410,8 +410,46 @@ OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"
 GATEWAY = {"at": 0.0, "models": []}  # OpenRouter's catalog, refetched every few hours
 
 
+GATEWAY_CHECKED = os.path.join(DATA, "gateway-checked.json")  # model -> did it return probabilities
+
+
+def read_checked():
+    try:
+        with open(GATEWAY_CHECKED) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+CHECKED = read_checked()
+
+
+def check_gateway(ids):
+    """Ask each model one tiny question; keep only those whose answer carries probabilities.
+    The catalog claims top_logprobs for many models whose providers then send none."""
+    question = {"q": {"type": "noul", "instructions": "Is this a greeting?"}}
+    for n, bid in enumerate(ids):
+        PROGRESS["gateway"] = [n, len(ids), "models"]
+        try:
+            Remote("openrouter", model=bid.split(":", 1)[1]).ask({"text": "hello"}, question)
+            CHECKED[bid] = True
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403, 429):  # a bad key or a rate limit says nothing about the model
+                break
+            CHECKED[bid] = False
+        except (NoProbabilities, ValueError, KeyError, IndexError):
+            CHECKED[bid] = False
+        except OSError:
+            break  # offline; try again next time
+        os.makedirs(DATA, exist_ok=True)
+        with open(GATEWAY_CHECKED, "w") as f:
+            json.dump(CHECKED, f)
+        time.sleep(1)
+    PROGRESS.pop("gateway", None)
+
+
 def gateway():
-    """OpenRouter models that return top log-probabilities, the only ones a readout can use."""
+    """OpenRouter models that really return top log-probabilities, the only ones a readout can use."""
     if time.time() - GATEWAY["at"] > 6 * 3600:
         try:
             with urllib.request.urlopen("https://openrouter.ai/api/v1/models", timeout=10) as r:
@@ -428,6 +466,10 @@ def gateway():
         GATEWAY.update(at=time.time(), models=usable)
     var = BACKENDS["openrouter"][0]
     ready = bool(env(var))
+    unchecked = ["openrouter:" + m["id"] for m in GATEWAY["models"] if "openrouter:" + m["id"] not in CHECKED]
+    if ready and unchecked and "gateway" not in PROGRESS:
+        PROGRESS["gateway"] = [0, len(unchecked), "models"]
+        Thread(target=check_gateway, args=(unchecked,), daemon=True).start()
     return [
         {
             "id": "openrouter:" + m["id"],
@@ -441,6 +483,7 @@ def gateway():
             "free": m["id"].endswith(":free"),  # OpenRouter marks its free variants this way
         }
         for m in GATEWAY["models"]
+        if CHECKED.get("openrouter:" + m["id"])
     ]
 
 
@@ -726,7 +769,11 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 bid = body.get("backend") or model_id
                 msg = str(e)
                 gateway_model = bid.startswith("openrouter:")
-                if isinstance(e, urllib.error.HTTPError) and gateway_model and e.code == 404:
+                if isinstance(e, NoProbabilities) and gateway_model:
+                    CHECKED[bid] = False  # it drops out of the list on the next refresh
+                    model = bid.split("/")[-1]
+                    msg = f"{model} answered without probabilities, so it cannot be read this way."
+                elif isinstance(e, urllib.error.HTTPError) and gateway_model and e.code == 404:
                     model = bid.split("/")[-1]
                     msg = f"OpenRouter has no provider for {model} that returns probabilities right now."
                 elif isinstance(e, urllib.error.HTTPError) and bid.startswith(("remote:", "openrouter:")):
