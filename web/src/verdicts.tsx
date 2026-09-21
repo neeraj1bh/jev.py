@@ -21,12 +21,21 @@ export function compareVerdict(names: string[], sides: RecordedSide[]) {
   const disagreed = Object.keys(sides[0]?.response.answers ?? {}).filter(
     (id) => new Set(sides.map((side) => labelOf(side, id))).size > 1,
   );
+  const ms = sides.map((side) => side.ms);
+  const [fastest] = fastestIndexes(ms);
+  const speed =
+    names.length <= 2 ? (
+      timesSentence(names, ms)
+    ) : fastest === undefined ? (
+      "No single fastest model"
+    ) : (
+      <>
+        Fastest: {names[fastest]} at <b>{ms[fastest]} ms</b>
+      </>
+    );
   return (
     <>
-      {timesSentence(
-        names,
-        sides.map((side) => side.ms),
-      )}
+      {speed}
       {disagreed.length ? (
         <>
           ; they disagreed on <span className="text-warn">{disagreed.join(", ")}</span>.
@@ -93,6 +102,7 @@ export function rowRecording(rows: Row[], index: number, names: string[]): Recor
       response: side.response,
       footer: sideFooter(side, names[k] ?? ""),
     })),
+    row: index,
     verdict: (
       <>
         Item {index + 1}:{" "}

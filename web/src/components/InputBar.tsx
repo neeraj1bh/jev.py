@@ -52,7 +52,7 @@ export function InputBar(props: InputBarProps) {
             onClick={() => props.onSourceChange(option)}
             className={cn(
               "rounded-full border-0 px-3 py-[3px] text-[13px]",
-              source === option ? "bg-code text-ink" : "bg-transparent text-dim",
+              source === option ? "bg-lift text-ink" : "bg-transparent text-dim",
             )}
           >
             {option === "examples" ? "Examples" : "Dataset"}

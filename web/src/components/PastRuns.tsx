@@ -92,7 +92,7 @@ export function PastRuns(props: PastRunsProps) {
                 <tr
                   key={run.name}
                   onClick={() => props.onOpenRun(run.name)}
-                  className="cursor-pointer hover:bg-code"
+                  className="cursor-pointer transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md"
                 >
                   <td className={tableCell}>
                     <span className={monoDim}>{runTime(run.name)}</span>

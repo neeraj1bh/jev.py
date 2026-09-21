@@ -20,7 +20,7 @@ import { isString, usePersistentState } from "./hooks/usePersistentState";
 import { useTheme } from "./hooks/useTheme";
 import { useToast } from "./hooks/useToast";
 import { now, runBatchLoop, runEach, timedGenerate, timedReadout } from "./runner";
-import { writtenAnswers } from "./scoring";
+import { readoutFooter, writtenAnswers } from "./scoring";
 import { cn, ghostButton, labelText, solidButton } from "./styles";
 import type { Item, Mode, Recording, Request, Row, RunKind, SavedRun } from "./types";
 import { compareVerdict, generateVerdict, rowRecording } from "./verdicts";
@@ -88,6 +88,7 @@ export default function App() {
     open: boolean;
   } | null>(null);
   const [openMenu, setOpenMenu] = useState("");
+  const [replayRow, setReplayRow] = useState<number | null>(null);
   const [savedRuns, setSavedRuns] = useState<SavedRun[]>([]);
   const [runsPage, setRunsPage] = useState(1);
   const [runsKind, setRunsKind] = usePersistentState<KindFilter>("runs-kind", "", isKindFilter);
@@ -548,7 +549,8 @@ export default function App() {
     setColumns(names);
     setTableVisible(true);
     setSummaryVisible(false);
-    setPanelsVisible(false);
+    setPanelsVisible(true);
+    resetPanelStates(models.length);
     setLogFile({
       text: `saved locally · ${pace}`,
       path: `results/logs/demo/${log.replace(/[^A-Za-z0-9._-]/g, "-")}.jsonl`,
@@ -580,6 +582,16 @@ export default function App() {
       onRow: (next, sides) => {
         replaceRows([...rowsRef.current, { item: next, sides, isNew: true }]);
         setItem(next);
+        // The panels show the latest finished item, as a single run would.
+        setPanels(
+          sides.map((side) => ({
+            status: "done",
+            ms: side.ms,
+            response: side.response.error ? undefined : side.response,
+            footer: side.response.error?.message ?? readoutFooter(side.response),
+          })),
+        );
+        markFastest(sides.map((side) => side.ms));
       },
       onError: toast.show,
     });
@@ -674,9 +686,15 @@ export default function App() {
     if (recording.sides && rows.length)
       panelsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     setReplaying(true);
-    setVerdict("Replaying the recorded run, both at once…");
+    setReplayRow(recording.row ?? null);
+    setVerdict(
+      recording.row === undefined
+        ? "Replaying: every side starts together and stops at its recorded time."
+        : `Replaying item ${recording.row + 1}: every model starts together and stops at its recorded time.`,
+    );
     const startedAt = now();
     const finish = (ms: number[]) => {
+      setReplayRow(null);
       setVerdict(recording.verdict);
       markFastest(ms);
       setReplaying(false);
@@ -846,7 +864,7 @@ export default function App() {
             )}
           </div>
 
-          <p className="mt-[18px] mb-0 flex min-h-[26px] flex-wrap items-baseline gap-[18px] text-base text-ink [&_b]:text-good">
+          <p className="mt-[18px] mb-0 min-h-[26px] text-base text-ink [&_b]:text-good">
             {verdict}
           </p>
 
@@ -876,8 +894,8 @@ export default function App() {
               columns={columns}
               note={tableNote}
               file={logFile}
-              selected={openItem?.index ?? null}
-              follow={!!openItem?.open}
+              selected={openItem?.index ?? replayRow}
+              follow={!!openItem?.open || replayRow !== null}
               onOpen={(index) => showItem(index)}
             />
           )}

@@ -22,7 +22,7 @@ function ModelHeading({ name, state }: { name: string; state: PanelState }) {
           state.fastest ? "text-good" : "text-dim",
         )}
       >
-        {state.status === "idle" ? "–" : `${ms} ms`}
+        {state.status === "idle" ? "\u00a0" : `${ms} ms`}
       </span>
     </th>
   );
@@ -33,6 +33,7 @@ function AnswerCell({ state, id, truth }: { state: PanelState; id: string; truth
   if (state.status === "running" && !state.response) {
     return <td className={cn(cell, "text-dim")}>…</td>;
   }
+  if (state.status === "idle") return <td className={cell} />;
   const answer = state.response?.answers[id];
   if (!answer) {
     const failed = state.status === "done" && !state.response;
@@ -83,6 +84,7 @@ const idle: PanelState = { status: "idle", footer: "" };
 
 /** Three or more models: one column each, one row per question, so nothing repeats. */
 export function CompareTable({ names, panels, questionIds, truth, bare }: CompareTableProps) {
+  const hasResults = panels.some((panel) => panel.status !== "idle");
   const failures = names.flatMap((name, k) => {
     const state = panels[k];
     return state?.status === "done" && !state.response ? [`${name}: ${state.footer}`] : [];
@@ -101,7 +103,10 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
         </thead>
         <tbody>
           {questionIds.map((id) => (
-            <tr key={id} className="transition-colors hover:bg-code">
+            <tr
+              key={id}
+              className="transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md"
+            >
               <td className="border-b border-rule px-2 py-2 align-top text-ink">{id}</td>
               {truth && (
                 <td className="border-b border-rule px-2 py-2 align-top text-dim">
@@ -115,7 +120,7 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
           ))}
         </tbody>
       </table>
-      <p className={cn(labelText, "mt-3 mb-0", bare && "hidden")}>
+      <p className={cn(labelText, "mt-3 mb-0", (bare || !hasResults) && "hidden")}>
         Green marks the fastest model{truth ? " and answers that match the label" : ""}. The bar is
         how sure the model was.
       </p>

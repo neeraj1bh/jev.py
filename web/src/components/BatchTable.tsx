@@ -5,9 +5,27 @@ import { cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../style
 import type { Response, Row } from "../types";
 import { CheckMark } from "./CheckMark";
 
-function ResultCell({ response, truth }: { response: Response; truth: Record<string, string> }) {
+function ResultCell({
+  response,
+  truth,
+  ms,
+}: {
+  response: Response;
+  truth: Record<string, string>;
+  ms: number;
+}) {
   if (response.error) return <td className={cn(tableCell, "text-warn")}>error</td>;
+  const time = <span className={cn(monoDim, "mt-0.5 block")}>{ms} ms</span>;
   const ids = Object.keys(truth);
+  if (ids.length === 0) {
+    const count = Object.keys(response.answers).length;
+    return (
+      <td className={cn(tableCell, "text-dim")}>
+        {count} {count === 1 ? "answer" : "answers"}
+        {time}
+      </td>
+    );
+  }
   const [onlyId] = ids;
   if (ids.length === 1 && onlyId !== undefined) {
     const answer = response.answers[onlyId];
@@ -24,6 +42,7 @@ function ResultCell({ response, truth }: { response: Response; truth: Record<str
       <td className={cn(tableCell, correct ? "text-good" : "text-warn")}>
         {label} <span className={monoDim}>{probability?.toFixed(2)}</span>{" "}
         <CheckMark ok={correct} />
+        {time}
       </td>
     );
   }
@@ -31,6 +50,7 @@ function ResultCell({ response, truth }: { response: Response; truth: Record<str
   return (
     <td className={cn(tableCell, correct === total ? "text-good" : "text-warn")}>
       {correct}/{total} right
+      {time}
     </td>
   );
 }
@@ -67,6 +87,7 @@ export function BatchTable({
     ),
   );
   const countsQuestions = (tally[0]?.[1] ?? 0) > rows.length;
+  const labelled = (tally[0]?.[1] ?? 0) > 0;
 
   // The table follows the item open in the item dialog.
   useEffect(() => {
@@ -79,32 +100,42 @@ export function BatchTable({
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="m-0 text-sm font-semibold text-ink">
           Batch results <span className="font-normal text-dim">{note}</span>
-          <span className="ml-2.5 text-[13px] font-normal text-dim">
-            {columns.map((column, k) => (
-              <span key={column}>
-                {k > 0 && " · "}
-                {column}{" "}
-                <b className="font-medium text-ink">
-                  {tally[k]?.[0]}/{tally[k]?.[1]}
-                </b>
-              </span>
-            ))}
-            {countsQuestions && " questions"}
-          </span>
+          {labelled && (
+            <span className="ml-2.5 text-[13px] font-normal text-dim">
+              {columns.map((column, k) => (
+                <span key={column}>
+                  {k > 0 && " · "}
+                  {column}{" "}
+                  <b className="font-medium text-ink">
+                    {tally[k]?.[0]}/{tally[k]?.[1]}
+                  </b>
+                </span>
+              ))}
+              {countsQuestions && " questions"}
+            </span>
+          )}
         </h2>
         <span className={labelText} title={file.path}>
           {file.text}
         </span>
       </div>
       <div className="max-h-[460px] overflow-auto">
-        <table className="w-full border-collapse text-[13px]">
+        <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px]">
+          <colgroup>
+            <col className="w-11" />
+            <col className={columns.length > 3 ? "w-[26%]" : "w-[38%]"} />
+            {labelled && <col className="w-28" />}
+            {columns.map((column) => (
+              <col key={column} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               <th className={tableHead}>#</th>
               <th className={tableHead}>Input</th>
-              <th className={tableHead}>Label</th>
+              {labelled && <th className={tableHead}>Label</th>}
               {columns.map((column) => (
-                <th key={column} className={tableHead}>
+                <th key={column} className={cn(tableHead, "truncate")} title={column}>
                   {column}
                 </th>
               ))}
@@ -119,29 +150,36 @@ export function BatchTable({
                   key={row.item.source}
                   onClick={() => onOpen(i)}
                   className={cn(
-                    "cursor-pointer hover:bg-code",
-                    selected === i && "bg-code",
+                    "cursor-pointer transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md",
+                    selected === i && "bg-lift",
                     row.isNew && "animate-rise motion-reduce:animate-none",
                   )}
                 >
                   <td className={tableCell}>
                     <span className={monoDim}>{i + 1}</span>
                   </td>
-                  <td className={cn(tableCell, "max-w-[380px] text-ink")} title={input}>
+                  <td className={cn(tableCell, "max-w-none text-ink")} title={input}>
                     {input}
                   </td>
-                  <td className={tableCell}>
-                    {questionCount > 1 ? (
-                      <span className={monoDim}>{questionCount} questions</span>
-                    ) : (
-                      Object.values(row.item.truth)[0]
-                    )}
-                  </td>
+                  {labelled && (
+                    <td className={tableCell}>
+                      {questionCount > 1 ? (
+                        <span className={monoDim}>{questionCount} questions</span>
+                      ) : (
+                        Object.values(row.item.truth)[0]
+                      )}
+                    </td>
+                  )}
                   {columns.map((column, k) => {
                     const side = row.sides[k];
                     return (
                       side && (
-                        <ResultCell key={column} response={side.response} truth={row.item.truth} />
+                        <ResultCell
+                          key={column}
+                          response={side.response}
+                          truth={row.item.truth}
+                          ms={side.ms}
+                        />
                       )
                     );
                   })}

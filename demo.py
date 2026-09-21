@@ -209,7 +209,7 @@ def sample(name, fresh=False):
         cases = eval.typesafe_rows()
         case, node, doc, qs, truth = cases[deal(name, len(cases), fresh)]
         truth = {k: {"true": "yes", "false": "no"}.get(v, v) for k, v in truth.items()}
-        src = "TypeSafe · " + case
+        src = f"TypeSafe · {case} · {node}"
         pool = len(cases)
         left = len(DECKS[name])
         return {
@@ -341,7 +341,7 @@ def runs():
             order = next((x["sides"] for x in lines if x.get("sides")), None)
             if order and lines[0].get("mode") != "gen":  # compare: the order the models were picked in
                 sides.sort(key=lambda b: order.index(b) if b in order else len(order))
-            items = len({(x["source"], json.dumps(x["state"], sort_keys=True)) for x in lines})
+            items = len({(x["source"], json.dumps((x["state"], x["questions"]), sort_keys=True)) for x in lines})
             score = {b: [0, 0] for b in sides}
             for x in lines:
                 for qid, t in x["truth"].items():
@@ -367,7 +367,8 @@ def run_rows(name):
     items = {}
     with open(path) as fh:
         for x in map(json.loads, filter(str.strip, fh)):
-            key = (x["source"], json.dumps(x["state"], sort_keys=True))
+            parts = (x["state"], x["questions"])  # two TypeSafe steps can share one document
+            key = (x["source"], json.dumps(parts, sort_keys=True))
             it = items.setdefault(
                 key, {"it": {k: x[k] for k in ("state", "questions", "truth", "source")}, "sides": {}}
             )

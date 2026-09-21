@@ -103,6 +103,8 @@ export interface GeneratedText {
 
 export interface Recording {
   verdict: ReactNode;
+  /** The batch row this came from, so a replay can point at it. */
+  row?: number;
   sides?: RecordedSide[];
   readout?: RecordedSide;
   written?: GeneratedText;

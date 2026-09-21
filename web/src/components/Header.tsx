@@ -53,7 +53,7 @@ export function Header({ mode, onModeChange, preference, onPreferenceChange }: H
               className={cn(
                 "grid size-7 place-items-center rounded-full border-0 transition-colors",
                 preference === theme.preference
-                  ? "bg-code text-ink"
+                  ? "bg-lift text-ink"
                   : "bg-transparent text-dim hover:text-ink",
               )}
             >

@@ -38,7 +38,7 @@ function agreementRate(rows: Row[]) {
   let same = 0;
   let compared = 0;
   for (const row of rows) {
-    for (const id of Object.keys(row.item.truth)) {
+    for (const id of Object.keys(row.item.questions)) {
       const answers = row.sides.map((side) => side.response.answers[id]);
       const present = answers.filter((answer): answer is Answer => answer !== undefined);
       if (present.length < answers.length) continue;
@@ -89,7 +89,8 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
   if (!first) return null;
   const stats = columns.map((_, k) => columnStats(rows, k));
   const stat = (k: number) => stats[k] ?? columnStats([], k);
-  const byQuestion = Object.keys(first.item.truth).length > 1 || stat(0).total > rows.length;
+  const labelled = stat(0).total > 0;
+  const byQuestion = Object.keys(first.item.questions).length > 1;
   const shares = stats.map((s) => (s.total ? s.correct / s.total : 0));
   const bestShare = Math.max(...shares);
   const singleBestShare = shares.filter((share) => share === bestShare).length === 1;
@@ -100,7 +101,7 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
         <tbody>
           <tr>
             <th className="pr-2 pb-2 text-left font-normal text-dim">
-              {dataset} · {rows.length} items
+              {dataset} · {rows.length} {rows.length === 1 ? "item" : "items"}
             </th>
             {columns.map((column) => (
               <th key={column} className="px-2 pb-2 text-left font-semibold text-ink">
@@ -108,14 +109,13 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
               </th>
             ))}
           </tr>
-          <StatRow
-            label={byQuestion ? "Questions right" : "Right"}
-            info="How often the model's answer matched the dataset's own label, which people wrote. Higher is better."
-            columns={columns}
-            values={shares}
-            cell={(k) => {
-              const share = stat(k).total ? stat(k).correct / stat(k).total : 0;
-              return (
+          {labelled && (
+            <StatRow
+              label={byQuestion ? "Questions right" : "Right"}
+              info="How often the model's answer matched the dataset's own label, which people wrote. Higher is better."
+              columns={columns}
+              values={shares}
+              cell={(k) => (
                 <>
                   {percent(stat(k).correct, stat(k).total)}{" "}
                   <span className={labelText}>
@@ -125,16 +125,16 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
                     <span
                       className={cn(
                         "block h-full rounded-full transition-[width] duration-500",
-                        share === bestShare && singleBestShare ? "bg-good" : "bg-dim",
+                        shares[k] === bestShare && singleBestShare ? "bg-good" : "bg-dim",
                       )}
-                      style={{ width: `${share * 100}%` }}
+                      style={{ width: `${(shares[k] ?? 0) * 100}%` }}
                     />
                   </span>
                 </>
-              );
-            }}
-          />
-          {byQuestion && (
+              )}
+            />
+          )}
+          {labelled && byQuestion && (
             <StatRow
               label="Items fully right"
               info="Items where every question on it was answered right."

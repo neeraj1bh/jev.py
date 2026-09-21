@@ -57,9 +57,11 @@ export function ModelsPicker({
       menuClassName="w-[340px]"
       button={
         <>
-          <i className="size-[7px] flex-none rounded-full bg-good" />
           {selected.length} models
-          <span className="truncate text-[12.5px] text-dim">{names.join(", ")}</span>
+          <span className="truncate text-[12.5px] text-dim">
+            {names.slice(0, 2).join(", ")}
+            {names.length > 2 && ` +${names.length - 2}`}
+          </span>
         </>
       }
     >

@@ -6,6 +6,7 @@
   --color-paper: #fbfbfa;
   --color-panel: #ffffff;
   --color-code: #f3f4f6;
+  --color-lift: #f0f1f3;
   --color-rule: #e4e5e7;
   --color-ink: #1a1c1f;
   --color-ink-2: #1a1c1f;
@@ -67,6 +68,7 @@
     --color-paper: #101214;
     --color-panel: #171a1e;
     --color-code: #0d0f11;
+    --color-lift: #21252b;
     --color-rule: #262a30;
     --color-ink: #e8eaed;
     --color-ink-2: #e8eaed;
