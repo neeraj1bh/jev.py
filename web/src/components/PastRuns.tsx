@@ -1,6 +1,7 @@
 import { cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
 import type { RunKind, SavedRun } from "../types";
 import { Dropdown, MenuItem } from "./Menu";
+import { Skeleton } from "./Skeleton";
 
 export type KindFilter = RunKind | "";
 
@@ -22,6 +23,7 @@ const runTime = (name: string) => name.slice(5, 16).replace(/-(\d\d)-(\d\d)$/, "
 
 interface PastRunsProps {
   runs: SavedRun[];
+  loading: boolean;
   page: number;
   kind: KindFilter;
   menuOpen: boolean;
@@ -77,7 +79,17 @@ export function PastRuns(props: PastRunsProps) {
             </tr>
           </thead>
           <tbody>
-            {shown.length === 0 && (
+            {props.loading &&
+              ["a", "b", "c", "d", "e", "f"].map((key) => (
+                <tr key={key}>
+                  {["w-20", "w-32", "w-56", "w-8"].map((width) => (
+                    <td key={width} className={tableCell}>
+                      <Skeleton className={width} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            {!props.loading && shown.length === 0 && (
               <tr>
                 <td colSpan={4} className={tableCell}>
                   Nothing saved yet{kind && " of this kind"}.

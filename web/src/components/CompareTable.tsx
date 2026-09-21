@@ -3,6 +3,7 @@ import { answerLabel, matchesLabel } from "../scoring";
 import { cn, labelText, panelBox, tableHead } from "../styles";
 import type { Answer, PanelState } from "../types";
 import { CheckMark } from "./CheckMark";
+import { Skeleton } from "./Skeleton";
 
 /** The probability behind the answer shown, or null for a written answer with no probabilities. */
 function confidence(answer: Answer) {
@@ -31,7 +32,12 @@ function ModelHeading({ name, state }: { name: string; state: PanelState }) {
 function AnswerCell({ state, id, truth }: { state: PanelState; id: string; truth?: string }) {
   const cell = "border-b border-rule px-2 py-2 align-top";
   if (state.status === "running" && !state.response) {
-    return <td className={cn(cell, "text-dim")}>…</td>;
+    return (
+      <td className={cell}>
+        <Skeleton className="mt-1 w-14" />
+        <Skeleton className="mt-2 h-1 w-16" />
+      </td>
+    );
   }
   if (state.status === "idle") return <td className={cell} />;
   const answer = state.response?.answers[id];
@@ -101,7 +107,7 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="[&>tr:last-child>td]:border-b-0">
           {questionIds.map((id) => (
             <tr
               key={id}

@@ -3,6 +3,7 @@ import { EXAMPLE_NAMES, EXAMPLES, type ExampleName } from "../examples";
 import { chipButton, cn } from "../styles";
 import type { Backend, Dataset } from "../types";
 import { Dropdown, MenuHeading, MenuItem } from "./Menu";
+import { Skeleton } from "./Skeleton";
 
 export type InputSource = "examples" | "dataset";
 
@@ -91,6 +92,12 @@ export function InputBar(props: InputBarProps) {
             button={dataset || "Choose a set"}
           >
             <MenuHeading>Public datasets</MenuHeading>
+            {props.datasets.length === 0 &&
+              ["w-32", "w-24", "w-36", "w-28"].map((width) => (
+                <div key={width} className="px-2.5 py-2">
+                  <Skeleton className={width} />
+                </div>
+              ))}
             {props.datasets.map((set) => {
               const blocker = blockingBackend(set, props.pickedBackends);
               return (

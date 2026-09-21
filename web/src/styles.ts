@@ -14,8 +14,9 @@ export const chipButton = (active = false) =>
       ? "border-ink bg-ink text-paper"
       : "border-rule bg-transparent text-dim hover:enabled:border-dim",
   );
+// A sticky cell drops a collapsed border, so the rule under the header is an inset shadow.
 export const tableHead =
-  "sticky top-0 border-b border-rule bg-panel px-2 py-1.5 text-left font-medium text-dim";
+  "sticky top-0 bg-panel px-2 py-1.5 text-left font-medium text-dim shadow-[inset_0_-1px_0_var(--color-rule)]";
 export const tableCell =
   "max-w-[260px] overflow-hidden border-b border-rule px-2 py-[7px] align-top text-ellipsis whitespace-nowrap";
 export const monoDim = "font-mono text-xs text-dim";

@@ -91,6 +91,7 @@ export default function App() {
   const [replayRow, setReplayRow] = useState<number | null>(null);
   const [savedRuns, setSavedRuns] = useState<SavedRun[]>([]);
   const [runsPage, setRunsPage] = useState(1);
+  const [runsLoading, setRunsLoading] = useState(false);
   const [runsKind, setRunsKind] = usePersistentState<KindFilter>("runs-kind", "", isKindFilter);
 
   const rowsRef = useRef<Row[]>([]);
@@ -200,7 +201,10 @@ export default function App() {
     setTableVisible(false);
     setSummaryVisible(false);
     if (next === "past") {
-      fetchRuns().then(setSavedRuns);
+      setRunsLoading(true);
+      fetchRuns()
+        .then(setSavedRuns)
+        .finally(() => setRunsLoading(false));
       return;
     }
     clearBatch();
@@ -769,6 +773,7 @@ export default function App() {
       {mode === "past" ? (
         <PastRuns
           runs={savedRuns}
+          loading={runsLoading}
           page={runsPage}
           kind={runsKind}
           menuOpen={openMenu === "kind"}

@@ -4,6 +4,7 @@ import { isOffline, location, pickerSubtitle, statusText, TEXTLESS } from "../ba
 import type { Backend, BackendGroup } from "../types";
 import { CheckMark } from "./CheckMark";
 import { Dropdown, MenuHeading, MenuHint, MenuItem } from "./Menu";
+import { Skeleton } from "./Skeleton";
 
 const GROUPS: [BackendGroup, string][] = [
   ["local", "On this machine"],
@@ -56,13 +57,17 @@ export function ModelsPicker({
       buttonClassName="max-w-[min(560px,60vw)]"
       menuClassName="w-[340px]"
       button={
-        <>
-          {selected.length} models
-          <span className="truncate text-[12.5px] text-dim">
-            {names.slice(0, 2).join(", ")}
-            {names.length > 2 && ` +${names.length - 2}`}
-          </span>
-        </>
+        backends.length === 0 ? (
+          <Skeleton className="my-1 w-44" />
+        ) : (
+          <>
+            {selected.length} models
+            <span className="truncate text-[12.5px] text-dim">
+              {names.slice(0, 2).join(", ")}
+              {names.length > 2 && ` +${names.length - 2}`}
+            </span>
+          </>
+        )
       }
     >
       <MenuHeading>Compare 2 to 6 · click to add or remove</MenuHeading>

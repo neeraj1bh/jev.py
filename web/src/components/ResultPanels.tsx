@@ -3,6 +3,7 @@ import type { PanelState } from "../types";
 import { Answers } from "./Answers";
 import { CompareTable } from "./CompareTable";
 import { Panel } from "./Panel";
+import { AnswerSkeleton } from "./Skeleton";
 
 const idle: PanelState = { status: "idle", footer: "Waiting to run." };
 
@@ -25,6 +26,7 @@ const GENERATE_PANELS = [
 ] as const;
 
 function PanelAnswers({ state, truth }: { state?: PanelState; truth?: Record<string, string> }) {
+  if (state?.status === "running" && !state.response) return <AnswerSkeleton />;
   if (!state?.response) return null;
   // Keyed by run so the probability bars grow again on every new result.
   return <Answers key={`${state.startedAt}-${state.ms}`} response={state.response} truth={truth} />;
