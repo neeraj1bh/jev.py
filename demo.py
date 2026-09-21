@@ -32,7 +32,6 @@ from jev import DEFAULT_MODEL, SYSTEM, Jev, _options, _text
 from remote import BACKENDS, EXTRAS, Remote, env
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PAGE = os.path.join(HERE, "demo.html")
 WEB = os.path.join(HERE, "web", "dist")  # the built page; see web/
 MODELS = os.environ.get("JEV_MODELS") or os.path.join(HERE, "models")
 LOCAL = {  # tested models: weights on disk, GB
@@ -602,11 +601,14 @@ def main(model_id=DEFAULT_MODEL, port=8080):
             path = urllib.parse.urlparse(self.path).path
             file = os.path.normpath(os.path.join(WEB, path.lstrip("/")))
             if path != "/" and file.startswith(WEB + os.sep) and os.path.isfile(file):
+                kind = mimetypes.guess_type(file)[0] or "application/octet-stream"
                 with open(file, "rb") as f:
-                    return self._send(200, f.read(), mimetypes.guess_type(file)[0] or "application/octet-stream")
+                    return self._send(200, f.read(), kind)
             index = os.path.join(WEB, "index.html")
-            page = PAGE if path == "/old" or not os.path.exists(index) else index
-            with open(page, encoding="utf-8") as f:
+            if not os.path.exists(index):
+                hint = "The page is not built yet. Run: cd web && pnpm install && pnpm build\n"
+                return self._send(503, hint.encode(), "text/plain; charset=utf-8")
+            with open(index, encoding="utf-8") as f:
                 html = f.read().replace("{{model}}", model_id)
             self._send(200, html.encode(), "text/html; charset=utf-8")
 
