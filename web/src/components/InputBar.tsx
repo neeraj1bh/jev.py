@@ -1,5 +1,5 @@
 import { blockingBackend } from "../backends";
-import { EXAMPLE_NAMES, type ExampleName } from "../examples";
+import { EXAMPLE_NAMES, EXAMPLES, type ExampleName } from "../examples";
 import { chipButton, cx } from "../styles";
 import type { Backend, Dataset } from "../types";
 import { Dropdown, MenuHeading, MenuItem } from "./Menu";
@@ -18,6 +18,8 @@ interface InputBarProps {
   onSourceChange: (source: InputSource) => void;
   example: ExampleName | "";
   onExampleChange: (name: ExampleName) => void;
+  exampleMenuOpen: boolean;
+  onExampleMenuOpenChange: (open: boolean) => void;
   dataset: string;
   datasets: Dataset[];
   onDatasetChange: (name: string) => void;
@@ -58,17 +60,26 @@ export function InputBar(props: InputBarProps) {
         ))}
       </div>
 
-      {source === "examples" &&
-        EXAMPLE_NAMES.map((name) => (
-          <button
-            key={name}
-            type="button"
-            className={chipButton(name === props.example)}
-            onClick={() => props.onExampleChange(name)}
-          >
-            {name}
-          </button>
-        ))}
+      {source === "examples" && (
+        <Dropdown
+          compact
+          active={!!props.example}
+          open={props.exampleMenuOpen}
+          onOpenChange={props.onExampleMenuOpenChange}
+          button={props.example || "Choose an example"}
+        >
+          <MenuHeading>Built-in examples</MenuHeading>
+          {EXAMPLE_NAMES.map((name) => (
+            <MenuItem
+              key={name}
+              label={name}
+              detail={`${Object.keys(EXAMPLES[name].questions).length} questions`}
+              selected={name === props.example}
+              onSelect={() => props.onExampleChange(name)}
+            />
+          ))}
+        </Dropdown>
+      )}
 
       {source === "dataset" && (
         <>

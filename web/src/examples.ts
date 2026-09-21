@@ -109,3 +109,5 @@ export const EXAMPLES = {
 export type ExampleName = keyof typeof EXAMPLES;
 
 export const EXAMPLE_NAMES = Object.keys(EXAMPLES) as ExampleName[];
+
+export const isExampleName = (name: string): name is ExampleName => name in EXAMPLES;

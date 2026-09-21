@@ -1,19 +1,11 @@
-import "./index.css";
-
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import App from "./App";
+import { readPreference, resolveTheme } from "./hooks/useTheme";
+import "./index.css";
 
-const saved = (() => {
-  try {
-    return localStorage.theme as string | undefined;
-  } catch {
-    return undefined;
-  }
-})();
-document.documentElement.dataset.theme =
-  saved ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+document.documentElement.dataset.theme = resolveTheme(readPreference());
 
 const root = document.getElementById("root");
 if (!root) throw new Error("index.html has no #root element");

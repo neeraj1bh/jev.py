@@ -1,16 +1,42 @@
 import { useEffect, useState } from "react";
 
+export type ThemePreference = "light" | "dark" | "system";
+
+const STORAGE_KEY = "theme";
+const darkQuery = () => matchMedia("(prefers-color-scheme: dark)");
+
+export function readPreference(): ThemePreference {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "light" || stored === "dark" || stored === "system") return stored;
+  } catch {
+    // Storage can be blocked; fall back to the device setting.
+  }
+  return "system";
+}
+
+export const resolveTheme = (preference: ThemePreference) =>
+  preference === "system" ? (darkQuery().matches ? "dark" : "light") : preference;
+
+/** Light, dark, or the device's setting, kept in sync when the device switches. */
 export function useTheme() {
-  const [theme, setTheme] = useState(document.documentElement.dataset.theme ?? "light");
+  const [preference, setPreference] = useState<ThemePreference>(readPreference);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    const apply = () => {
+      document.documentElement.dataset.theme = resolveTheme(preference);
+    };
+    apply();
     try {
-      localStorage.theme = theme;
+      localStorage.setItem(STORAGE_KEY, preference);
     } catch {
-      // Storage can be blocked; the theme still applies for this visit.
+      // The choice still applies for this visit.
     }
-  }, [theme]);
+    if (preference !== "system") return;
+    const query = darkQuery();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, [preference]);
 
-  return { theme, toggle: () => setTheme((current) => (current === "dark" ? "light" : "dark")) };
+  return { preference, setPreference };
 }

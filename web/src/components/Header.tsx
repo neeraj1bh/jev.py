@@ -1,4 +1,5 @@
-import { cx, labelText } from "../styles";
+import type { ThemePreference } from "../hooks/useTheme";
+import { cx } from "../styles";
 import type { Mode } from "../types";
 
 const TABS: [Mode, string][] = [
@@ -13,14 +14,20 @@ const LEDE: Record<Mode, string> = {
   past: "Batches you ran, saved on this machine.",
 };
 
+const THEME_OPTIONS: [ThemePreference, string][] = [
+  ["light", "Light"],
+  ["dark", "Dark"],
+  ["system", "Device"],
+];
+
 interface HeaderProps {
   mode: Mode;
   onModeChange: (mode: Mode) => void;
-  theme: string;
-  onThemeToggle: () => void;
+  preference: ThemePreference;
+  onPreferenceChange: (preference: ThemePreference) => void;
 }
 
-export function Header({ mode, onModeChange, theme, onThemeToggle }: HeaderProps) {
+export function Header({ mode, onModeChange, preference, onPreferenceChange }: HeaderProps) {
   return (
     <>
       <header className="flex items-center gap-3">
@@ -30,14 +37,24 @@ export function Header({ mode, onModeChange, theme, onThemeToggle }: HeaderProps
         <p className="m-0 ml-1.5 min-w-0 flex-1 text-sm text-dim max-[860px]:hidden">
           {LEDE[mode]}
         </p>
-        <button
-          type="button"
-          className={cx(labelText, "rounded-full border border-rule bg-transparent px-3 py-1")}
-          title="Switch light and dark"
-          onClick={onThemeToggle}
-        >
-          {theme === "dark" ? "Light" : "Dark"}
-        </button>
+        <div className="inline-flex rounded-full border border-rule p-0.5" title="Theme">
+          {THEME_OPTIONS.map(([option, name]) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={preference === option}
+              onClick={() => onPreferenceChange(option)}
+              className={cx(
+                "rounded-full border-0 px-2.5 py-0.5 text-[12.5px] transition-colors",
+                preference === option
+                  ? "bg-code text-ink"
+                  : "bg-transparent text-dim hover:text-ink",
+              )}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
       </header>
       <nav className="mt-[18px] mb-4 flex gap-[22px] border-b border-rule max-[600px]:[scrollbar-width:none] max-[600px]:overflow-x-auto max-[600px]:overflow-y-hidden">
         {TABS.map(([tab, title]) => (

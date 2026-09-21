@@ -13,7 +13,7 @@ import { type KindFilter, PastRuns } from "./components/PastRuns";
 import { CompareView, GenerateView } from "./components/ResultPanels";
 import { Summary } from "./components/Summary";
 import { Toast } from "./components/Toast";
-import { EXAMPLES, type ExampleName } from "./examples";
+import { EXAMPLES, type ExampleName, isExampleName } from "./examples";
 import { useBackends } from "./hooks/useBackends";
 import { idlePanel, runningPanel, usePanels } from "./hooks/usePanels";
 import { useTheme } from "./hooks/useTheme";
@@ -618,9 +618,15 @@ export default function App() {
     const models = saved.backends;
     const target: Mode = saved.mode === "gen" ? "generate" : "compare";
     if (mode !== target) switchMode(target);
-    setDataset(saved.dataset);
-    setSource("dataset");
-    setExample("");
+    if (isExampleName(saved.dataset)) {
+      setSource("examples");
+      setExample(saved.dataset);
+      setDataset("");
+    } else {
+      setSource("dataset");
+      setExample("");
+      setDataset(saved.dataset);
+    }
 
     const baseId = (id: string) => id.replace(/#text$/, "");
     const known = models.map(baseId).filter((id) => backends[id]);
@@ -727,8 +733,8 @@ export default function App() {
       <Header
         mode={mode}
         onModeChange={switchMode}
-        theme={theme.theme}
-        onThemeToggle={theme.toggle}
+        preference={theme.preference}
+        onPreferenceChange={theme.setPreference}
       />
 
       {mode === "past" ? (
@@ -793,7 +799,12 @@ export default function App() {
               source={source}
               onSourceChange={chooseSource}
               example={dataset ? "" : example}
-              onExampleChange={chooseExample}
+              onExampleChange={(name) => {
+                setOpenMenu("");
+                chooseExample(name);
+              }}
+              exampleMenuOpen={openMenu === "example"}
+              onExampleMenuOpenChange={menuHandler("example")}
               dataset={dataset}
               datasets={datasets}
               onDatasetChange={chooseDataset}
@@ -828,7 +839,7 @@ export default function App() {
             {verdict}
           </p>
 
-          {summaryVisible && <Summary rows={rows} columns={columns} dataset={dataset} />}
+          {summaryVisible && <Summary rows={rows} columns={columns} dataset={inputName} />}
 
           <div ref={panelsRef} hidden={!panelsVisible}>
             {isCompare ? (
@@ -864,7 +875,7 @@ export default function App() {
           direction={openItem.direction}
           rows={rows}
           columns={columns}
-          dataset={dataset}
+          dataset={inputName}
           onClose={() => setOpenItem((previous) => previous && { ...previous, open: false })}
           onNavigate={(index) => showItem(index, false)}
         />

@@ -175,7 +175,16 @@ latency figure. DeepSeek is V4.1-Flash, hosted.
 
 ## Demo
 
-`uv run demo.py`, then open <http://localhost:8080>. Two modes:
+Build the page once, then serve it with the backends:
+
+```bash
+cd web && pnpm install && pnpm build && cd ..   # Node 20.19+ and pnpm
+uv run demo.py                                   # http://localhost:8080
+```
+
+While changing the page, `pnpm dev` in `web/` serves it on <http://localhost:3000> with live
+reload and passes API calls to `demo.py`. `pnpm check` runs Biome, the type check and the build.
+Two modes:
 
 - **Generate vs readout.** One local model answers the same questions two ways: writing JSON
   token by token on the left, reading the logits in one pass on the right.
@@ -260,7 +269,7 @@ providers return probabilities, and how many, is in [docs/providers.md](docs/pro
 | `jev.py` | the model wrapper, the HTTP server and the self-check — the whole idea |
 | `eval.py` | public evaluation, results in `results/` |
 | `readout.py` | letter vs option-text readout, and how often answers flip when the options are reversed |
-| `demo.py`, `demo.html` | the side-by-side page |
+| `demo.py`, `web/` | the demo server and its React page |
 | `remote.py`, `.env.example` | hosted backends and where their keys go |
 | `docs/providers.md` | which hosted providers return probabilities |
 
