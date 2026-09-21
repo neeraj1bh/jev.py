@@ -12,4 +12,13 @@ results/typesafe/
 models/
 results/eval-set.json
 data/
-temp/
+local/
+
+# model weights, wherever they are saved
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.onnx
+*.ckpt
