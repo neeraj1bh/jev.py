@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export type Mode = "compare" | "generate" | "past";
 export type RunKind = "cmp" | "gen";
-export type BackendGroup = "local" | "server" | "hosted";
+export type BackendGroup = "local" | "server" | "hosted" | "gateway";
 
 export interface Backend {
   id: string;
@@ -17,6 +17,8 @@ export interface Backend {
   url?: string;
   key?: string;
   max?: number | null;
+  /** For gateway models: who made the model, e.g. "qwen". */
+  provider?: string;
 }
 
 export interface Dataset {

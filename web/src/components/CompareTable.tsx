@@ -34,8 +34,10 @@ function AnswerCell({ state, id, truth }: { state: PanelState; id: string; truth
   if (state.status === "running" && !state.response) {
     return (
       <td className={cell}>
-        <Skeleton className="mt-1 w-14" />
-        <Skeleton className="mt-2 h-1 w-16" />
+        <span className="flex items-center gap-3">
+          <Skeleton className="w-14" />
+          <Skeleton className="ml-auto h-1 w-12" />
+        </span>
       </td>
     );
   }
@@ -53,26 +55,30 @@ function AnswerCell({ state, id, truth }: { state: PanelState; id: string; truth
   const correct = truth === undefined ? null : matchesLabel(label, truth);
   return (
     <td className={cell}>
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 font-medium",
-          correct === null ? "text-ink" : correct ? "text-good" : "text-warn",
-        )}
-      >
-        {shown}
-        {correct !== null && <CheckMark ok={correct} />}
-      </span>
-      {probability !== null && (
-        <span className="mt-1 flex items-center gap-2">
-          <span className="h-1 w-16 overflow-hidden rounded-full bg-bar">
-            <span
-              className="block h-full rounded-full bg-dim"
-              style={{ width: `${probability * 100}%` }}
-            />
-          </span>
-          <span className="font-mono text-xs text-dim tabular-nums">{probability.toFixed(2)}</span>
+      <span className="flex items-center gap-3">
+        <span
+          className={cn(
+            "inline-flex min-w-0 items-center gap-1 truncate font-medium",
+            correct === null ? "text-ink" : correct ? "text-good" : "text-warn",
+          )}
+        >
+          {shown}
+          {correct !== null && <CheckMark ok={correct} />}
         </span>
-      )}
+        {probability !== null && (
+          <span className="ml-auto flex flex-none items-center gap-2">
+            <span className="h-1 w-12 overflow-hidden rounded-full bg-bar">
+              <span
+                className="block h-full rounded-full bg-dim"
+                style={{ width: `${probability * 100}%` }}
+              />
+            </span>
+            <span className="font-mono text-xs text-dim tabular-nums">
+              {probability.toFixed(2)}
+            </span>
+          </span>
+        )}
+      </span>
     </td>
   );
 }

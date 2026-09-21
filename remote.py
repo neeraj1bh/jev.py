@@ -28,7 +28,7 @@ BACKENDS = {
     "openrouter": (
         "OPENROUTER_API_KEY",
         "https://openrouter.ai/api/v1/chat/completions",
-        "deepseek/deepseek-chat",
+        "openai/gpt-4o-mini",  # routes to a provider that returns log-probabilities
     ),
     "openai": ("OPENAI_API_KEY", "https://api.openai.com/v1/chat/completions", "gpt-4o-mini"),
     "typesafe": ("TYPESAFE_API_KEY", "https://api.typesafe.ai/v1/systemone", "jev-latest"),
@@ -45,6 +45,8 @@ BACKENDS = {
 EXTRAS = {
     "deepseek": {"thinking": {"type": "disabled"}, "temperature": 1},
     "moonshot": {"thinking": {"type": "disabled"}, "temperature": 0.6},
+    # route only to providers that return top_logprobs; others would silently drop them
+    "openrouter": {"temperature": 0, "provider": {"require_parameters": True}},
 }
 CONCURRENCY = {"moonshot": 2, "llamacpp": 4}  # llamacpp: match llama-server -np
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { fetchBackends, fetchDatasets } from "../api";
+import { fetchBackends, fetchDatasets, fetchGateway } from "../api";
 import { isUsable, TEXTLESS } from "../backends";
 import type { Backend, Dataset } from "../types";
 import { isString, isStringList, usePersistentState } from "./usePersistentState";
@@ -55,12 +55,18 @@ export function useBackends() {
     [setCompareModels, setGenerateModel],
   );
 
-  const reload = useCallback(async () => apply(await fetchBackends()), [apply]);
+  /** Direct backends, plus the gateway's catalog when it can be fetched. */
+  const fetchAll = useCallback(async () => {
+    const [direct, gateway] = await Promise.all([fetchBackends(), fetchGateway().catch(() => [])]);
+    return [...direct, ...gateway];
+  }, []);
+
+  const reload = useCallback(async () => apply(await fetchAll()), [apply, fetchAll]);
 
   useEffect(() => {
-    fetchBackends().then(apply);
+    fetchAll().then(apply);
     fetchDatasets().then(setDatasets);
-  }, [apply]);
+  }, [apply, fetchAll]);
 
   const markDatasetLocal = (name: string) =>
     setDatasets((all) =>

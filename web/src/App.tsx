@@ -8,7 +8,8 @@ import { Header } from "./components/Header";
 import { InputBar, type InputSource } from "./components/InputBar";
 import { ItemDialog } from "./components/ItemDialog";
 import { KeyDialog } from "./components/KeyDialog";
-import { ModelPicker, ModelsPicker } from "./components/ModelPicker";
+import { ModelPicker } from "./components/ModelPicker";
+import { ModelsPicker } from "./components/ModelsPicker";
 import { type KindFilter, PastRuns } from "./components/PastRuns";
 import { CompareView, GenerateView } from "./components/ResultPanels";
 import { Summary } from "./components/Summary";
@@ -79,9 +80,12 @@ export default function App() {
   const [batchProgress, setBatchProgress] = useState("");
   const [batchSize, setBatchSize] = usePersistentState("batch-size", "50", isString);
   const [editing, setEditing] = useState(false);
-  const [keyRequest, setKeyRequest] = useState<{ backend: string; forCompare: boolean } | null>(
-    null,
-  );
+  const [keyRequest, setKeyRequest] = useState<{
+    backend: string;
+    forCompare: boolean;
+    /** The model to add once the key works, when it differs from the keyed backend. */
+    add?: string;
+  } | null>(null);
   const [openItem, setOpenItem] = useState<{
     index: number;
     direction: "" | "forward" | "back";
@@ -107,6 +111,7 @@ export default function App() {
   const runKind: RunKind = mode === "generate" ? "gen" : "cmp";
   const compareNames = savedNames ?? compareModels.map((id) => backends[id]?.label ?? id);
   const inputName = dataset || example || "edited input";
+  const labels = item && Object.keys(item.truth).length > 0 ? item.truth : undefined;
   const questionIds = (() => {
     try {
       const questions: unknown = JSON.parse(questionsText);
@@ -213,13 +218,14 @@ export default function App() {
     reload();
   }
 
-  function askForKey(backend: string, forCompare: boolean) {
+  function askForKey(backend: string, forCompare: boolean, add?: string) {
     setOpenMenu("");
-    setKeyRequest({ backend, forCompare });
+    setKeyRequest({ backend, forCompare, add });
   }
 
-  async function onKeySaved(backend: string) {
+  async function onKeySaved(keyed: string) {
     const forCompare = keyRequest?.forCompare ?? true;
+    const backend = keyRequest?.add ?? keyed;
     setKeyRequest(null);
     if (forCompare)
       setCompareModels((models) =>
@@ -264,6 +270,10 @@ export default function App() {
     const adding = !compareModels.includes(id);
     if (adding && !backend.ready && backend.group === "hosted") {
       askForKey(id, true);
+      return;
+    }
+    if (adding && !backend.ready && backend.group === "gateway") {
+      askForKey("remote:openrouter", true, id);
       return;
     }
     const next = adding ? [...compareModels, id] : compareModels.filter((model) => model !== id);
@@ -869,7 +879,7 @@ export default function App() {
             )}
           </div>
 
-          <p className="mt-[18px] mb-0 min-h-[26px] text-base text-ink [&_b]:text-good">
+          <p className="mt-[18px] mb-0 min-h-[26px] text-sm text-ink [&_b]:font-semibold [&_b]:text-good">
             {verdict}
           </p>
 
@@ -881,14 +891,14 @@ export default function App() {
                 names={compareNames}
                 panels={panels}
                 questionIds={questionIds}
-                truth={item?.truth}
+                truth={labels}
               />
             ) : (
               <GenerateView
                 panels={panels}
                 savedNames={savedNames}
                 writtenAsAnswers={writtenAsAnswers}
-                truth={item?.truth}
+                truth={labels}
               />
             )}
           </div>

@@ -28,6 +28,7 @@ async function postOrThrow<T>(path: string, body: unknown): Promise<T> {
 }
 
 export const fetchBackends = () => getJson<Backend[]>("/v1/backends");
+export const fetchGateway = () => getJson<Backend[]>("/v1/gateway");
 export const fetchDatasets = () => getJson<Dataset[]>("/v1/datasets");
 export const fetchRuns = () => getJson<SavedRun[]>("/v1/runs");
 export const fetchProgress = () =>

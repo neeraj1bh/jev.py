@@ -326,6 +326,11 @@ def right(a, truth):
     return answer(a).lower().strip() == norm.get(str(truth).lower(), str(truth).lower().strip())
 
 
+def item_key(x):
+    """One logged item: two TypeSafe steps can share a document, so the questions count too."""
+    return x["source"], json.dumps((x["state"], x["questions"]), sort_keys=True)
+
+
 def runs():
     """The saved batches, newest first: set, the two backends, items and each side's score."""
     out = []
@@ -341,7 +346,7 @@ def runs():
             order = next((x["sides"] for x in lines if x.get("sides")), None)
             if order and lines[0].get("mode") != "gen":  # compare: the order the models were picked in
                 sides.sort(key=lambda b: order.index(b) if b in order else len(order))
-            items = len({(x["source"], json.dumps((x["state"], x["questions"]), sort_keys=True)) for x in lines})
+            items = len({item_key(x) for x in lines})
             score = {b: [0, 0] for b in sides}
             for x in lines:
                 for qid, t in x["truth"].items():
@@ -367,10 +372,8 @@ def run_rows(name):
     items = {}
     with open(path) as fh:
         for x in map(json.loads, filter(str.strip, fh)):
-            parts = (x["state"], x["questions"])  # two TypeSafe steps can share one document
-            key = (x["source"], json.dumps(parts, sort_keys=True))
             it = items.setdefault(
-                key, {"it": {k: x[k] for k in ("state", "questions", "truth", "source")}, "sides": {}}
+                item_key(x), {"it": {k: x[k] for k in ("state", "questions", "truth", "source")}, "sides": {}}
             )
             it["sides"][x["backend"]] = {"ms": x["ms"], "res": {"answers": x["answers"]}}
     return list(items.values())
@@ -401,6 +404,42 @@ def memory_gb():
 
 def llamacpp_url():
     return env("LLAMACPP_URL") or BACKENDS["llamacpp"][1]
+
+
+OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"
+GATEWAY = {"at": 0.0, "models": []}  # OpenRouter's catalog, refetched every few hours
+
+
+def gateway():
+    """OpenRouter models that return top log-probabilities, the only ones a readout can use."""
+    if time.time() - GATEWAY["at"] > 6 * 3600:
+        try:
+            with urllib.request.urlopen("https://openrouter.ai/api/v1/models", timeout=10) as r:
+                data = json.load(r)["data"]
+        except (OSError, ValueError, KeyError):
+            return []  # offline: the page simply shows no gateway models
+        usable = [
+            m
+            for m in data
+            if "top_logprobs" in (m.get("supported_parameters") or [])
+            and m.get("architecture", {}).get("output_modalities") == ["text"]  # no image or audio models
+            and not m["name"].endswith("(batch)")
+        ]
+        GATEWAY.update(at=time.time(), models=usable)
+    var = BACKENDS["openrouter"][0]
+    ready = bool(env(var))
+    return [
+        {
+            "id": "openrouter:" + m["id"],
+            "group": "gateway",
+            "provider": m["id"].lstrip("~").split("/")[0],
+            "label": m["name"].split(": ", 1)[-1],
+            "ready": ready,
+            "key": var,
+            "max": 26,
+        }
+        for m in GATEWAY["models"]
+    ]
 
 
 def backends(extra):
@@ -459,9 +498,10 @@ LOADED, LOCK = {}, Lock()  # backend id -> Jev or Remote; at most two local mode
 def get(bid):
     with LOCK:
         if bid not in LOADED:
-            if bid.startswith("remote:"):
+            if bid.startswith(("remote:", "openrouter:")):
+                kind, _, name = bid.partition(":")
                 try:
-                    LOADED[bid] = Remote(bid.split(":", 1)[1])
+                    LOADED[bid] = Remote(name) if kind == "remote" else Remote("openrouter", model=name)
                 except SystemExit as e:  # no key
                     raise ValueError(str(e)) from None
             else:
@@ -492,14 +532,26 @@ def set_key(bid, key, save):
     old = os.environ.get(var)
     os.environ[var] = key
     LOADED.pop(bid, None)
-    try:
-        get(bid).ask({"text": "hello"}, {"q": {"type": "noul", "instructions": "Is this a greeting?"}})
-    except Exception:
+
+    def undo():
         if old is None:
             os.environ.pop(var, None)
         else:
             os.environ[var] = old
         LOADED.pop(bid, None)
+
+    try:
+        if bid == "remote:openrouter":  # its key endpoint checks the key alone, whatever a model can do
+            request = urllib.request.Request(OPENROUTER_KEY_URL, headers={"Authorization": "Bearer " + key})
+            urllib.request.urlopen(request, timeout=15).close()
+        else:
+            get(bid).ask({"text": "hello"}, {"q": {"type": "noul", "instructions": "Is this a greeting?"}})
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):  # only these say the key is wrong; anything else is the model or the route
+            undo()
+            raise
+    except Exception:
+        undo()
         raise
     if save:
         path = os.path.join(HERE, ".env")
@@ -582,6 +634,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
         def do_GET(self):
             if self.path.endswith("/backends"):
                 return self._send(200, json.dumps(backends([model_id])).encode())
+            if self.path.endswith("/gateway"):
+                return self._send(200, json.dumps(gateway()).encode())
             if self.path.endswith("/runs"):
                 return self._send(200, json.dumps(runs()).encode())
             if "/run?" in self.path:
@@ -669,10 +723,14 @@ def main(model_id=DEFAULT_MODEL, port=8080):
             except Exception as e:
                 bid = body.get("backend") or model_id
                 msg = str(e)
-                if isinstance(e, urllib.error.HTTPError) and bid.startswith("remote:"):
+                gateway_model = bid.startswith("openrouter:")
+                if isinstance(e, urllib.error.HTTPError) and gateway_model and e.code == 404:
+                    model = bid.split("/")[-1]
+                    msg = f"OpenRouter has no provider for {model} that returns probabilities right now."
+                elif isinstance(e, urllib.error.HTTPError) and bid.startswith(("remote:", "openrouter:")):
                     LOADED.pop(bid, None)  # the next try re-reads .env
-                    name = next((x["label"] for x in backends([]) if x["id"] == bid), bid)
-                    var = BACKENDS[bid.split(":", 1)[1]][0]
+                    name = next((x["label"] for x in backends([]) if x["id"] == bid), bid.split("/")[-1])
+                    var = BACKENDS["openrouter" if gateway_model else bid.split(":", 1)[1]][0]
                     fix = "That key was rejected." if self.path.endswith("/key") else f"Check {var} in .env."
                     msg = f"{name} answered HTTP {e.code} ({e.reason})" + (
                         f". {fix}" if e.code in (401, 403) else "."

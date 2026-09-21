@@ -15,7 +15,7 @@ function ResultCell({
   ms: number;
 }) {
   if (response.error) return <td className={cn(tableCell, "text-warn")}>error</td>;
-  const time = <span className={cn(monoDim, "mt-0.5 block")}>{ms} ms</span>;
+  const time = <span className={cn(monoDim, "ml-2")}>{ms} ms</span>;
   const ids = Object.keys(truth);
   if (ids.length === 0) {
     const count = Object.keys(response.answers).length;
