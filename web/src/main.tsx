@@ -1,3 +1,6 @@
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
+import { Provider as TooltipProvider } from "@radix-ui/react-tooltip";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -12,6 +15,8 @@ if (!root) throw new Error("index.html has no #root element");
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <TooltipProvider>
+      <App />
+    </TooltipProvider>
   </StrictMode>,
 );

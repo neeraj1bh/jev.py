@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 
 import { ApiError, saveKey } from "../api";
-import { cx, ghostButton, labelText } from "../styles";
+import { cn, ghostButton, labelText } from "../styles";
 import type { Backend } from "../types";
 import { Modal } from "./Modal";
 
@@ -36,7 +36,7 @@ export function KeyDialog({ backend, onCancel, onSaved }: KeyDialogProps) {
     <Modal open onClose={onCancel} className="w-[min(440px,calc(100vw-32px))]">
       <form onSubmit={submit}>
         <h2 className="mt-0 mb-3.5 text-[15px] font-semibold">{backend.label} API key</h2>
-        <label htmlFor="api-key" className={cx(labelText, "mb-1.5 block")}>
+        <label htmlFor="api-key" className={cn(labelText, "mb-1.5 block")}>
           {backend.key}
         </label>
         <input

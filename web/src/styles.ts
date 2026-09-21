@@ -1,4 +1,4 @@
-export const cx = (...classes: (string | false | null | undefined)[]) =>
+export const cn = (...classes: (string | false | null | undefined)[]) =>
   classes.filter(Boolean).join(" ");
 
 export const labelText = "text-[13px] text-dim";
@@ -8,7 +8,7 @@ export const ghostButton =
 export const solidButton =
   "rounded-md border border-ink bg-ink px-5 py-2 font-semibold text-paper hover:enabled:opacity-[0.88] active:enabled:translate-y-px";
 export const chipButton = (active = false) =>
-  cx(
+  cn(
     "rounded-full border px-3 py-1 text-[13.5px]",
     active
       ? "border-ink bg-ink text-paper"

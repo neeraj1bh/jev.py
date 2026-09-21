@@ -16,15 +16,18 @@ import { Toast } from "./components/Toast";
 import { EXAMPLES, type ExampleName, isExampleName } from "./examples";
 import { useBackends } from "./hooks/useBackends";
 import { idlePanel, runningPanel, usePanels } from "./hooks/usePanels";
+import { isString, usePersistentState } from "./hooks/usePersistentState";
 import { useTheme } from "./hooks/useTheme";
 import { useToast } from "./hooks/useToast";
 import { now, runBatchLoop, runEach, timedGenerate, timedReadout } from "./runner";
 import { writtenAnswers } from "./scoring";
-import { cx, ghostButton, labelText, solidButton } from "./styles";
+import { cn, ghostButton, labelText, solidButton } from "./styles";
 import type { Item, Mode, Recording, Request, Row, RunKind, SavedRun } from "./types";
 import { compareVerdict, generateVerdict, rowRecording } from "./verdicts";
 
 const FIRST_EXAMPLE: ExampleName = "Support ticket";
+const isKindFilter = (value: unknown): value is KindFilter =>
+  value === "" || value === "cmp" || value === "gen";
 const HOSTED_PARALLEL = 8;
 
 const prettyJson = (value: unknown) => JSON.stringify(value, null, 2);
@@ -74,7 +77,7 @@ export default function App() {
   const [replaying, setReplaying] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
-  const [batchSize, setBatchSize] = useState("50");
+  const [batchSize, setBatchSize] = usePersistentState("batch-size", "50", isString);
   const [editing, setEditing] = useState(false);
   const [keyRequest, setKeyRequest] = useState<{ backend: string; forCompare: boolean } | null>(
     null,
@@ -87,7 +90,7 @@ export default function App() {
   const [openMenu, setOpenMenu] = useState("");
   const [savedRuns, setSavedRuns] = useState<SavedRun[]>([]);
   const [runsPage, setRunsPage] = useState(1);
-  const [runsKind, setRunsKind] = useState<KindFilter>("");
+  const [runsKind, setRunsKind] = usePersistentState<KindFilter>("runs-kind", "", isKindFilter);
 
   const rowsRef = useRef<Row[]>([]);
   const batchKey = useRef("");
@@ -102,6 +105,14 @@ export default function App() {
   const runKind: RunKind = mode === "generate" ? "gen" : "cmp";
   const compareNames = savedNames ?? compareModels.map((id) => backends[id]?.label ?? id);
   const inputName = dataset || example || "edited input";
+  const questionIds = (() => {
+    try {
+      const questions: unknown = JSON.parse(questionsText);
+      return questions && typeof questions === "object" ? Object.keys(questions) : [];
+    } catch {
+      return [];
+    }
+  })();
   const isLocal = (id: string) => !isHosted(backends[id]);
 
   const menuHandler = useCallback(
@@ -729,7 +740,7 @@ export default function App() {
   const tableNote = `· ${rows.length} done${remaining !== null && batchRunning ? ` · ${remaining} left in the set` : ""}`;
 
   return (
-    <div className="mx-auto max-w-[1120px] px-6 pt-7 pb-14">
+    <div className="mx-auto max-w-[1280px] px-6 pt-7 pb-14 max-[600px]:px-4">
       <Header
         mode={mode}
         onModeChange={switchMode}
@@ -827,7 +838,7 @@ export default function App() {
               onEdit={() => setEditing(true)}
             />
             {item && dataset && (
-              <p className={cx(labelText, "mt-2.5 mb-0")}>
+              <p className={cn(labelText, "mt-2.5 mb-0")}>
                 {dataset} · {item.source} · {questionCount} question{questionCount > 1 ? "s" : ""}
                 {item.options ? `, ${item.options} options` : ""}
                 {batchProgress}
@@ -843,7 +854,12 @@ export default function App() {
 
           <div ref={panelsRef} hidden={!panelsVisible}>
             {isCompare ? (
-              <CompareView names={compareNames} panels={panels} truth={item?.truth} />
+              <CompareView
+                names={compareNames}
+                panels={panels}
+                questionIds={questionIds}
+                truth={item?.truth}
+              />
             ) : (
               <GenerateView
                 panels={panels}

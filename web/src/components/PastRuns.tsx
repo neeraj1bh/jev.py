@@ -1,4 +1,4 @@
-import { cx, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
+import { cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
 import type { RunKind, SavedRun } from "../types";
 import { Dropdown, MenuItem } from "./Menu";
 
@@ -41,11 +41,11 @@ export function PastRuns(props: PastRunsProps) {
   const first = (page - 1) * PAGE_SIZE + 1;
 
   return (
-    <div className={cx(panelBox, "flex min-h-[420px] flex-col")}>
+    <div className={cn(panelBox, "flex flex-col")}>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="m-0 text-sm font-semibold text-ink">
           Past runs{" "}
-          <span className={cx(labelText, "font-normal")}>
+          <span className={cn(labelText, "font-normal")}>
             saved in results/logs/demo · opening one sends no requests
           </span>
         </h2>
@@ -66,7 +66,7 @@ export function PastRuns(props: PastRunsProps) {
           ))}
         </Dropdown>
       </div>
-      <div className="max-h-[460px] flex-1 overflow-auto">
+      <div className="overflow-x-auto">
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr>
@@ -106,7 +106,7 @@ export function PastRuns(props: PastRunsProps) {
                         <span key={backend} className="mr-3.5 whitespace-nowrap">
                           {props.backendLabel(backend, run.mode)}{" "}
                           <i
-                            className={cx(
+                            className={cn(
                               "font-mono text-xs not-italic",
                               won ? "text-good" : "text-dim",
                             )}

@@ -1,12 +1,12 @@
 import { useEffect, useRef } from "react";
 
 import { answerLabel, inputSnippet, matchesLabel, scoreResponse } from "../scoring";
-import { cx, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
+import { cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
 import type { Response, Row } from "../types";
 import { CheckMark } from "./CheckMark";
 
 function ResultCell({ response, truth }: { response: Response; truth: Record<string, string> }) {
-  if (response.error) return <td className={cx(tableCell, "text-warn")}>error</td>;
+  if (response.error) return <td className={cn(tableCell, "text-warn")}>error</td>;
   const ids = Object.keys(truth);
   const [onlyId] = ids;
   if (ids.length === 1 && onlyId !== undefined) {
@@ -21,7 +21,7 @@ function ResultCell({ response, truth }: { response: Response; truth: Record<str
         : answer.probabilities?.[label];
     const correct = matchesLabel(label, truth[onlyId]);
     return (
-      <td className={cx(tableCell, correct ? "text-good" : "text-warn")}>
+      <td className={cn(tableCell, correct ? "text-good" : "text-warn")}>
         {label} <span className={monoDim}>{probability?.toFixed(2)}</span>{" "}
         <CheckMark ok={correct} />
       </td>
@@ -29,7 +29,7 @@ function ResultCell({ response, truth }: { response: Response; truth: Record<str
   }
   const [correct, total] = scoreResponse(response, truth);
   return (
-    <td className={cx(tableCell, correct === total ? "text-good" : "text-warn")}>
+    <td className={cn(tableCell, correct === total ? "text-good" : "text-warn")}>
       {correct}/{total} right
     </td>
   );
@@ -75,7 +75,7 @@ export function BatchTable({
   }, [selected, follow]);
 
   return (
-    <div className={cx(panelBox, "mt-3.5")}>
+    <div className={cn(panelBox, "mt-3.5")}>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="m-0 text-sm font-semibold text-ink">
           Batch results <span className="font-normal text-dim">{note}</span>
@@ -118,7 +118,7 @@ export function BatchTable({
                 <tr
                   key={row.item.source}
                   onClick={() => onOpen(i)}
-                  className={cx(
+                  className={cn(
                     "cursor-pointer hover:bg-code",
                     selected === i && "bg-code",
                     row.isNew && "animate-rise motion-reduce:animate-none",
@@ -127,7 +127,7 @@ export function BatchTable({
                   <td className={tableCell}>
                     <span className={monoDim}>{i + 1}</span>
                   </td>
-                  <td className={cx(tableCell, "max-w-[380px] text-ink")} title={input}>
+                  <td className={cn(tableCell, "max-w-[380px] text-ink")} title={input}>
                     {input}
                   </td>
                   <td className={tableCell}>

@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 
 import { answerLabel, percent, scoreResponse } from "../scoring";
-import { cx, labelText, panelBox } from "../styles";
+import { cn, labelText, panelBox } from "../styles";
 import type { Answer, Row } from "../types";
+import { InfoTip } from "./InfoTip";
 
 interface ColumnStats {
   correct: number;
@@ -50,18 +51,24 @@ function agreementRate(rows: Row[]) {
 
 interface StatRowProps {
   label: string;
+  info: ReactNode;
   columns: string[];
   values: number[];
   cell: (column: number) => ReactNode;
   higherIsBetter?: boolean;
 }
 
-function StatRow({ label, columns, values, cell, higherIsBetter = true }: StatRowProps) {
+function StatRow({ label, info, columns, values, cell, higherIsBetter = true }: StatRowProps) {
   const best = higherIsBetter ? Math.max(...values) : Math.min(...values);
   const singleBest = values.filter((value) => value === best).length === 1;
   return (
     <tr>
-      <td className="border-t border-rule py-[7px] pr-2 text-dim">{label}</td>
+      <td className="border-t border-rule py-[7px] pr-2 text-dim">
+        <span className="inline-flex items-center gap-1">
+          {label}
+          <InfoTip>{info}</InfoTip>
+        </span>
+      </td>
       {columns.map((column, k) => (
         <td key={column} className="border-t border-rule px-2 py-[7px] tabular-nums">
           <b className={singleBest && values[k] === best ? "text-good" : "text-ink"}>{cell(k)}</b>
@@ -83,9 +90,12 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
   const stats = columns.map((_, k) => columnStats(rows, k));
   const stat = (k: number) => stats[k] ?? columnStats([], k);
   const byQuestion = Object.keys(first.item.truth).length > 1 || stat(0).total > rows.length;
+  const shares = stats.map((s) => (s.total ? s.correct / s.total : 0));
+  const bestShare = Math.max(...shares);
+  const singleBestShare = shares.filter((share) => share === bestShare).length === 1;
 
   return (
-    <div className={cx(panelBox, "mb-3.5 animate-fade motion-reduce:animate-none")}>
+    <div className={cn(panelBox, "mb-3.5 animate-fade motion-reduce:animate-none")}>
       <table className="w-full border-collapse text-sm">
         <tbody>
           <tr>
@@ -100,20 +110,34 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
           </tr>
           <StatRow
             label={byQuestion ? "Questions right" : "Right"}
+            info="How often the model's answer matched the dataset's own label, which people wrote. Higher is better."
             columns={columns}
-            values={stats.map((s) => (s.total ? s.correct / s.total : 0))}
-            cell={(k) => (
-              <>
-                {percent(stat(k).correct, stat(k).total)}{" "}
-                <span className={labelText}>
-                  {stat(k).correct}/{stat(k).total}
-                </span>
-              </>
-            )}
+            values={shares}
+            cell={(k) => {
+              const share = stat(k).total ? stat(k).correct / stat(k).total : 0;
+              return (
+                <>
+                  {percent(stat(k).correct, stat(k).total)}{" "}
+                  <span className={labelText}>
+                    {stat(k).correct}/{stat(k).total}
+                  </span>
+                  <span className="mt-1.5 block h-1 w-full max-w-[160px] overflow-hidden rounded-full bg-bar">
+                    <span
+                      className={cn(
+                        "block h-full rounded-full transition-[width] duration-500",
+                        share === bestShare && singleBestShare ? "bg-good" : "bg-dim",
+                      )}
+                      style={{ width: `${share * 100}%` }}
+                    />
+                  </span>
+                </>
+              );
+            }}
           />
           {byQuestion && (
             <StatRow
               label="Items fully right"
+              info="Items where every question on it was answered right."
               columns={columns}
               values={stats.map((s) => s.fullyRight)}
               cell={(k) => `${stat(k).fullyRight}/${rows.length}`}
@@ -121,6 +145,7 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
           )}
           <StatRow
             label="Average time"
+            info="Time from sending the item to getting every answer back, averaged over the batch."
             columns={columns}
             values={stats.map((s) => s.averageMs)}
             cell={(k) => `${stat(k).averageMs.toLocaleString()} ms`}
@@ -128,6 +153,7 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
           />
           <StatRow
             label="Median time"
+            info="The middle time: half the items were faster. One slow request moves it less than the average."
             columns={columns}
             values={stats.map((s) => s.medianMs)}
             cell={(k) => `${stat(k).medianMs.toLocaleString()} ms`}

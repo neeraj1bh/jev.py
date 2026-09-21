@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { answerLabel, matchesLabel } from "../scoring";
-import { cx } from "../styles";
+import { cn } from "../styles";
 import type { Answer, Response } from "../types";
 import { CheckMark } from "./CheckMark";
 
@@ -16,7 +16,7 @@ function ProbabilityBar({ percent, top }: { percent: number; top: boolean }) {
   return (
     <span className="h-[7px] overflow-hidden rounded bg-bar">
       <i
-        className={cx(
+        className={cn(
           "block h-full transition-[width] duration-[450ms] ease-(--ease-out) motion-reduce:transition-none",
           top ? "bg-good" : "bg-dim",
         )}
@@ -31,11 +31,10 @@ interface AnswerRowProps {
   answer: Answer;
   truth?: string;
   collapsible: boolean;
-  compact?: boolean;
   toggleable?: boolean;
 }
 
-function AnswerRow({ id, answer, truth, collapsible, compact, toggleable }: AnswerRowProps) {
+function AnswerRow({ id, answer, truth, collapsible, toggleable }: AnswerRowProps) {
   const [collapsed, setCollapsed] = useState(collapsible);
   const probabilities =
     answer.type === "noul"
@@ -56,11 +55,9 @@ function AnswerRow({ id, answer, truth, collapsible, compact, toggleable }: Answ
 
   return (
     <div
-      className={cx(
+      className={cn(
         "grid gap-3.5 border-t border-rule max-[860px]:grid-cols-1 max-[860px]:gap-1.5",
-        collapsed
-          ? "grid-cols-1 py-[7px]"
-          : cx("py-[11px]", compact ? "grid-cols-1 gap-1.5" : "grid-cols-[150px_minmax(0,1fr)]"),
+        collapsed ? "grid-cols-1 py-[7px]" : "grid-cols-[minmax(0,150px)_minmax(0,1fr)] py-[11px]",
       )}
     >
       <Heading
@@ -69,7 +66,7 @@ function AnswerRow({ id, answer, truth, collapsible, compact, toggleable }: Answ
           "aria-expanded": !collapsed,
           onClick: () => setCollapsed(!collapsed),
         })}
-        className={cx(
+        className={cn(
           "text-[13px] [overflow-wrap:anywhere] text-dim",
           collapsed && "flex items-baseline gap-2.5",
           canToggle && "w-full cursor-pointer border-0 bg-transparent p-0 text-left",
@@ -77,7 +74,7 @@ function AnswerRow({ id, answer, truth, collapsible, compact, toggleable }: Answ
       >
         {id}
         <b
-          className={cx(
+          className={cn(
             "font-mono text-ink",
             collapsed ? "line-clamp-1 text-[13px]" : "line-clamp-2 text-sm",
           )}
@@ -87,7 +84,7 @@ function AnswerRow({ id, answer, truth, collapsible, compact, toggleable }: Answ
         </b>
         {truth !== undefined && (
           <span
-            className={cx(
+            className={cn(
               "block overflow-hidden text-[13px]",
               correct ? "text-good" : "text-warn",
               collapsed ? "ml-auto max-w-[45%] flex-none" : "mt-[3px]",
@@ -104,11 +101,9 @@ function AnswerRow({ id, answer, truth, collapsible, compact, toggleable }: Answ
           {shown.map(([option, probability]) => (
             <div
               key={option}
-              className={cx(
+              className={cn(
                 "grid items-center gap-2.5 font-mono text-xs leading-[1.7]",
-                compact
-                  ? "grid-cols-[minmax(0,96px)_minmax(24px,1fr)_36px]"
-                  : "grid-cols-[110px_minmax(40px,260px)_44px]",
+                "grid-cols-[minmax(0,110px)_minmax(40px,1fr)_44px]",
                 option === best ? "font-semibold text-ink" : "text-dim",
               )}
             >
@@ -133,11 +128,10 @@ function AnswerRow({ id, answer, truth, collapsible, compact, toggleable }: Answ
 interface AnswersProps {
   response: Response;
   truth?: Record<string, string>;
-  compact?: boolean;
   toggleable?: boolean;
 }
 
-export function Answers({ response, truth, compact, toggleable }: AnswersProps) {
+export function Answers({ response, truth, toggleable }: AnswersProps) {
   const entries = Object.entries(response.answers);
   const collapsible = entries.length > 4;
   return entries.map(([id, answer]) => (
@@ -147,7 +141,6 @@ export function Answers({ response, truth, compact, toggleable }: AnswersProps) 
       answer={answer}
       truth={truth?.[id]}
       collapsible={collapsible}
-      compact={compact}
       toggleable={toggleable}
     />
   ));

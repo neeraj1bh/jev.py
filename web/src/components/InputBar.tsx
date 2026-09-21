@@ -1,6 +1,6 @@
 import { blockingBackend } from "../backends";
 import { EXAMPLE_NAMES, EXAMPLES, type ExampleName } from "../examples";
-import { chipButton, cx } from "../styles";
+import { chipButton, cn } from "../styles";
 import type { Backend, Dataset } from "../types";
 import { Dropdown, MenuHeading, MenuItem } from "./Menu";
 
@@ -50,7 +50,7 @@ export function InputBar(props: InputBarProps) {
             key={option}
             type="button"
             onClick={() => props.onSourceChange(option)}
-            className={cx(
+            className={cn(
               "rounded-full border-0 px-3 py-[3px] text-[13px]",
               source === option ? "bg-code text-ink" : "bg-transparent text-dim",
             )}
@@ -156,7 +156,7 @@ export function InputBar(props: InputBarProps) {
         </>
       )}
 
-      <button type="button" className={cx(chipButton(), "ml-auto")} onClick={props.onEdit}>
+      <button type="button" className={cn(chipButton(), "ml-auto")} onClick={props.onEdit}>
         Edit input
       </button>
     </div>

@@ -1,11 +1,21 @@
-import type { ThemePreference } from "../hooks/useTheme";
-import { cx } from "../styles";
-import type { Mode } from "../types";
+import { Columns3, History, type LucideIcon, Monitor, Moon, Split, Sun } from "lucide-react";
+import { motion } from "motion/react";
 
-const TABS: [Mode, string][] = [
-  ["compare", "Compare"],
-  ["generate", "Generate vs readout"],
-  ["past", "Past runs"],
+import type { ThemePreference } from "../hooks/useTheme";
+import { cn } from "../styles";
+import type { Mode } from "../types";
+import { Icon } from "./Icon";
+
+const TABS: { mode: Mode; name: string; icon: LucideIcon }[] = [
+  { mode: "compare", name: "Compare", icon: Columns3 },
+  { mode: "generate", name: "Generate vs readout", icon: Split },
+  { mode: "past", name: "Past runs", icon: History },
+];
+
+const THEMES: { preference: ThemePreference; name: string; icon: LucideIcon }[] = [
+  { preference: "light", name: "Light", icon: Sun },
+  { preference: "dark", name: "Dark", icon: Moon },
+  { preference: "system", name: "Device", icon: Monitor },
 ];
 
 const LEDE: Record<Mode, string> = {
@@ -13,12 +23,6 @@ const LEDE: Record<Mode, string> = {
   generate: "One model, two ways to ask it the same questions.",
   past: "Batches you ran, saved on this machine.",
 };
-
-const THEME_OPTIONS: [ThemePreference, string][] = [
-  ["light", "Light"],
-  ["dark", "Dark"],
-  ["system", "Device"],
-];
 
 interface HeaderProps {
   mode: Mode;
@@ -38,40 +42,52 @@ export function Header({ mode, onModeChange, preference, onPreferenceChange }: H
           {LEDE[mode]}
         </p>
         <div className="inline-flex rounded-full border border-rule p-0.5" title="Theme">
-          {THEME_OPTIONS.map(([option, name]) => (
+          {THEMES.map((theme) => (
             <button
-              key={option}
+              key={theme.preference}
               type="button"
-              aria-pressed={preference === option}
-              onClick={() => onPreferenceChange(option)}
-              className={cx(
-                "rounded-full border-0 px-2.5 py-0.5 text-[12.5px] transition-colors",
-                preference === option
+              aria-pressed={preference === theme.preference}
+              aria-label={`${theme.name} theme`}
+              title={theme.name}
+              onClick={() => onPreferenceChange(theme.preference)}
+              className={cn(
+                "grid size-7 place-items-center rounded-full border-0 transition-colors",
+                preference === theme.preference
                   ? "bg-code text-ink"
                   : "bg-transparent text-dim hover:text-ink",
               )}
             >
-              {name}
+              <Icon icon={theme.icon} size={14} />
             </button>
           ))}
         </div>
       </header>
-      <nav className="mt-[18px] mb-4 flex gap-[22px] border-b border-rule max-[600px]:[scrollbar-width:none] max-[600px]:overflow-x-auto max-[600px]:overflow-y-hidden">
-        {TABS.map(([tab, title]) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => onModeChange(tab)}
-            className={cx(
-              "flex-none rounded-none border-0 bg-transparent px-0 pt-[9px] pb-2.5 text-sm whitespace-nowrap",
-              tab === mode
-                ? "text-ink shadow-[inset_0_-2px_0_var(--color-ink)]"
-                : "text-dim hover:text-ink-2",
-            )}
-          >
-            {title}
-          </button>
-        ))}
+      <nav className="mt-[18px] mb-4 flex gap-[22px] border-b border-rule max-[600px]:overflow-x-auto max-[600px]:overflow-y-hidden max-[600px]:[scrollbar-width:none]">
+        {TABS.map((tab) => {
+          const active = tab.mode === mode;
+          return (
+            <button
+              key={tab.mode}
+              type="button"
+              aria-current={active ? "page" : undefined}
+              onClick={() => onModeChange(tab.mode)}
+              className={cn(
+                "relative flex flex-none items-center gap-1.5 rounded-none border-0 bg-transparent px-0 pt-[9px] pb-2.5 text-sm whitespace-nowrap transition-colors",
+                active ? "text-ink" : "text-dim hover:text-ink",
+              )}
+            >
+              <Icon icon={tab.icon} size={14} />
+              {tab.name}
+              {active && (
+                <motion.span
+                  layoutId="tab-underline"
+                  transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                  className="absolute inset-x-0 bottom-0 h-0.5 bg-ink"
+                />
+              )}
+            </button>
+          );
+        })}
       </nav>
     </>
   );

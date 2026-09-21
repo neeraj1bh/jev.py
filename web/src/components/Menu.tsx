@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef } from "react";
 
-import { cx } from "../styles";
+import { cn } from "../styles";
 
 const arrow =
   "after:ml-1 after:size-1.5 after:-translate-y-0.5 after:rotate-45 after:border-r-[1.5px] after:border-b-[1.5px] after:content-['']";
@@ -56,13 +56,13 @@ export function Dropdown({
         aria-expanded={open}
         title={title}
         onClick={() => onOpenChange(!open)}
-        className={cx(
+        className={cn(
           "inline-flex items-center gap-[9px] rounded-full border",
           arrow,
           compact ? "px-3 py-1 text-[13.5px]" : "px-3.5 py-1.5 text-sm",
           active
             ? "border-ink bg-ink text-paper after:border-paper"
-            : cx(
+            : cn(
                 "border-rule after:border-dim hover:border-dim",
                 compact ? "bg-transparent text-dim" : "bg-paper text-ink",
               ),
@@ -74,8 +74,8 @@ export function Dropdown({
       {open && (
         <div
           role="listbox"
-          className={cx(
-            "absolute top-[calc(100%+6px)] left-0 z-10 max-h-[70vh] w-[320px] max-w-[calc(100vw-32px)] overflow-x-hidden overflow-y-auto rounded-lg border border-rule bg-panel p-1.5 shadow-[0_10px_28px_var(--color-shadow)]",
+          className={cn(
+            "absolute top-[calc(100%+6px)] left-0 z-10 max-h-[70vh] w-[320px] max-w-[calc(100vw-32px)] overflow-x-hidden overflow-y-auto rounded-lg border border-rule bg-panel p-1.5 shadow-[0_10px_28px_var(--color-shadow)] flex flex-col gap-0.5 animate-fade",
             menuClassName,
           )}
         >
@@ -87,11 +87,7 @@ export function Dropdown({
 }
 
 export function MenuHeading({ children }: { children: ReactNode }) {
-  return (
-    <h3 className="mx-2 mt-2.5 mb-1 text-[11px] font-semibold tracking-[0.05em] text-dim uppercase">
-      {children}
-    </h3>
-  );
+  return <h3 className="mx-2 mt-2.5 mb-0.5 text-xs font-medium text-dim first:mt-1">{children}</h3>;
 }
 
 interface MenuItemProps {
@@ -121,10 +117,10 @@ export function MenuItem({
       disabled={disabled}
       title={title}
       onClick={onSelect}
-      className="flex w-full items-baseline justify-between gap-3 rounded-md border-0 bg-transparent px-2 py-1.5 text-left text-sm text-ink hover:enabled:bg-code disabled:text-dim disabled:opacity-100 aria-selected:bg-code"
+      className="flex w-full items-baseline justify-between gap-3 rounded-md border-0 bg-transparent px-2.5 py-1.5 text-left text-sm text-ink transition-colors duration-150 hover:enabled:bg-code disabled:text-dim disabled:opacity-100 aria-selected:bg-code"
     >
       <span>{label}</span>
-      <span className={cx("text-xs whitespace-nowrap", highlightDetail ? "text-good" : "text-dim")}>
+      <span className={cn("text-xs whitespace-nowrap", highlightDetail ? "text-good" : "text-dim")}>
         {detail}
       </span>
     </button>
