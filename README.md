@@ -185,7 +185,8 @@ latency figure. DeepSeek is V4.1-Flash, hosted.
 
 Four examples are built in (a support ticket, a shell command, an email, a pull request) and
 both boxes are editable. Under **Dataset** the input is a labelled item from a public set (SST-2,
-RTE, BoolQ, SNLI, AG News, tweet emotion, Banking77, CLINC150, or TypeSafe's cases): each answer
+RTE, BoolQ, SNLI, AG News, tweet emotion, Banking77, CLINC150, MMLU, MMLU-Pro, ARC-Challenge,
+HellaSwag, TruthfulQA, or TypeSafe's cases): each answer
 is marked against the label and a running score is kept. A batch runs any number of items, or all
 of them; two hosted backends run eight items at a time. Items are downloaded on first use into
 `data/`, and every batch answer is logged to `results/logs/demo/`; both are git-ignored.
@@ -201,6 +202,11 @@ of them; two hosted backends run eight items at a time. Items are downloaded on 
 | [Banking77](https://huggingface.co/datasets/legacy-datasets/banking77) | intent of a banking message | 77 labels |
 | [CLINC150](https://huggingface.co/datasets/clinc/clinc_oos) | intent of an assistant request | 151 labels |
 | TypeSafe's published cases | several questions about one business document | mixed |
+| [MMLU](https://huggingface.co/datasets/cais/mmlu) | exam question, 57 subjects | 4 choices |
+| [MMLU-Pro](https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro) | harder exam question | 10 choices |
+| [ARC-Challenge](https://huggingface.co/datasets/allenai/ai2_arc) | grade-school science | 4 choices |
+| [HellaSwag](https://huggingface.co/datasets/Rowan/hellaswag) | most plausible ending | 4 choices |
+| [TruthfulQA](https://huggingface.co/datasets/truthfulqa/truthful_qa) | the true answer among misconceptions | 4 to 13 choices |
 
 Backends that read the answer as a letter (DeepSeek, Kimi, OpenAI, OpenRouter, llama.cpp) take at
 most 26 labels, so the menu greys out Banking77 and CLINC150 for them.

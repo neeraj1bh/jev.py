@@ -86,6 +86,38 @@ DATASETS = {
 }  # fmt: skip
 
 
+MC = {  # benchmarks whose options differ per question: (Hub dataset, config, split, state, question, options)
+    "MMLU": (
+        "cais/mmlu", "all", "test",
+        lambda r: {"subject": r["subject"].replace("_", " "), "question": r["question"]},
+        "Which answer is correct?",
+        lambda r: (r["choices"], int(r["answer"])),
+    ),
+    "MMLU-Pro": (
+        "TIGER-Lab/MMLU-Pro", "default", "test",
+        lambda r: {"subject": r["category"], "question": r["question"]},
+        "Which answer is correct?",
+        lambda r: (r["options"], int(r["answer_index"])),
+    ),
+    "ARC-Challenge": (
+        "allenai/ai2_arc", "ARC-Challenge", "test",
+        lambda r: {"question": r["question"]},
+        "Which answer is correct?",
+        lambda r: (r["choices"]["text"], r["choices"]["label"].index(r["answerKey"])),
+    ),
+    "HellaSwag": (
+        "Rowan/hellaswag", "default", "validation",
+        lambda r: {"activity": r["activity_label"], "context": r["ctx"]},
+        "Which ending is the most likely continuation?",
+        lambda r: (r["endings"], int(r["label"])),
+    ),
+    "TruthfulQA": (
+        "truthfulqa/truthful_qa", "multiple_choice", "validation",
+        lambda r: {"question": r["question"]},
+        "Which answer is true?",
+        lambda r: (r["mc1_targets"]["choices"], r["mc1_targets"]["labels"].index(1)),
+    ),
+}  # fmt: skip
 ABOUT = {  # one line per set, shown when hovering it in the page
     "SST-2 sentiment": "Is this movie-review sentence positive?",
     "RTE entailment": "Does sentence A entail sentence B?",
@@ -96,8 +128,18 @@ ABOUT = {  # one line per set, shown when hovering it in the page
     "Banking77": "Banking customer message: which of 77 intents?",
     "CLINC150": "Assistant request: which of 150 intents, or out of scope?",
     "TypeSafe cases": "TypeSafe's published cases: a business document with several questions",
+    "MMLU": "Exam question from 57 subjects, four choices",
+    "MMLU-Pro": "Harder exam question, ten choices",
+    "ARC-Challenge": "Grade-school science question that simple methods get wrong",
+    "HellaSwag": "Which ending continues the scene most plausibly?",
+    "TruthfulQA": "Which answer is true, where a common misconception is also offered?",
 }
 OPTIONS = {
+    "MMLU": 4,
+    "MMLU-Pro": 10,
+    "ARC-Challenge": 5,
+    "HellaSwag": 4,
+    "TruthfulQA": 13,
     "SNLI": 3,
     "AG News topic": 4,
     "Tweet emotion": 4,
@@ -132,6 +174,31 @@ def deal(name, n, fresh):
     return DECKS[name].pop()
 
 
+def download(name, hub, config, split):
+    """300 rows of a set (three random pages), fetched once into DATA."""
+    path = dataset_path(name)
+    if not os.path.exists(path):
+        PROGRESS[name] = [0, 3, "pages"]
+        try:
+            with urllib.request.urlopen(ROWS.format(hub, config, split, 0), timeout=30) as r:
+                first = json.load(r)
+            total, rows = first["num_rows_total"], first["rows"]
+            starts = range(100, max(101, total - 100), 100)
+            picked = random.sample(starts, min(2, len(starts)))
+            PROGRESS[name] = [1, 1 + len(picked), "pages"]
+            for o in picked:
+                with urllib.request.urlopen(ROWS.format(hub, config, split, o), timeout=30) as r:
+                    rows += json.load(r)["rows"]
+                PROGRESS[name][0] += 1
+        finally:
+            PROGRESS.pop(name, None)
+        os.makedirs(DATA, exist_ok=True)
+        with open(path, "w") as f:
+            json.dump({"features": first["features"], "rows": rows}, f)
+    with open(path) as f:
+        return json.load(f)
+
+
 def sample(name, fresh=False):
     """One random labelled item as a request, plus its truth. The first call per dataset
     downloads 300 rows (three random pages) into DATA; later calls deal from them."""
@@ -153,28 +220,23 @@ def sample(name, fresh=False):
             "pool": pool,
             "left": left,
         }
+    if name in MC:
+        hub, config, split, state_of, question, options_of = MC[name]
+        rows = download(name, hub, config, split)["rows"]
+        r = rows[deal(name, len(rows), fresh)]
+        options, answer = options_of(r["row"])
+        q = {"type": "choice", "instructions": question, "criteria": dict.fromkeys(options)}
+        return {
+            "state": state_of(r["row"]),
+            "questions": {"answer": q},
+            "truth": {"answer": options[answer]},
+            "source": f"{hub} · {split} row {r['row_idx']}",
+            "options": len(options),
+            "pool": len(rows),
+            "left": len(DECKS[name]),
+        }
     hub, config, split, fields, question, label, yes = DATASETS[name]
-    path = dataset_path(name)
-    if not os.path.exists(path):
-        PROGRESS[name] = [0, 3, "pages"]
-        try:
-            with urllib.request.urlopen(ROWS.format(hub, config, split, 0), timeout=30) as r:
-                first = json.load(r)
-            total, rows = first["num_rows_total"], first["rows"]
-            starts = range(100, max(101, total - 100), 100)
-            picked = random.sample(starts, min(2, len(starts)))
-            PROGRESS[name] = [1, 1 + len(picked), "pages"]
-            for o in picked:
-                with urllib.request.urlopen(ROWS.format(hub, config, split, o), timeout=30) as r:
-                    rows += json.load(r)["rows"]
-                PROGRESS[name][0] += 1
-        finally:
-            PROGRESS.pop(name, None)
-        os.makedirs(DATA, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump({"features": first["features"], "rows": rows}, f)
-    with open(path) as f:
-        page = json.load(f)
+    page = download(name, hub, config, split)
     names = next(x["type"].get("names") for x in page["features"] if x["name"] == label)
     rows = [r for r in page["rows"] if r["row"][label] != -1]  # SNLI marks unlabelled pairs -1
     r = rows[deal(name, len(rows), fresh)]
@@ -215,6 +277,42 @@ def where(model_id):
     return MODELS, False
 
 
+def text_answers(text, questions):
+    """A written JSON reply in the shape of a probability reply, each answer counted as certain."""
+    try:
+        got = json.loads(text.replace("```json", "").replace("```", "").strip())
+    except ValueError:
+        return {}
+    out = {}
+    for qid, q in questions.items():
+        if not isinstance(got, dict) or qid not in got:
+            continue
+        v = str(got[qid]).strip().lower()
+        first = (v.replace(",", " ").split() or [""])[0]
+        if q["type"] == "noul":
+            out[qid] = {"type": "noul", "noul": 1.0 if first in ("yes", "true") else 0.0}
+        elif q["type"] == "choice":
+            hit = next((la for la in _options(q)[0] if v == la.lower() or v.startswith(la.lower())), None)
+            if hit is not None:
+                out[qid] = {"type": "choice", "choice": hit, "probabilities": {hit: 1.0}}
+        else:
+            try:
+                out[qid] = {"type": "score", "score": float(first)}
+            except ValueError:
+                pass
+    return out
+
+
+def log_row(body, backend, answers, ms):
+    """One answer of a run, appended to its session's file."""
+    name = "".join(c if c.isalnum() or c in "._-" else "-" for c in body["log"])[:120]
+    os.makedirs(LOGS, exist_ok=True)
+    row = {k: body.get(k) for k in ("dataset", "source", "state", "questions", "truth", "mode")}
+    row |= {"backend": backend, "answers": answers, "ms": ms}
+    with LOCK, open(os.path.join(LOGS, name + ".jsonl"), "a") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
 def answer(a):
     """The answer a probability reply amounts to, in the label set's words."""
     if a["type"] == "noul":
@@ -236,15 +334,26 @@ def runs():
                 continue
             with open(os.path.join(LOGS, f)) as fh:
                 lines = [json.loads(x) for x in fh if x.strip()]
-            sides = list(dict.fromkeys(x["backend"] for x in lines))
+            sides = sorted(
+                dict.fromkeys(x["backend"] for x in lines), key=lambda b: not b.endswith("#text")
+            )  # written side first
             items = len({(x["source"], json.dumps(x["state"], sort_keys=True)) for x in lines})
             score = {b: [0, 0] for b in sides}
             for x in lines:
                 for qid, t in x["truth"].items():
                     score[x["backend"]][1] += 1
                     score[x["backend"]][0] += qid in x["answers"] and right(x["answers"][qid], t)
-            ds = lines[0]["dataset"] if lines else ""
-            out.append({"name": f[:-6], "dataset": ds, "backends": sides, "items": items, "score": score})
+            ds, kind = (lines[0]["dataset"], lines[0].get("mode") or "cmp") if lines else ("", "cmp")
+            out.append(
+                {
+                    "name": f[:-6],
+                    "dataset": ds,
+                    "backends": sides,
+                    "items": items,
+                    "score": score,
+                    "mode": kind,
+                }
+            )
     return out
 
 
@@ -478,7 +587,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
             if self.path.endswith("/datasets"):
                 sets = [
                     {"name": n, "options": OPTIONS.get(n, 2), "local": os.path.exists(dataset_path(n))}
-                    for n in DATASETS
+                    for n in [*DATASETS, *MC]
                 ]
                 ts = os.path.isdir(os.path.join(HERE, "results", "typesafe"))
                 sets.append({"name": "TypeSafe cases", "options": None, "local": ts})
@@ -511,34 +620,36 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     if (body.get("backend") or model_id) in TEXTLESS:
                         raise ValueError("Jev returns probabilities only; it does not write text")
                     make = generate if isinstance(jev, Jev) else generate_remote
+                    t = time.time()
                     pieces = make(jev, body["state"], body["questions"])
                     head = next(pieces, "")  # errors surface here, before the stream starts
                     self.send_response(200)
                     self.send_header("content-type", "text/plain; charset=utf-8")
                     self.send_header("transfer-encoding", "chunked")
                     self.end_headers()
+                    text = []
                     for piece in [head, *pieces] if head else pieces:
+                        text.append(piece)
                         chunk = piece.encode()
                         if not chunk:  # a zero-length chunk would end the stream
                             continue
                         self.wfile.write(f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
                         self.wfile.flush()
                     self.wfile.write(b"0\r\n\r\n")
+                    if body.get("log"):  # the written side of generate vs readout
+                        answers = text_answers("".join(text), body["questions"])
+                        log_row(
+                            body,
+                            (body.get("backend") or model_id) + "#text",
+                            answers,
+                            round((time.time() - t) * 1000),
+                        )
                     return
                 t = time.time()
                 res = jev.ask(body["state"], body["questions"])
                 res["latency_ms"] = round((time.time() - t) * 1000)
-                if body.get("log"):  # a batch: keep every answer with its input and label
-                    name = "".join(c if c.isalnum() or c in "._-" else "-" for c in body["log"])[:120]
-                    os.makedirs(LOGS, exist_ok=True)
-                    row = {k: body.get(k) for k in ("dataset", "source", "state", "questions", "truth")}
-                    row |= {
-                        "backend": body.get("backend") or model_id,
-                        "answers": res["answers"],
-                        "ms": res["latency_ms"],
-                    }
-                    with LOCK, open(os.path.join(LOGS, name + ".jsonl"), "a") as f:
-                        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+                if body.get("log"):  # every run is kept, with its input and label
+                    log_row(body, body.get("backend") or model_id, res["answers"], res["latency_ms"])
                 self._send(200, json.dumps(res).encode())
             except Exception as e:
                 bid = body.get("backend") or model_id
