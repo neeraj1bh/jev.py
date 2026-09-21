@@ -1,104 +1,104 @@
-# python eval.py Qwen/Qwen2.5-1.5B-Instruct   (2026-09-18, Ryzen 7 7700X, CPU, bf16, frozen results/eval-set.json: 1,736 items)
+# python eval.py Qwen/Qwen2.5-1.5B-Instruct   (2026-09-19, Ryzen 7 7700X, CPU, bf16, frozen results/eval-set.json: 3,101 items + TypeSafe public eval)
 
-show     noul    n=120  accuracy=0.608  brier=0.316
+
+show     noul    n=120  accuracy=0.608  brier=0.318
   p(yes)       n   actually yes
-  [0.0,0.1)      8   0.12
-  [0.1,0.3)     10   0.20
+  [0.0,0.1)      9   0.11
+  [0.1,0.3)      9   0.22
   [0.3,0.5)      2   0.50
-  [0.5,0.7)      6   0.33
-  [0.7,0.9)     21   0.29
+  [0.5,0.7)      7   0.43
+  [0.7,0.9)     20   0.25
   [0.9,1.0)     73   0.66
 
-ask      noul    n=120  accuracy=0.900  brier=0.099
+ask      noul    n=120  accuracy=0.900  brier=0.098
   p(yes)       n   actually yes
-  [0.0,0.1)     54   0.13
-  [0.1,0.3)      9   0.11
-  [0.3,0.5)      7   0.43
-  [0.5,0.7)      7   1.00
-  [0.7,0.9)     19   1.00
-  [0.9,1.0)     24   0.96
+  [0.0,0.1)     55   0.13
+  [0.1,0.3)      8   0.12
+  [0.3,0.5)      6   0.33
+  [0.5,0.7)      8   1.00
+  [0.7,0.9)     18   1.00
+  [0.9,1.0)     25   0.96
 
 kind     choice  n=120  accuracy=0.650  (chance 0.20)
   confidence   n   accuracy
-  [0.3,0.6)      3   0.00
-  [0.6,0.8)      4   0.25
+  [0.3,0.6)      5   0.00
+  [0.6,0.8)      2   0.50
   [0.8,1.0)    113   0.68
 
-type     choice  n=296  accuracy=0.264  (chance 0.17)
+type     choice  n=296  accuracy=0.260  (chance 0.17)
   confidence   n   accuracy
-  [0.0,0.3)      5   0.20
-  [0.3,0.6)     91   0.16
-  [0.6,0.8)     79   0.22
-  [0.8,1.0)    121   0.37
+  [0.0,0.3)      3   0.00
+  [0.3,0.6)     93   0.16
+  [0.6,0.8)     77   0.22
+  [0.8,1.0)    123   0.37
 
-writes   noul    n=40   accuracy=0.650  brier=0.241
+writes   noul    n=40   accuracy=0.650  brier=0.240
   p(yes)       n   actually yes
   [0.0,0.1)     20   0.25
   [0.1,0.3)     10   0.50
   [0.3,0.5)      3   1.00
-  [0.5,0.7)      3   1.00
-  [0.7,0.9)      1   1.00
+  [0.5,0.7)      2   1.00
+  [0.7,0.9)      2   1.00
   [0.9,1.0)      3   1.00
 
-answer   choice  n=400  accuracy=0.497  (chance 0.25)
+answer   choice  n=400  accuracy=0.495  (chance 0.25)
   confidence   n   accuracy
-  [0.0,0.3)    315   0.41
-  [0.3,0.6)     44   0.70
-  [0.6,0.8)     25   0.96
+  [0.0,0.3)    314   0.40
+  [0.3,0.6)     47   0.74
+  [0.6,0.8)     23   0.96
   [0.8,1.0)     16   0.94
 
-sentiment noul    n=100  accuracy=0.950  brier=0.051
+sentiment noul    n=300  accuracy=0.940  brier=0.054
   p(yes)       n   actually yes
-  [0.0,0.1)     42   0.02
-  [0.1,0.3)      1   0.00
-  [0.3,0.5)      2   0.00
-  [0.7,0.9)      3   0.67
-  [0.9,1.0)     52   0.94
+  [0.0,0.1)    135   0.05
+  [0.1,0.3)      5   0.20
+  [0.3,0.5)      5   0.20
+  [0.5,0.7)      2   0.50
+  [0.7,0.9)      3   0.33
+  [0.9,1.0)    150   0.96
 
-phishing noul    n=100  accuracy=0.810  brier=0.154
+phishing noul    n=291  accuracy=0.821  brier=0.143
   p(yes)       n   actually yes
-  [0.0,0.1)     71   0.14
-  [0.1,0.3)      8   0.75
-  [0.3,0.5)      4   0.75
-  [0.5,0.7)      2   1.00
-  [0.7,0.9)      7   1.00
-  [0.9,1.0)      8   1.00
+  [0.0,0.1)    207   0.14
+  [0.1,0.3)     16   0.75
+  [0.3,0.5)      9   0.89
+  [0.5,0.7)      7   0.86
+  [0.7,0.9)     16   1.00
+  [0.9,1.0)     36   1.00
 
-entails  noul    n=100  accuracy=0.760  brier=0.184
+entails  noul    n=277  accuracy=0.736  brier=0.205
   p(yes)       n   actually yes
-  [0.0,0.1)     38   0.16
-  [0.1,0.3)     14   0.50
-  [0.3,0.5)      4   0.75
-  [0.5,0.7)      3   1.00
-  [0.7,0.9)     11   0.64
-  [0.9,1.0)     30   0.87
+  [0.0,0.1)    113   0.22
+  [0.1,0.3)     33   0.52
+  [0.3,0.5)     15   0.60
+  [0.5,0.7)     12   0.75
+  [0.7,0.9)     31   0.74
+  [0.9,1.0)     73   0.86
 
-snli     choice  n=100  accuracy=0.760  (chance 0.33)
+snli     choice  n=297  accuracy=0.761  (chance 0.33)
   confidence   n   accuracy
-  [0.0,0.3)     46   0.63
-  [0.3,0.6)     16   0.81
-  [0.6,0.8)     11   0.82
-  [0.8,1.0)     27   0.93
+  [0.0,0.3)    134   0.64
+  [0.3,0.6)     59   0.78
+  [0.6,0.8)     26   0.88
+  [0.8,1.0)     78   0.91
 
-topic    choice  n=100  accuracy=0.820  (chance 0.25)
+topic    choice  n=300  accuracy=0.827  (chance 0.25)
   confidence   n   accuracy
   [0.0,0.3)      2   1.00
-  [0.3,0.6)      2   1.00
-  [0.6,0.8)      6   0.33
-  [0.8,1.0)     90   0.84
+  [0.3,0.6)     14   0.71
+  [0.6,0.8)     28   0.68
+  [0.8,1.0)    256   0.85
 
-intent   choice  n=100  accuracy=0.660  (chance 0.04)
+intent   choice  n=300  accuracy=0.693  (chance 0.04)
   confidence   n   accuracy
-  [0.0,0.3)      3   0.00
-  [0.3,0.6)     57   0.56
-  [0.6,0.8)     31   0.81
-  [0.8,1.0)      9   1.00
+  [0.0,0.3)      7   0.14
+  [0.3,0.6)    141   0.57
+  [0.6,0.8)    112   0.77
+  [0.8,1.0)     40   1.00
 
-toxicity choice  n=100  accuracy=0.390  (chance 0.25)
-  confidence   n   accuracy
-  [0.0,0.3)     95   0.38
-  [0.3,0.6)      5   0.60
-  by subject: biology 0.57  chemistry 0.35  physics 0.40  medicine 0.53  electrical_engineering 0.62  computer_science 0.40  computer_security 0.78  professional_law 0.33  econometrics 0.28  world_religions 0.72
+toxicity score   n=300  exact level=0.377  mean level error=1.14
+typesafe  354 questions  accuracy vs consensus=0.511
+  by subject: biology 0.53  chemistry 0.35  physics 0.42  medicine 0.55  electrical_engineering 0.62  computer_science 0.40  computer_security 0.75  professional_law 0.33  econometrics 0.28  world_religions 0.72
 
-1736 items, 856 ms each on cpu, Qwen/Qwen2.5-1.5B-Instruct
+3146 items, 1804 ms each on cpu, Qwen/Qwen2.5-1.5B-Instruct
 every answer, probability and latency: results/logs/qwen2.5-1.5b-instruct.jsonl

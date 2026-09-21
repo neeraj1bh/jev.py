@@ -3,7 +3,7 @@
 Typed decisions from any local language model, in one file.
 
 Ask a yes/no, pick-one or rate-on-a-scale question about some text and get a probability
-back instead of prose. No GPU needed, no API key, no text generation. About 250 lines.
+back instead of prose. No GPU needed, no API key, no text generation. About 270 lines.
 
 ```console
 $ uv run jev.py
@@ -122,8 +122,11 @@ text; the truth comes from the item itself:
 | topic | choice, 4 | a news snippet | AG News section |
 | intent | choice, 26 | a customer message | Bitext customer-support intent |
 | toxicity | score, 4 levels | a comment | Civil Comments human toxicity score, binned |
+| typesafe | noul, choice | a business document: security incident, agent trace, invoice, support ticket | TypeSafe's published eval cases, the consensus of its two reference label sets |
 
-The last seven are 100 items each, fetched from the Hugging Face Hub's JSON rows endpoint.
+The seven from sentiment to toxicity are 300 items each, fetched from the Hugging Face Hub's JSON
+rows endpoint. The TypeSafe cases (354 questions) are downloaded from TypeSafe's public eval page
+at run time into the git-ignored `results/typesafe/`.
 
 It prints accuracy, Brier score and a reliability table — how often a 0.9 was actually a yes —
 and writes every answer with its probabilities and latency to `results/logs/<model>.jsonl`. The item
@@ -134,32 +137,49 @@ three questions, so two of its three `.jsonl` rows have no truth. The item set c
 samples of third-party text: HN titles, commit messages from three public repos, and rows from
 six public datasets, including toxic comments and phishing emails.
 
-| task | chance | Qwen2.5-1.5B | Qwen2.5-3B | DeepSeek V4.1-Flash, hosted |
-|---|---|---|---|---|
-| ask | 0.50 | 0.90 | 0.92 | **0.95** — Brier 0.05 |
-| show | 0.50 | 0.61 | 0.77 | 0.77 |
-| kind | 0.20 | 0.65 | 0.65 | **0.84** |
-| type | 0.17 | 0.26 | 0.41 | **0.60** |
-| writes | 0.50 | 0.65 — calls 5 of 20 write commands read-only at p < 0.1 | 0.70 | **0.975** — Brier 0.02 |
-| fields | 0.25 | 0.50 — from 0.28 (econometrics) to 0.78 (computer security) | 0.57 — from 0.30 (law) to 0.80 (world religions) | **0.87** — from 0.65 (chemistry) to 0.95 (electrical engineering, world religions) |
-| sentiment | 0.50 | 0.95 | 0.95 | **0.99** — Brier 0.01 |
-| phishing | 0.50 | 0.81 | 0.77 | **0.93** |
-| entails | 0.50 | 0.76 | 0.70 | **0.89** |
-| snli | 0.33 | 0.76 | **0.91** | 0.82 |
-| topic | 0.25 | **0.82** | 0.79 | 0.79 |
-| intent (26-way) | 0.04 | 0.66 | 0.71 | **0.94** |
-| toxicity, mean level error (0–3 scale) | | 1.13 — calls nearly everything toxic | 1.36 | **0.74** — right order, compressed toward the middle |
-| ms / item | | 860 on CPU | 1,620 on CPU | 1,010 over the network |
+| task | n | chance | Qwen2.5-1.5B<br>CPU | Qwen2.5-3B<br>CPU | Qwen2.5-3B f16<br>GPU | Qwen2.5-7B Q4<br>GPU | Qwen2.5-7B Q8<br>GPU | Qwen2.5-14B Q4<br>GPU | Qwen3-30B-A3B Q4<br>GPU | DeepSeek V4.1-Flash<br>hosted |
+|---|---|---|---|---|---|---|---|---|---|---|
+| show | 120 | .50 | .608 | .767 | .725 | .767 | **.775** | **.775** | **.775** | **.775** |
+| ask | 120 | .50 | .900 | .917 | .908 | .933 | .925 | .942 | .942 | **.950** |
+| kind | 120 | .20 | .650 | .650 | .675 | .717 | .742 | .775 | .758 | **.842** |
+| type | 296 | .17 | .260 | .402 | .355 | .429 | .426 | .422 | .466 | **.598** |
+| writes | 40 | .50 | .650 | .700 | .775 | .875 | .925 | .925 | .925 | **.975** |
+| fields | 400 | .25 | .495 | .565 | .585 | .640 | .655 | .695 | .777 | **.868** |
+| sentiment | 300 | .50 | .940 | .930 | .907 | .947 | .933 | .947 | .950 | **.970** |
+| phishing | 291 | .50 | .821 | .808 | .893 | .849 | .832 | .869 | **.945** | .924 |
+| entails | 277 | .50 | .736 | .690 | .516 | .758 | .769 | .819 | **.856** | **.856** |
+| snli | 297 | .33 | .761 | **.906** | .747 | .731 | .721 | .889 | .845 | .828 |
+| topic | 300 | .25 | .827 | .747 | .750 | **.837** | **.837** | .787 | .780 | .813 |
+| intent | 300 | .04 | .693 | .690 | .480 | .813 | .790 | .837 | .843 | **.927** |
+| toxicity (exact level) | 300 | .25 | .377 | .157 | .180 | .337 | .313 | .447 | .327 | **.520** |
+| toxicity, mean level error (0–3) | 300 |  | 1.140 | 1.320 | 1.460 | 1.050 | 1.110 | .790 | 1.120 | **.670** |
+| **TypeSafe cases** (vs consensus) | 354 |  | .511 | .593 | .630 | .675 | .675 | .751 | .774 | **.876** |
+| ms / item | | | 1,804 | 3,405 | 1,249 | 1,916 | 2,403 | 4,715 | — | 725 |
+
+GPU = AMD Radeon RX 6700 XT through llama.cpp's Vulkan backend (`uv run eval.py remote:llamacpp:<name>`);
+CPU = Ryzen 7 7700X, PyTorch bf16. The 30B run was resumed after GPU driver crashes, so its wall
+time is not a latency figure.
 
 Read that as:
 
-- the readout works on every model tried — 1,736 items, three question types, twelve tasks;
-- judgment scales with the model: 1.5B → 3B → a hosted frontier model goes from unreliable to
-  trustworthy on the questions an agent would gate on (shell `writes`: 0.65 → 0.70 → 0.975);
-- small models run hot — they say 0.9 far more often than they are right, and neither can grade
-  toxicity — so use them for demos and bulk triage, not for gating destructive actions;
+- the readout works on every model tried — 3,146 items, three question types, thirteen tasks,
+  eight models on CPU, an AMD GPU and a hosted API;
+- judgment scales with the model: on TypeSafe's cases 1.5B → 14B → 30B MoE → hosted goes
+  .51 → .75 → .77 → .88, and on the shell `writes` gate .65 → .925 → .925 → .975;
+- 4-bit costs nothing measurable at 7B: Q4 and Q8 both score .675 on the TypeSafe cases;
+- small models run hot — they say 0.9 far more often than they are right, and none of the local
+  models grades toxicity well — so use them for demos and bulk triage, not for gating
+  destructive actions;
 - probabilities are softmaxed log-probs, not measured outcomes: read the reliability table for
   your model and your questions before choosing a threshold.
+
+| hardware | how | status |
+|---|---|---|
+| x86 CPU | PyTorch, bf16 where the CPU has it | measured: 1.5B, 3B |
+| AMD GPU | llama.cpp (Vulkan) server, `remote.py llamacpp` | measured: 3B to 30B |
+| NVIDIA GPU | PyTorch CUDA, picked automatically | supported, not yet measured |
+| Apple Silicon | PyTorch MPS, picked automatically | supported, not yet measured |
+| hosted APIs | `remote.py` | measured: DeepSeek |
 
 ## Demo
 
@@ -179,13 +199,16 @@ reading the logits it says `billing` at 1.00. Same weights. That gap is the poin
 ## Hosted models
 
 `remote.py` answers the same requests from a hosted model through its chat API's
-log-probabilities — DeepSeek, Kimi, OpenRouter or OpenAI — and passes straight through to the
-TypeSafe API when that key is present. Keys go in `.env` (copy `.env.example`).
+log-probabilities — DeepSeek, Kimi, OpenRouter, OpenAI, or a llama.cpp `llama-server` on your own
+GPU — and passes straight through to the TypeSafe API when that key is present. The options are
+labelled A, B, C… and the model's probability for each letter is the answer, so these backends
+take at most 26 options. Keys go in `.env` (copy `.env.example`).
 
 ```sh
 uv run remote.py deepseek            # self-check
 uv run remote.py deepseek serve      # the same server, backed by DeepSeek
 uv run eval.py remote:deepseek       # the same eval on a hosted model
+uv run eval.py remote:llamacpp:qwen2.5-7b-q4   # a model in llama-server (LLAMACPP_URL, default :8080)
 ```
 
 Thinking is turned off per provider (otherwise the first token is reasoning, not the answer)
@@ -198,6 +221,7 @@ usable this way; Anthropic's API does not, and Kimi K3 cannot stop reasoning fir
 |---|---|
 | `jev.py` | the model wrapper, the HTTP server and the self-check — the whole idea |
 | `eval.py` | public evaluation, results in `results/` |
+| `readout.py` | letter vs option-text readout, and how often answers flip when the options are reversed |
 | `demo.py`, `demo.html` | the side-by-side page |
 | `remote.py`, `.env.example` | hosted backends and where their keys go |
 
