@@ -43,6 +43,10 @@ uv run demo.py                                  # side-by-side comparison page, 
 Without uv: `pip install torch transformers`, then `python` instead of `uv run`. Uses CUDA,
 Apple MPS or CPU, whichever is there; on CPUs with native bf16 it uses that.
 
+On Linux without an NVIDIA GPU, skip the 2.5 GB of CUDA libraries: `uv venv && uv pip install
+torch --index-url https://download.pytorch.org/whl/cpu && uv pip install transformers`, then
+`uv run --no-sync` instead of `uv run`, e.g. `uv run --no-sync demo.py`.
+
 The HTTP request and response follow the
 [TypeSafe System One API](https://docs.typesafe.ai/api), so a client written for it only
 needs a base URL change.
@@ -124,77 +128,102 @@ text; the truth comes from the item itself:
 | toxicity | score, 4 levels | a comment | Civil Comments human toxicity score, binned |
 | typesafe | noul, choice | a business document: security incident, agent trace, invoice, support ticket | TypeSafe's published eval cases, the consensus of its two reference label sets |
 
-The seven from sentiment to toxicity are 300 items each, fetched from the Hugging Face Hub's JSON
-rows endpoint. The TypeSafe cases (354 questions) are downloaded from TypeSafe's public eval page
-at run time into the git-ignored `results/typesafe/`.
+The seven from sentiment to toxicity are 300 items each from the Hugging Face Hub; the 354
+TypeSafe questions come from TypeSafe's public eval page. No items are in this repo: `eval.py`
+downloads the items on first run and saves the set, so every model is scored on the same items.
+It prints accuracy, Brier score and a reliability table (how often a 0.9 was actually a yes), and
+logs every answer to `results/logs/<model>.jsonl`. A yes/no is correct when its probability is
+above 0.5. Per-model summaries are in [`results/`](results/).
 
-It prints accuracy, Brier score and a reliability table — how often a 0.9 was actually a yes —
-and writes every answer with its probabilities and latency to `results/logs/<model>.jsonl`. The item
-set is saved on first run and reused, so every model is scored on the same items. Summaries
-are kept in [`results/`](results/), one file per model; they call the `fields` task `answer`.
-A yes/no counts as correct when its probability is above 0.5. Each Hacker News item carries
-three questions, so two of its three `.jsonl` rows have no truth. The item set contains
-samples of third-party text: HN titles, commit messages from three public repos, and rows from
-six public datasets, including toxic comments and phishing emails.
+| task | chance | 1.5B CPU | 3B CPU | 7B Q4 | 14B Q4 | 30B-A3B Q4 | DeepSeek |
+|---|---|---|---|---|---|---|---|
+| show | .50 | .608 | .767 | .767 | **.775** | **.775** | **.775** |
+| ask | .50 | .900 | .917 | .933 | .942 | .942 | **.950** |
+| kind | .20 | .650 | .650 | .717 | .775 | .758 | **.842** |
+| type | .17 | .260 | .402 | .429 | .422 | .466 | **.598** |
+| writes | .50 | .650 | .700 | .875 | .925 | .925 | **.975** |
+| fields | .25 | .495 | .565 | .640 | .695 | .777 | **.868** |
+| sentiment | .50 | .940 | .930 | .947 | .947 | .950 | **.970** |
+| phishing | .50 | .821 | .808 | .849 | .869 | **.945** | .924 |
+| entails | .50 | .736 | .690 | .758 | .819 | **.856** | **.856** |
+| snli | .33 | .761 | **.906** | .731 | .889 | .845 | .828 |
+| topic | .25 | .827 | .747 | **.837** | .787 | .780 | .813 |
+| intent | .04 | .693 | .690 | .813 | .837 | .843 | **.927** |
+| toxicity, exact level | .25 | .377 | .157 | .337 | .447 | .327 | **.520** |
+| toxicity, mean level error |  | 1.140 | 1.320 | 1.050 | .790 | 1.120 | **.670** |
+| **typesafe** |  | .511 | .593 | .675 | .751 | .774 | **.876** |
+| ms / item | | 1,804 | 3,405 | 1,916 | 4,715 | — | 725 |
 
-| task | n | chance | Qwen2.5-1.5B<br>CPU | Qwen2.5-3B<br>CPU | Qwen2.5-3B f16<br>GPU | Qwen2.5-7B Q4<br>GPU | Qwen2.5-7B Q8<br>GPU | Qwen2.5-14B Q4<br>GPU | Qwen3-30B-A3B Q4<br>GPU | DeepSeek V4.1-Flash<br>hosted |
-|---|---|---|---|---|---|---|---|---|---|---|
-| show | 120 | .50 | .608 | .767 | .725 | .767 | **.775** | **.775** | **.775** | **.775** |
-| ask | 120 | .50 | .900 | .917 | .908 | .933 | .925 | .942 | .942 | **.950** |
-| kind | 120 | .20 | .650 | .650 | .675 | .717 | .742 | .775 | .758 | **.842** |
-| type | 296 | .17 | .260 | .402 | .355 | .429 | .426 | .422 | .466 | **.598** |
-| writes | 40 | .50 | .650 | .700 | .775 | .875 | .925 | .925 | .925 | **.975** |
-| fields | 400 | .25 | .495 | .565 | .585 | .640 | .655 | .695 | .777 | **.868** |
-| sentiment | 300 | .50 | .940 | .930 | .907 | .947 | .933 | .947 | .950 | **.970** |
-| phishing | 291 | .50 | .821 | .808 | .893 | .849 | .832 | .869 | **.945** | .924 |
-| entails | 277 | .50 | .736 | .690 | .516 | .758 | .769 | .819 | **.856** | **.856** |
-| snli | 297 | .33 | .761 | **.906** | .747 | .731 | .721 | .889 | .845 | .828 |
-| topic | 300 | .25 | .827 | .747 | .750 | **.837** | **.837** | .787 | .780 | .813 |
-| intent | 300 | .04 | .693 | .690 | .480 | .813 | .790 | .837 | .843 | **.927** |
-| toxicity (exact level) | 300 | .25 | .377 | .157 | .180 | .337 | .313 | .447 | .327 | **.520** |
-| toxicity, mean level error (0–3) | 300 |  | 1.140 | 1.320 | 1.460 | 1.050 | 1.110 | .790 | 1.120 | **.670** |
-| **TypeSafe cases** (vs consensus) | 354 |  | .511 | .593 | .630 | .675 | .675 | .751 | .774 | **.876** |
-| ms / item | | | 1,804 | 3,405 | 1,249 | 1,916 | 2,403 | 4,715 | — | 725 |
+Qwen2.5 1.5B–14B and Qwen3-30B-A3B. CPU: Ryzen 7 7700X, PyTorch bf16. The rest: AMD RX 6700 XT
+through llama.cpp's Vulkan server (`remote:llamacpp`), which also ran 3B f16 and 7B Q8 (in
+`results/`; 7B Q8 is within a few points of Q4). The 30B run was resumed after driver crashes, so it has no
+latency figure. DeepSeek is V4.1-Flash, hosted.
 
-GPU = AMD Radeon RX 6700 XT through llama.cpp's Vulkan backend (`uv run eval.py remote:llamacpp:<name>`);
-CPU = Ryzen 7 7700X, PyTorch bf16. The 30B run was resumed after GPU driver crashes, so its wall
-time is not a latency figure.
+- Quality grows with the model: on the TypeSafe questions .51 (1.5B) → .75 (14B) → .77 (30B) →
+  .88 (DeepSeek).
+- Small models are overconfident and none of the local ones grades toxicity well. Use them for
+  triage, not for gating destructive actions.
+- The probabilities are softmaxed log-probs, not measured frequencies. Check the reliability
+  table for your model before picking a threshold.
 
-Read that as:
-
-- the readout works on every model tried — 3,146 items, three question types, thirteen tasks,
-  eight models on CPU, an AMD GPU and a hosted API;
-- judgment scales with the model: on TypeSafe's cases 1.5B → 14B → 30B MoE → hosted goes
-  .51 → .75 → .77 → .88, and on the shell `writes` gate .65 → .925 → .925 → .975;
-- 4-bit costs nothing measurable at 7B: Q4 and Q8 both score .675 on the TypeSafe cases;
-- small models run hot — they say 0.9 far more often than they are right, and none of the local
-  models grades toxicity well — so use them for demos and bulk triage, not for gating
-  destructive actions;
-- probabilities are softmaxed log-probs, not measured outcomes: read the reliability table for
-  your model and your questions before choosing a threshold.
-
-| hardware | how | status |
+| hardware | how | measured |
 |---|---|---|
-| x86 CPU | PyTorch, bf16 where the CPU has it | measured: 1.5B, 3B |
-| AMD GPU | llama.cpp (Vulkan) server, `remote.py llamacpp` | measured: 3B to 30B |
-| NVIDIA GPU | PyTorch CUDA, picked automatically | supported, not yet measured |
-| Apple Silicon | PyTorch MPS, picked automatically | supported, not yet measured |
-| hosted APIs | `remote.py` | measured: DeepSeek |
+| x86 CPU | PyTorch | 1.5B, 3B |
+| AMD GPU | llama.cpp server | 3B to 30B |
+| NVIDIA GPU | PyTorch CUDA | not yet |
+| Apple Silicon | PyTorch MPS | not yet |
 
 ## Demo
 
-`uv run demo.py`, then open <http://localhost:8080>. The same model answers the same
-questions two ways, timed one after the other, then replayed side by side:
+`uv run demo.py`, then open <http://localhost:8080>. Two modes:
 
-- **left** — asked to write the answers as JSON, streamed token by token, then parsed
-- **right** — one pass over the state, a probability bar for every option, nothing to parse
+- **Generate vs readout.** One local model answers the same questions two ways: writing JSON
+  token by token on the left, reading the logits in one pass on the right.
+- **Compare two.** The same request to any two backends: a local model, a llama.cpp server or a
+  hosted API. Each runs alone so its time is honest; **Replay together** plays both back at the
+  recorded speed.
 
-Four examples are built in — a support ticket, a shell command, an inbox email, a pull
-request — and both boxes are editable. The line above the columns states the speed ratio and
-where the two answers differed, computed from the run.
+Four examples are built in (a support ticket, a shell command, an email, a pull request) and
+both boxes are editable. Under **Dataset** the input is a labelled item from a public set (SST-2,
+RTE, BoolQ, SNLI, AG News, tweet emotion, Banking77, CLINC150, or TypeSafe's cases): each answer
+is marked against the label and a running score is kept. A batch runs any number of items, or all
+of them; two hosted backends run eight items at a time. Items are downloaded on first use into
+`data/`, and every batch answer is logged to `results/logs/demo/`; both are git-ignored.
+
+| dataset | asks | answers |
+|---|---|---|
+| [SST-2](https://huggingface.co/datasets/stanfordnlp/sst2) | is this movie-review sentence positive? | yes / no |
+| [RTE](https://huggingface.co/datasets/nyu-mll/glue) | does sentence A entail sentence B? | yes / no |
+| [BoolQ](https://huggingface.co/datasets/google/boolq) | given a passage, is the answer yes? | yes / no |
+| [SNLI](https://huggingface.co/datasets/stanfordnlp/snli) | premise vs hypothesis | 3 labels |
+| [AG News](https://huggingface.co/datasets/fancyzhx/ag_news) | news section | 4 labels |
+| [Tweet emotion](https://huggingface.co/datasets/cardiffnlp/tweet_eval) | emotion of a tweet | 4 labels |
+| [Banking77](https://huggingface.co/datasets/legacy-datasets/banking77) | intent of a banking message | 77 labels |
+| [CLINC150](https://huggingface.co/datasets/clinc/clinc_oos) | intent of an assistant request | 151 labels |
+| TypeSafe's published cases | several questions about one business document | mixed |
+
+Backends that read the answer as a letter (DeepSeek, Kimi, OpenAI, OpenRouter, llama.cpp) take at
+most 26 labels, so the menu greys out Banking77 and CLINC150 for them.
 
 On the example ticket the 1.5B, generating text, routes the double charge to `returns`;
 reading the logits it says `billing` at 1.00. Same weights. That gap is the point.
+
+The menu lists Qwen2.5 0.5B, 1.5B and 3B, the hosted backends whose key is in `.env`, and a
+llama.cpp server if one is running. Nothing downloads until you pick it. A model already in the
+Hugging Face cache is used from there; anything else goes to `models/` (git-ignored, or set
+`JEV_MODELS`). A hosted backend without a key takes one in the page: it is checked with one tiny
+request, then used for the session and, if you tick the box, saved to `.env`. A rejected key shows
+up as a message and changes nothing.
+
+Bigger models run through llama.cpp. The GGUFs measured above (Q4_K_M):
+[Qwen2.5-7B](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF),
+[Qwen2.5-14B](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF),
+[Qwen3-30B-A3B](https://huggingface.co/unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF).
+
+```sh
+llama-server -m qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf --port 8081
+echo "LLAMACPP_URL=http://localhost:8081/v1/chat/completions" >> .env
+```
 
 ## Hosted models
 
@@ -213,7 +242,8 @@ uv run eval.py remote:llamacpp:qwen2.5-7b-q4   # a model in llama-server (LLAMAC
 
 Thinking is turned off per provider (otherwise the first token is reasoning, not the answer)
 and the temperature set to what each accepts. A provider must return log-probabilities to be
-usable this way; Anthropic's API does not, and Kimi K3 cannot stop reasoning first.
+usable this way; Anthropic's API does not, and Kimi K3 cannot stop reasoning first. Which
+providers return probabilities, and how many, is in [docs/providers.md](docs/providers.md).
 
 ## Files
 
@@ -224,6 +254,7 @@ usable this way; Anthropic's API does not, and Kimi K3 cannot stop reasoning fir
 | `readout.py` | letter vs option-text readout, and how often answers flip when the options are reversed |
 | `demo.py`, `demo.html` | the side-by-side page |
 | `remote.py`, `.env.example` | hosted backends and where their keys go |
+| `docs/providers.md` | which hosted providers return probabilities |
 
 `pyproject.toml` carries the two dependencies and the ruff config; `uvx ruff format . && uvx ruff check .` keeps it clean.
 

@@ -9,3 +9,6 @@ results/logs/
 results/typesafe/
 .vscode/
 .specstory/
+models/
+results/eval-set.json
+data/

@@ -56,7 +56,7 @@ def env(name):
     if os.path.exists(path):
         for line in open(path):
             k, _, v = line.partition("=")
-            if k.strip() == name:
+            if k.strip() == name and v.split("#")[0].strip():  # skip empty template lines
                 return v.split("#")[0].strip()
     return ""
 

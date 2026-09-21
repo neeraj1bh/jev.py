@@ -64,8 +64,9 @@ def _options(q):
 
 
 class Jev:
-    def __init__(self, model_id=DEFAULT_MODEL, device=None, dtype=None, readout="text"):
-        """readout="letter" labels the options A, B, C… and scores the letter instead of the words."""
+    def __init__(self, model_id=DEFAULT_MODEL, device=None, dtype=None, readout="text", cache_dir=None):
+        """readout="letter" labels the options A, B, C… and scores the letter instead of the words.
+        cache_dir: where the weights are, or are downloaded to (default: the Hugging Face cache)."""
         self.model_id, self.readout = model_id, readout
         self.device = device or (
             "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
@@ -73,8 +74,12 @@ class Jev:
         # bf16 is ~3x faster than fp32 on CPUs with native bf16 (AVX512-BF16); emulated it is slower
         cpu_bf16 = getattr(torch.cpu, "_is_avx512_bf16_supported", lambda: False)()
         dtype = dtype or (torch.bfloat16 if self.device == "cuda" or cpu_bf16 else torch.float32)
-        self.tok = AutoTokenizer.from_pretrained(model_id)
-        self.model = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype).to(self.device).eval()
+        self.tok = AutoTokenizer.from_pretrained(model_id, cache_dir=cache_dir)
+        self.model = (
+            AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype, cache_dir=cache_dir)
+            .to(self.device)
+            .eval()
+        )
         # one letter must be one token, or the letter readout would compare different lengths
         bad = [c for c in LETTERS if len(self.tok.encode(c, add_special_tokens=False)) != 1]
         assert readout != "letter" or not bad, f"{bad} are several tokens each in {model_id}"
@@ -203,7 +208,13 @@ def serve(model_id=DEFAULT_MODEL, port=8080, jev=None):
             sys.stderr.write(f"{self.command} {self.path} {a[1] if len(a) > 1 else ''}\n")
 
     print(f"jev.py serving {jev.model_id} on http://localhost:{port}/v1/systemone ({jev.device})")
-    ThreadingHTTPServer(("", port), H).serve_forever()
+    server = ThreadingHTTPServer(("", port), H)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nstopped")
+    finally:
+        server.server_close()
 
 
 def demo(model_id=DEFAULT_MODEL, jev=None):

@@ -4,96 +4,216 @@
 <title>jev.py</title>
 <style>
   :root {
-    --bg: #fbfbfa; --panel: #ffffff; --line: #e4e5e7; --fg: #1a1c1f; --dim: #6b7079;
-    --code: #f3f4f6; --good: #1f8a4c; --warn: #b4531a; --bar: #d9dbdf;
+    --color-paper: #fbfbfa; --color-panel: #ffffff; --color-code: #f3f4f6; --color-rule: #e4e5e7;
+    --color-ink: #1a1c1f; --color-ink-2: #1a1c1f; --color-dim: #6b7079; --color-bar: #d9dbdf;
+    --color-accent: #1f8a4c; --color-on-accent: #fbfbfa; --color-good: #1f8a4c; --color-warn: #b4531a;
+    --color-shadow: rgb(0 0 0 / 0.12);
+    --font-display: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --radius: 8px; --radius-lg: 12px;
+    --ease-out: ease-out;
   }
   :root[data-theme="dark"] {
-    --bg: #101214; --panel: #171a1e; --line: #262a30; --fg: #e8eaed; --dim: #8b929c;
-    --code: #0d0f11; --good: #4cc172; --warn: #f0a15b; --bar: #2a2f36;
+    --color-paper: #101214; --color-panel: #171a1e; --color-code: #0d0f11; --color-rule: #262a30;
+    --color-ink: #e8eaed; --color-ink-2: #e8eaed; --color-dim: #8b929c; --color-bar: #2a2f36;
+    --color-accent: #4cc172; --color-on-accent: #101214; --color-good: #4cc172; --color-warn: #f0a15b;
+    --color-shadow: rgb(0 0 0 / 0.4);
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--color-bar) transparent; }
+  html, body { overflow-x: clip; }
   html { color-scheme: light; }
   html[data-theme="dark"] { color-scheme: dark; }
-  * { scrollbar-width: thin; scrollbar-color: var(--bar) transparent; }
-  body {
-    margin: 0; background: var(--bg); color: var(--fg);
-    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  body { margin: 0; background: var(--color-paper); color: var(--color-ink-2); font: 15px/1.5 var(--font-body); }
+  .mono, pre, textarea { font-family: var(--font-mono); }
+  [hidden] { display: none !important; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 24px 56px; }
+  button { font: inherit; cursor: pointer; border-radius: var(--radius); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, textarea:focus-visible { outline: 2px solid var(--color-good); outline-offset: 2px; }
+  button:focus, textarea:focus { outline: none; }
+  .label { font-size: 13px; color: var(--color-dim); }
+
+  header { display: flex; align-items: center; gap: 12px; }
+  header h1 { margin: 0; font: 650 22px/1 var(--font-display); letter-spacing: -0.01em; color: var(--color-ink); }
+  header .tag { display: none; }
+  header p { margin: 0 0 0 6px; flex: 1; min-width: 0; color: var(--color-dim); font-size: 14px; }
+  #theme { background: none; border: 1px solid var(--color-rule); color: var(--color-dim); padding: 4px 12px; border-radius: 999px; }
+
+  .tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--color-rule); margin: 18px 0 16px; }
+  .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; margin-bottom: -1px; padding: 9px 0; }
+  .tabs button { font-size: 14px; }
+  .tabs button.on { color: var(--color-ink); border-bottom-color: var(--color-ink); }
+  .tabs button:hover:not(.on) { color: var(--color-ink-2); }
+
+  .panel { background: var(--color-panel); border: 1px solid var(--color-rule); border-radius: var(--radius-lg); padding: 14px 16px; }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .pick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+  .actions { display: flex; gap: 8px; }
+  #run { background: var(--color-ink); color: var(--color-paper); border: 1px solid var(--color-ink); padding: 8px 20px; font-weight: 600; }
+  #run:hover:not(:disabled) { opacity: 0.88; }
+  #run:active:not(:disabled) { transform: translateY(1px); }
+  .ghost { background: none; border: 1px solid var(--color-rule); color: var(--color-ink); padding: 8px 14px; }
+  .ghost:hover:not(:disabled) { border-color: var(--color-dim); }
+
+  .dd { position: relative; min-width: 0; }
+  .dd > button { display: inline-flex; align-items: center; gap: 9px; background: var(--color-paper); color: var(--color-ink); border: 1px solid var(--color-rule); border-radius: 999px; padding: 6px 14px; font-size: 14px; }
+  .dd > button:hover { border-color: var(--color-dim); }
+  .dd > button::after { content: ""; width: 6px; height: 6px; margin-left: 4px; border-right: 1.5px solid var(--color-dim); border-bottom: 1.5px solid var(--color-dim); transform: translateY(-2px) rotate(45deg); }
+  .dd > button .sub { font-size: 12.5px; color: var(--color-dim); white-space: nowrap; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-good); flex: none; }
+  .dot.off { background: var(--color-bar); }
+  .menu { position: absolute; z-index: 10; top: calc(100% + 6px); left: 0; width: 320px; max-width: calc(100vw - 32px); max-height: 70vh; overflow: auto; padding: 6px;
+          background: var(--color-panel); border: 1px solid var(--color-rule); border-radius: var(--radius-lg); box-shadow: 0 10px 28px var(--color-shadow); }
+  .menu h3 { margin: 10px 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+  .menu button { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; text-align: left; background: none; border: 0; color: var(--color-ink); padding: 6px 8px; font-size: 14px; }
+  .menu button span + span { font-size: 12px; color: var(--color-dim); white-space: nowrap; }
+  .menu button span.ok { color: var(--color-good); }
+  .menu button:hover:not(:disabled), .menu button[aria-selected="true"] { background: var(--color-code); }
+  .menu button:disabled { opacity: 1; color: var(--color-dim); }
+  .menu .hint { margin: -2px 8px 6px; font-size: 12px; color: var(--color-dim); white-space: nowrap; }
+
+  .inputs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 14px 0 0; padding-top: 14px; border-top: 1px solid var(--color-rule); }
+  .src-tabs { display: inline-flex; margin-right: 10px; padding: 2px; border: 1px solid var(--color-rule); border-radius: 999px; }
+  .src-tabs button { background: none; border: 0; border-radius: 999px; padding: 3px 12px; }
+  .src-tabs button.on { color: var(--color-ink); background: var(--color-code); }
+  #examples, #dsrow, #batch { display: contents; }
+  #n { width: 64px; margin-left: 8px; padding: 4px 8px; font: 13.5px var(--font-mono); color: var(--color-ink); background: var(--color-paper); border: 1px solid var(--color-rule); border-radius: 999px; text-align: center; }
+  #n:focus-visible { outline: 2px solid var(--color-good); outline-offset: 1px; }
+  #batch > .label { margin: 0 2px 0 10px; }
+  .chip { background: none; border: 1px solid var(--color-rule); color: var(--color-dim); padding: 4px 12px; font-size: 13.5px; border-radius: 999px; }
+  .chip:hover:not(.on):not(:disabled) { border-color: var(--color-dim); }
+  .chip.on, #ds.on > button { color: var(--color-paper); border-color: var(--color-ink); background: var(--color-ink); }
+  #ds.on > button::after { border-color: var(--color-paper); }
+  #ds > button { padding: 4px 12px; font-size: 13.5px; color: var(--color-dim); background: none; }
+  .src { margin: 10px 0 0; }
+
+  .edit-open { margin-left: auto; }
+  #keydlg { width: min(440px, calc(100vw - 32px)); }
+  #keydlg h2 { margin: 0 0 14px; font-size: 15px; font-weight: 600; }
+  #keydlg .label { display: block; margin-bottom: 6px; }
+  #key-in { width: 100%; font: 14px var(--font-mono); padding: 8px 10px; color: var(--color-ink); background: var(--color-paper); border: 1px solid var(--color-rule); border-radius: var(--radius); }
+  #key-in:focus-visible { outline: 2px solid var(--color-good); outline-offset: 1px; }
+  .check { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 13.5px; color: var(--color-dim); }
+  .err { margin: 12px 0 0; font-size: 13.5px; color: var(--color-warn); }
+  .key-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  #key-ok { background: var(--color-ink); color: var(--color-paper); border: 1px solid var(--color-ink); padding: 8px 16px; font-weight: 600; }
+  dialog { width: min(1000px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 18px 20px; color: var(--color-ink);
+           background: var(--color-panel); border: 1px solid var(--color-rule); border-radius: var(--radius-lg); box-shadow: 0 16px 40px var(--color-shadow); }
+  dialog::backdrop, #keydlg::backdrop { background: rgb(0 0 0 / 0.3); backdrop-filter: blur(6px); }
+  .edit-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .edit-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .readout { margin-top: 18px !important; }
+  .editors { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 10px; }
+  .editors label { display: block; font-size: 13px; color: var(--color-dim); margin-bottom: 6px; }
+  textarea { width: 100%; min-height: 140px; resize: none; padding: 12px; font-size: 12.5px; line-height: 1.55; tab-size: 2; overflow: hidden;
+             background: var(--color-panel); color: var(--color-ink); border: 1px solid var(--color-rule); border-radius: var(--radius); }
+
+  .readout { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; min-height: 26px; margin: 0 0 12px; }
+  #verdict { margin: 0; font-size: 16px; color: var(--color-ink); }
+  #verdict b { color: var(--color-good); }
+  #verdict .miss { color: var(--color-warn); }
+  #log-n { font-weight: 400; color: var(--color-dim); }
+  #tally { margin-left: 10px; font-size: 13px; font-weight: 400; color: var(--color-dim); }
+  #tally b { color: var(--color-ink); font-weight: 500; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  section { background: var(--color-panel); border: 1px solid var(--color-rule); border-radius: var(--radius-lg); padding: 18px 20px; min-height: 420px; display: flex; flex-direction: column; min-width: 0; }
+  section h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--color-ink); }
+  section h2 small { display: block; margin-top: 2px; font: 400 13px var(--font-body); color: var(--color-dim); letter-spacing: 0; }
+  .clock { margin: 14px 0 16px; font: 650 40px/1 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--color-ink); }
+  .clock small { font-size: 15px; font-weight: 400; color: var(--color-dim); margin-left: 4px; }
+  .done .clock { color: var(--color-good); }
+  pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; line-height: 1.55; color: var(--color-ink); background: var(--color-code); border: 1px solid var(--color-rule); border-radius: var(--radius); padding: 12px; min-height: 120px; }
+  .row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; padding: 11px 0; border-top: 1px solid var(--color-rule); }
+  .row .q { font-size: 13px; color: var(--color-dim); overflow-wrap: anywhere; }
+  .row .q b { display: block; color: var(--color-ink); font-size: 14px; font-family: var(--font-mono); }
+  .row .q .t { display: block; margin-top: 3px; }
+  .row .q .t.hit { color: var(--color-good); }
+  .row .q .t.miss { color: var(--color-warn); }
+  .opt { display: grid; grid-template-columns: 110px minmax(40px, 260px) 44px; gap: 10px; align-items: center; font: 12px/1.7 var(--font-mono); color: var(--color-dim); }
+  .opt span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .opt span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .opt .bar { height: 7px; background: var(--color-bar); border-radius: 4px; overflow: hidden; }
+  .opt .bar i { display: block; height: 100%; width: 0; background: var(--color-dim); transition: width 0.45s var(--ease-out); }
+  .opt.top { color: var(--color-ink); }
+  .opt.top { font-weight: 600; }
+  .opt.top .bar i { background: var(--color-good); }
+  .more { margin-top: 4px; }
+  .foot { margin-top: auto; padding-top: 14px; }
+  .log { margin-top: 14px; background: var(--color-panel); border: 1px solid var(--color-rule); border-radius: var(--radius-lg); padding: 16px 20px; }
+  .log-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .log-head h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--color-ink); }
+  .log-scroll { max-height: 460px; overflow: auto; }
+  .log table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .log th { position: sticky; top: 0; background: var(--color-panel); text-align: left; font-weight: 500; color: var(--color-dim); padding: 6px 8px; border-bottom: 1px solid var(--color-rule); }
+  .log td { padding: 7px 8px; border-bottom: 1px solid var(--color-rule); vertical-align: top; white-space: nowrap; }
+  .log td.in { max-width: 380px; overflow: hidden; text-overflow: ellipsis; color: var(--color-ink); }
+  .log td.hit { color: var(--color-good); }
+  .log td.miss { color: var(--color-warn); }
+  .log td span { font-family: var(--font-mono); font-size: 12px; color: var(--color-dim); }
+  .log tbody tr { cursor: pointer; }
+  .log tbody tr:hover, .log tbody tr.on { background: var(--color-code); }
+  #toast { position: fixed; z-index: 20; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; gap: 14px; align-items: flex-start;
+           max-width: min(560px, calc(100vw - 32px)); padding: 12px 14px 12px 16px; font-size: 14px; color: var(--color-ink);
+           background: var(--color-panel); border: 1px solid var(--color-warn); border-left-width: 3px; border-radius: var(--radius); box-shadow: 0 10px 28px var(--color-shadow); }
+  #toast button { flex: none; background: none; border: 0; color: var(--color-dim); font-size: 18px; line-height: 1; padding: 0 2px; }
+  @media (max-width: 860px) {
+    main, .editors { grid-template-columns: minmax(0, 1fr); }
+    .row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+    header p { display: none; }
   }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 24px 48px; }
-  header { display: flex; align-items: center; gap: 14px; }
-  header h1 { font-size: 22px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
-  header p { margin: 0; color: var(--dim); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  header .right { display: flex; align-items: center; gap: 10px; flex: none; }
-  .chip { font-size: 12px; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
-  button { font: inherit; cursor: pointer; border-radius: 8px; }
-  #theme { background: none; border: 1px solid var(--line); color: var(--dim); padding: 4px 12px; border-radius: 999px; font-size: 13px; }
-  #run { background: var(--fg); color: var(--bg); border: 0; padding: 9px 18px; font-weight: 600; }
-  #run:disabled, #replay:disabled { opacity: 0.5; cursor: default; }
-  #replay { background: none; border: 1px solid var(--line); color: var(--fg); padding: 8px 16px; }
-  .controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 22px 0 12px; }
-  details { color: var(--dim); font-size: 14px; margin: 0 0 14px; }
-  summary { cursor: pointer; width: fit-content; }
-  .editors { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
-  .editors label { display: block; font-size: 13px; color: var(--dim); margin-bottom: 6px; }
-  .seg { position: relative; display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--panel); }
-  .seg i { position: absolute; top: 3px; left: 0; height: calc(100% - 6px); width: 0; background: var(--fg); border-radius: 999px; transition: transform 0.25s ease, width 0.25s ease; }
-  .seg button { position: relative; border: 0; background: none; color: var(--dim); padding: 5px 12px; border-radius: 999px; font-size: 14px; transition: color 0.25s; }
-  .seg button.on { color: var(--bg); }
-  @media (prefers-reduced-motion: reduce) { .seg i, .seg button { transition: none; } }
-  textarea {
-    width: 100%; min-height: 140px; resize: none;
-    padding: 12px; font-size: 12.5px; line-height: 1.5; tab-size: 2; overflow: hidden;
-    background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px;
-  }
-  textarea:focus-visible, summary:focus-visible, button:focus-visible { outline: 2px solid var(--good); outline-offset: 2px; }
-  textarea:focus, summary:focus, button:focus { outline: none; }
-  #verdict { min-height: 24px; margin: 0 0 14px; font-size: 16px; }
-  #verdict b { color: var(--good); }
-  #verdict .miss { color: var(--warn); }
-  main { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  section {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px;
-    min-height: 420px; display: flex; flex-direction: column;
-  }
-  section h2 { margin: 0; font-size: 14px; font-weight: 600; }
-  section h2 small { display: block; font-weight: 400; color: var(--dim); font-size: 13px; }
-  .clock { margin: 14px 0 16px; font-size: 40px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; }
-  .clock small { font-size: 15px; color: var(--dim); font-weight: 400; margin-left: 4px; }
-  .done .clock { color: var(--good); }
-  pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.5;
-        background: var(--code); border-radius: 8px; padding: 12px; min-height: 120px; }
-  .row { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
-  .row .q { font-size: 13px; color: var(--dim); }
-  .row .q b { display: block; color: var(--fg); font-size: 14px; }
-  .opt { display: grid; grid-template-columns: 84px minmax(60px, 260px) 44px; gap: 10px; align-items: center; font-size: 12px; color: var(--dim); }
-  .opt .bar { height: 7px; background: var(--bar); border-radius: 4px; overflow: hidden; }
-  .opt .bar i { display: block; height: 100%; width: 0; background: var(--dim); transition: width 0.45s ease-out; }
-  .opt.top { color: var(--fg); font-weight: 600; }
-  .opt.top .bar i { background: var(--good); }
-  .foot { margin-top: auto; padding-top: 12px; font-size: 13px; color: var(--dim); }
-  @media (max-width: 860px) { main, .editors { grid-template-columns: 1fr; } .row { grid-template-columns: 1fr; gap: 6px; } }
   @media (prefers-reduced-motion: reduce) { .opt .bar i { transition: none; } }
 </style>
 
 <div class="wrap">
   <header>
-    <h1>jev.py</h1>
-    <p>One model, two ways to ask it the same questions.</p>
-    <div class="right">
-      <span class="chip mono" id="model">{{model}}</span>
-      <button id="theme" title="Switch light and dark">Dark</button>
-    </div>
+    <h1>jev.py</h1><span class="label tag">demo</span>
+    <p id="lede">One model, two ways to ask it the same questions.</p>
+    <button id="theme" class="label" title="Switch light and dark">Dark</button>
   </header>
 
-  <div class="controls">
-    <button id="run">Run</button>
-    <button id="replay" disabled>Replay together</button>
-    <div id="examples" class="seg"><i></i><button type="button" data-name="Support ticket" class="on">Support ticket</button><button type="button" data-name="Shell command">Shell command</button><button type="button" data-name="Inbox email">Inbox email</button><button type="button" data-name="Pull request">Pull request</button></div>
+  <nav id="mode" class="tabs">
+    <button type="button" data-mode="gen" class="label on">Generate vs readout</button>
+    <button type="button" data-mode="cmp" class="label">Compare two</button>
+  </nav>
+
+  <div class="panel">
+  <div class="toolbar">
+    <div class="pick">
+      <div class="dd" id="a"></div>
+      <span class="vs label" id="vs" hidden>vs</span>
+      <div class="dd" id="b" hidden></div>
+    </div>
+    <div class="actions">
+      <button id="replay" class="ghost" disabled>Replay together</button>
+      <button id="run">Run</button>
+    </div>
   </div>
 
-  <details>
-      <summary>Edit the state and the questions</summary>
+  <div class="inputs">
+    <div id="srcs" class="src-tabs"><button type="button" class="label on" data-src="ex">Examples</button><button type="button" class="label" data-src="ds">Dataset</button></div>
+    <span id="examples">
+      <button type="button" class="chip on" data-name="Support ticket">Support ticket</button>
+      <button type="button" class="chip" data-name="Shell command">Shell command</button>
+      <button type="button" class="chip" data-name="Inbox email">Inbox email</button>
+      <button type="button" class="chip" data-name="Pull request">Pull request</button>
+    </span>
+    <span id="dsrow" hidden>
+      <div class="dd" id="ds"></div>
+      <button id="next" class="chip" hidden>Next item</button>
+      <span id="batch" hidden>
+        <input id="n" type="number" min="1" value="50" aria-label="Items in the batch" />
+        <button type="button" class="chip" id="run-n">Run batch</button>
+        <button type="button" class="chip" id="run-all">All</button>
+        <button type="button" class="chip" id="stop" hidden>Stop</button></span>
+    </span>
+    <button type="button" id="edit-open" class="chip edit-open">Edit input</button>
+  </div>
+  <p id="source" class="src label" hidden></p>
+  </div>
+
+  <dialog id="edit">
+    <div class="edit-head"><h2>State and questions</h2><button type="button" id="edit-done" class="ghost">Done</button></div>
       <div class="editors">
         <div><label for="state">State — the thing being judged</label><textarea id="state" class="mono">{
   "ticket": "I was charged twice for order #4411 and I want my money back. This is the third time I've written, I'm done with you people.",
@@ -129,25 +249,44 @@
   }
 }</textarea></div>
       </div>
-  </details>
+  </dialog>
 
-  <p id="verdict">Run to compare.</p>
+  <p id="verdict" class="readout">Run to compare.</p>
 
   <main>
     <section id="gen">
       <h2>Write the answers as text<small>generate JSON one token at a time, then parse it</small></h2>
       <div class="clock mono"><span>0</span><small>ms</small></div>
       <pre id="gen-out" class="mono"></pre>
-      <div class="foot" id="gen-foot">Waiting to run.</div>
+      <div id="gen-ans" hidden></div>
+      <div class="foot label" id="gen-foot">Waiting to run.</div>
     </section>
     <section id="jev">
       <h2>Read the answers off the logits<small>one pass over the state, a probability for every option</small></h2>
       <div class="clock mono"><span>0</span><small>ms</small></div>
       <div id="jev-out"></div>
-      <div class="foot" id="jev-foot">Waiting to run.</div>
+      <div class="foot label" id="jev-foot">Waiting to run.</div>
     </section>
   </main>
+
+  <div id="log" class="log" hidden>
+    <div class="log-head"><h2>Batch results <span id="log-n"></span><span id="tally"></span></h2><span class="label" id="log-file"></span></div>
+    <div class="log-scroll"><table><thead><tr><th>#</th><th>Input</th><th>Label</th><th id="log-a"></th><th id="log-b"></th></tr></thead><tbody></tbody></table></div>
+  </div>
 </div>
+
+<dialog id="keydlg">
+  <form method="dialog" id="keyform">
+    <h2 id="key-title">Add a key</h2>
+    <label for="key-in" class="label" id="key-var"></label>
+    <input id="key-in" type="password" autocomplete="off" spellcheck="false" required />
+    <label class="check"><input type="checkbox" id="key-save" checked /> Also save to .env (git-ignored)</label>
+    <p id="key-err" class="err" hidden></p>
+    <div class="key-actions"><button type="button" class="ghost" id="key-cancel">Cancel</button><button type="submit" id="key-ok">Check and use</button></div>
+  </form>
+</dialog>
+
+<div id="toast" role="alert" hidden><span></span><button type="button" aria-label="Close">×</button></div>
 
 <script>
   const $ = (s) => document.querySelector(s);
@@ -157,34 +296,173 @@
   $("#theme").onclick = () => setTheme(root.dataset.theme === "dark" ? "light" : "dark");
 
   const EXAMPLES = {"Support ticket": {"state": {"ticket": "I was charged twice for order #4411 and I want my money back. This is the third time I've written, I'm done with you people.", "customer_since": "2019"}, "questions": {"refund_requested": {"type": "noul", "instructions": "Is the customer asking for a refund?"}, "is_spam": {"type": "noul", "instructions": "Is this message spam or an advertisement?"}, "department": {"type": "choice", "instructions": "Which team should handle this ticket?", "criteria": {"billing": "charges, refunds, invoices", "shipping": "delivery, tracking, lost parcels", "returns": "returning or exchanging an item", "other": null}}, "frustration": {"type": "score", "instructions": "How frustrated is the customer?", "criteria": ["calm and polite", "annoyed but civil", "angry, threatening to leave"]}}}, "Shell command": {"state": {"command": "git push --force origin main", "run_by": "an unattended coding agent"}, "questions": {"writes": {"type": "noul", "instructions": "Does this command create, modify or delete anything?"}, "reversible": {"type": "noul", "instructions": "Can its effect be undone easily?"}, "needs_human": {"type": "noul", "instructions": "Should a person approve this before it runs?"}, "risk": {"type": "score", "instructions": "How risky is running this unattended?", "criteria": ["harmless", "recoverable if wrong", "destructive"]}}}, "Inbox email": {"state": {"from": "noreply@bank-alerts.example", "subject": "Action required: your account will be suspended", "body": "We detected unusual activity. Verify your identity within 24 hours by entering your password at the link below or your account will be closed."}, "questions": {"phishing": {"type": "noul", "instructions": "Is this email a phishing attempt?"}, "needs_reply": {"type": "noul", "instructions": "Does the recipient need to reply?"}, "category": {"type": "choice", "instructions": "Which folder does this belong in?", "criteria": {"personal": null, "work": null, "promotions": "marketing and offers", "alerts": "automated notifications", "suspicious": "scams and phishing"}}, "urgency": {"type": "score", "instructions": "How urgent is it for the recipient?", "criteria": ["can wait a week", "this week", "today"]}}}, "Pull request": {"state": {"title": "Move session token check into middleware", "description": "Refactors the per-route auth check into one middleware. No behaviour change intended. Removed the old helper. Tests not updated yet.", "files_changed": ["src/auth/middleware.py", "src/routes/*.py", "src/auth/helpers.py"]}, "questions": {"touches_auth": {"type": "noul", "instructions": "Does this change affect authentication or authorization?"}, "needs_tests": {"type": "noul", "instructions": "Should tests be added or updated before merging?"}, "kind": {"type": "choice", "instructions": "What kind of change is this?", "criteria": {"fix": "fixes a bug", "feature": "adds behaviour", "refactor": "restructures without changing behaviour", "docs": null, "chore": "tooling or dependencies"}}, "review_depth": {"type": "score", "instructions": "How carefully should a reviewer read it?", "criteria": ["skim", "normal review", "line by line, security in mind"]}}}};
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const post = (path, body) => fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const answerOf = (a) => a.type === "noul" ? (a.noul >= 0.5 ? "yes" : "no") : a.type === "choice" ? a.choice : String(Math.round(a.score));
+  const norm = (v) => String(v ?? "").toLowerCase().trim().replace(/^true$/, "yes").replace(/^false$/, "no");
+  const right = (got, want) => { const g = norm(got), w = norm(want); return g === w || g.split(/[\s(:,]/)[0] === w; };
+  let toastTimer;
+  const toast = (msg) => { const t = $("#toast"); t.querySelector("span").textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 10000); };
+  $("#toast button").onclick = () => ($("#toast").hidden = true);
+
   const fit = () => {
     const ts = [...document.querySelectorAll("textarea")];
     ts.forEach((t) => (t.style.height = "auto"));
     const h = Math.max(...ts.map((t) => t.scrollHeight)) + 2;
     ts.forEach((t) => (t.style.height = h + "px"));
   };
-  const fill = (name) => { $("#state").value = JSON.stringify(EXAMPLES[name].state, null, 2); $("#questions").value = JSON.stringify(EXAMPLES[name].questions, null, 2); fit(); };
-  const slide = () => { const b = $("#examples button.on"), i = $("#examples i");
-    i.style.width = b.offsetWidth + "px"; i.style.transform = `translateX(${b.offsetLeft}px)`; };
-  $("#examples").onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
-    document.querySelectorAll("#examples button").forEach((x) => x.classList.toggle("on", x === b)); slide(); fill(b.dataset.name);
-    results[b.dataset.name] ? restore(results[b.dataset.name]) : reset(); };
-  addEventListener("resize", slide); slide();
+  const fill = (req) => { $("#state").value = JSON.stringify(req.state, null, 2); $("#questions").value = JSON.stringify(req.questions, null, 2); fit(); };
   document.querySelectorAll("textarea").forEach((t) => t.addEventListener("input", fit));
-  document.querySelector("details").addEventListener("toggle", fit);
+  $("#edit-open").onclick = () => { $("#edit").showModal(); fit(); };
+  $("#edit-done").onclick = () => $("#edit").close();
+  $("#edit").onclick = (e) => { if (e.target === $("#edit")) $("#edit").close(); };  // click on the backdrop
 
+  let BK = {}, DS = [], mode = "gen", ds = "", item = null, tally = null, last = null;
+  const pick = { a: "", b: "" };
+  const results = {};  // finished runs of the built-in examples, generate mode
+  const forget = () => { for (const k in results) delete results[k]; };
+
+  // ---- backend and dataset menus
+  const meta = (b) => b.group === "local" ? (b.ready ? `${b.gb ? b.gb + " GB · " : ""}on disk` : `download${b.gb ? " " + b.gb + " GB" : ""}`)
+    : b.group === "server" ? (b.ready ? "running" : "not running") : b.ready ? "key set" : "add key";
+  const status = (b) => !b ? "" : b.group === "local" ? `${b.device}${b.gb ? " · " + b.gb + " GB" : ""}${b.ready ? "" : " · download"}`
+    : b.group === "server" ? (b.ready ? "running" : "not running") : "hosted";
+  const where = (b) => !b ? "" : b.group === "local"
+    ? `${b.ready ? "On disk" : "Downloads to"} ${b.path}` + (b.need_gb && b.have_gb ? `. Needs about ${b.need_gb} GB; this machine has ${b.have_gb} GB.` : "")
+    : b.group === "server" ? `llama.cpp at ${b.url}` : `Key from ${b.key}`;
+  const off = (id, b) => !b.ready && b.group === "server";
+  const why = () => "";
+  const menu = (html) => `<div class="menu" role="listbox">${html}</div>`;
+  function drawPick(id) {
+    const el = $("#" + id), b = BK[pick[id]], open = el.classList.contains("open"), all = Object.values(BK);
+    const device = all.find((x) => x.group === "local")?.device ?? "";
+    const heads = [["local", `On this machine · ${device}`], ["server", "Local server"], ["hosted", "Hosted"]];
+    el.innerHTML = `<button type="button" aria-haspopup="listbox" aria-expanded="${open}" title="${esc(where(b))}"><i class="dot${b?.ready ? "" : " off"}"></i>${esc(b?.label ?? "Pick a model")}<span class="sub">${esc(status(b))}</span></button>` + (!open ? "" : menu(heads.map(([g, name]) =>
+        `<h3 class="label">${name}${id === "a" && mode === "gen" && g !== "local" ? " · opens Compare two" : ""}</h3>` +
+        all.filter((x) => x.group === g).sort((x, y) => y.ready - x.ready).map((x) =>
+          `<button type="button" role="option" data-id="${esc(x.id)}" aria-selected="${x.id === pick[id]}"${why(x)}${off(id, x) ? " disabled" : ""}>` +
+          `<span>${esc(x.label)}</span><span class="${x.ready ? "ok" : ""}">${meta(x)}</span></button>` +
+          (g === "server" && !x.ready && !(id === "a" && mode === "gen") ? `<div class="hint">start llama-server · see README</div>` : "")).join("") +
+        (g === "hosted" ? `<div class="hint">Claude and Groq give no probabilities · docs/providers.md</div>` : "")).join("")));
+  }
+  // a set with more options than a picked backend can read (letter readout: 26) cannot run there
+  const blocker = (set) => (mode === "cmp" ? [pick.a, pick.b] : [pick.a]).map((id) => BK[id]).find((b) => b?.max && set.options > b.max);
+  const answers = (set) => set.options === 2 ? "yes / no" : set.options ? set.options + " labels" : "several questions";
+  function drawDs() {
+    const el = $("#ds"), open = el.classList.contains("open");
+    el.classList.toggle("on", !!ds);
+    el.innerHTML = `<button type="button" aria-haspopup="listbox" aria-expanded="${open}">${esc(ds || "Choose a set")}</button>` + (!open ? "" :
+      menu(`<h3 class="label">Public datasets</h3>` + DS.map((set) => {
+        const no = blocker(set);
+        return `<button type="button" role="option" data-id="${esc(set.name)}" title="${esc(set.about ?? "")}" aria-selected="${set.name === ds}"${no ? " disabled" : ""}>` +
+          `<span>${esc(set.name)}</span><span class="${set.local && !no ? "ok" : ""}">${no ? `${set.options} labels · ${esc(no.label)} takes ${no.max}` : answers(set) + (set.local ? " · on disk" : " · download")}</span></button>`;
+      }).join("")));
+  }
+  const checkSet = () => { const set = DS.find((x) => x.name === ds), no = set && blocker(set);
+    if (no) toast(`${ds} has ${set.options} labels; ${no.label} reads the answer as a letter and takes at most ${no.max}. Pick Jev or a local model, or another set.`); };
+  const draw = { a: () => drawPick("a"), b: () => drawPick("b"), ds: drawDs };
+  const showInfo = () => {
+    drawPick("a"); drawPick("b");
+    if (mode === "cmp") for (const [k, id] of [["a", "gen"], ["b", "jev"]])
+      $(`#${id} h2`).innerHTML = `${esc(BK[pick[k]]?.label ?? "")}<small>one request, a probability for every option</small>`;
+  };
+  async function loadBackends() {
+    BK = Object.fromEntries((await (await fetch("/v1/backends")).json()).map((b) => [b.id, b]));
+    const all = Object.values(BK);
+    for (const id of ["a", "b"]) {
+      const keep = pick[id] || (id === "a" ? "{{model}}" : "");
+      const ok = (v) => BK[v] && !off(id, BK[v]) && (BK[v].ready || BK[v].group === "local") && !(id === "a" && mode === "gen" && BK[v].group !== "local");
+      const pref = (b) => ok(b.id) && (id === "b") === (b.group !== "local");
+      pick[id] = ok(keep) ? keep : (all.find(pref) ?? all.find((b) => ok(b.id)))?.id ?? "";
+    }
+    showInfo();
+  }
+  document.addEventListener("click", async (e) => {
+    for (const id of ["a", "b", "ds"]) {
+      const el = $("#" + id), was = el.classList.contains("open");
+      if (!el.contains(e.target)) { if (was) { el.classList.remove("open"); draw[id](); } continue; }
+      const opt = e.target.closest("[data-id]");
+      if (opt && !opt.disabled) {
+        el.classList.remove("open"); draw[id]();
+        if (id === "ds") { ds = opt.dataset.id; drawDs(); useDataset(); }
+        else if (id === "a" && mode === "gen" && BK[opt.dataset.id].group !== "local") toCompare(opt.dataset.id);
+        else if (!BK[opt.dataset.id].ready) askKey(id, opt.dataset.id);
+        else { pick[id] = opt.dataset.id; forget(); reset(); showInfo(); checkSet(); }
+      } else if (e.target.closest(".dd > button")) { el.classList.toggle("open", !was); draw[id](); }
+    }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") for (const id of ["a", "b", "ds"]) { $("#" + id).classList.remove("open"); draw[id](); } });
+
+  // generate mode needs a local model; picking anything else there moves it to the right side of Compare two
+  function toCompare(bid) {
+    if (!BK[bid].ready) return askKey("b", bid);
+    pick.b = bid; $('#mode [data-mode="cmp"]').click();
+  }
+
+  // ---- a key typed into the page, checked by the server before it is used
+  let keyFor = null;
+  function askKey(side, bid) {
+    keyFor = [side, bid]; const b = BK[bid];
+    $("#key-title").textContent = `${b.label} API key`; $("#key-var").textContent = b.key;
+    $("#key-in").value = ""; $("#key-err").hidden = true; $("#key-ok").disabled = false; $("#keydlg").showModal();
+  }
+  $("#key-cancel").onclick = () => $("#keydlg").close();
+  $("#keydlg").onclick = (e) => { if (e.target === $("#keydlg")) $("#keydlg").close(); };  // click on the backdrop
+  $("#keyform").onsubmit = async (e) => {
+    e.preventDefault(); const [side, bid] = keyFor;
+    $("#key-ok").disabled = true; $("#key-ok").textContent = "Checking…"; $("#key-err").hidden = true;
+    const r = await post("/v1/key", { backend: bid, key: $("#key-in").value, save: $("#key-save").checked });
+    $("#key-ok").disabled = false; $("#key-ok").textContent = "Check and use";
+    if (!r.ok) { $("#key-err").textContent = (await r.json()).error.message; $("#key-err").hidden = false; return; }
+    $("#key-in").value = ""; $("#keydlg").close();
+    pick[side] = bid; forget(); reset(); await loadBackends();
+    if (side === "b" && mode === "gen") $('#mode [data-mode="cmp"]').click();
+  };
+
+  // ---- inputs: built-in examples or a dataset item
+  $("#examples").onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
+    ds = ""; item = null; tally = null; batchKey = ""; drawDs(); showDataset();
+    document.querySelectorAll("#examples .chip").forEach((x) => x.classList.toggle("on", x === b));
+    fill(EXAMPLES[b.dataset.name]); results[b.dataset.name] ? restore(results[b.dataset.name]) : reset(); };
+  $("#srcs").onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
+    document.querySelectorAll("#srcs button").forEach((x) => x.classList.toggle("on", x === b));
+    const toDs = b.dataset.src === "ds"; $("#examples").hidden = toDs; $("#dsrow").hidden = !toDs;
+    if (toDs) { if (!ds) setTimeout(() => { $("#ds").classList.add("open"); drawDs(); });  // after this click's outside-close
+    } else ($("#examples .chip.on") ?? $("#examples .chip")).click(); };
+  const showDataset = () => { for (const s of ["#next", "#batch", "#source"]) $(s).hidden = !ds; if (!ds) $("#log").hidden = true; };
+  async function nextItem() {
+    const set = DS.find((s) => s.name === ds), stop = set && !set.local ? watch(ds, ds) : () => {};
+    const r = await post("/v1/sample", { dataset: ds }), x = await r.json(); stop();
+    if (set && r.ok) set.local = true;
+    if (!r.ok) { toast(x.error.message); return false; }
+    item = x; fill(x); reset(); $("#run-all").textContent = `All ${x.pool}`; $("#run-all").dataset.n = x.pool;
+    $("#source").textContent = `${ds} · ${x.source} · ${Object.keys(x.truth).length} question${Object.keys(x.truth).length > 1 ? "s" : ""}` +
+      (x.options ? `, ${x.options} options` : "") + ($("#source").dataset.batch ?? "");
+    return true;
+  }
+  async function useDataset() {
+    document.querySelectorAll("#examples .chip").forEach((x) => x.classList.remove("on"));
+    tally = null; batchKey = ""; showDataset(); $("#verdict").textContent = `Fetching an item from ${ds}…`;
+    if (await nextItem()) $("#verdict").textContent = "Run to score it against the dataset's label.";
+  }
+  $("#next").onclick = nextItem;
+
+  // ---- running
   const clock = (sec, cap) => {
     const el = sec.querySelector(".clock span"), t0 = performance.now(); let raf;
     const tick = () => { el.textContent = Math.min(Math.round(performance.now() - t0), cap ?? Infinity); raf = requestAnimationFrame(tick); };
     tick();
     return () => { cancelAnimationFrame(raf); const ms = cap ?? Math.round(performance.now() - t0); el.textContent = ms; sec.classList.add("done"); return ms; };
   };
-  let last = null;
-  const results = {};
-  const reset = () => {
+  const faster = (l, r) => { $("#gen").classList.toggle("win", l < r); $("#jev").classList.toggle("win", r < l); };
+  const clear = () => {
+    faster(0, 0);
     for (const id of ["gen", "jev"]) { const sec = $("#" + id); sec.classList.remove("done"); sec.querySelector(".clock span").textContent = "0"; }
-    $("#gen-out").textContent = ""; $("#jev-out").innerHTML = "";
-    $("#gen-foot").textContent = "Waiting to run."; $("#jev-foot").textContent = "Waiting to run.";
+    $("#gen-out").textContent = ""; $("#jev-out").innerHTML = ""; $("#gen-ans").innerHTML = "";
+  };
+  const reset = () => {
+    clear(); $("#gen-foot").textContent = "Waiting to run."; $("#jev-foot").textContent = "Waiting to run.";
     $("#verdict").textContent = "Run to compare."; $("#replay").disabled = true; last = null;
   };
   const restore = (r) => {
@@ -193,14 +471,43 @@
     renderAnswers(r.j.res); $("#jev").querySelector(".clock span").textContent = r.j.ms; $("#jev").classList.add("done");
     $("#gen-foot").textContent = r.g.foot; $("#jev-foot").textContent = r.j.foot; $("#verdict").innerHTML = r.verdict; $("#replay").disabled = false;
   };
-  const post = (path, body) => fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  const answerOf = (a) => a.type === "noul" ? (a.noul >= 0.5 ? "yes" : "no") : a.type === "choice" ? a.choice : String(Math.round(a.score));
+
+  function renderAnswers(res, out = $("#jev-out"), truth = item?.truth) {
+    out.innerHTML = "";
+    for (const [id, a] of Object.entries(res.answers)) {
+      const probs = a.type === "noul" ? { yes: a.noul, no: +(1 - a.noul).toFixed(4) } : a.probabilities;
+      const best = answerOf(a);
+      const head = a.type === "score" ? `score ${a.score.toFixed(2)}` : a.type === "noul" ? `${best} · ${a.noul.toFixed(2)}` : a.choice;
+      const t = truth?.[id] === undefined ? "" : `<span class="t label ${right(best, truth[id]) ? "hit" : "miss"}">label: ${esc(truth[id])} ${right(best, truth[id]) ? "✓" : "✗"}</span>`;
+      const ranked = Object.entries(probs).sort((x, y) => y[1] - x[1]), shown = ranked.length > 8 ? ranked.slice(0, 6) : Object.entries(probs);
+      const opts = shown.map(([k, p]) =>
+        `<div class="opt mono ${k === best ? "top" : ""}"><span title="${esc(k)}">${a.type === "score" ? "level " + k : esc(k)}</span><span class="bar"><i data-w="${(p * 100).toFixed(1)}"></i></span><span>${p.toFixed(2)}</span></div>`).join("") +
+        (shown.length < ranked.length ? `<div class="more label">+ ${ranked.length - shown.length} more options</div>` : "");
+      out.insertAdjacentHTML("beforeend", `<div class="row"><div class="q">${esc(id)}<b class="mono">${esc(head)}</b>${t}</div><div>${opts}</div></div>`);
+    }
+    requestAnimationFrame(() => out.querySelectorAll(".bar i").forEach((i) => (i.style.width = i.dataset.w + "%")));
+  }
+
+  async function runJev(body, id = "jev", out = $("#jev-out")) {
+    const sec = $("#" + id), foot = $("#" + id + "-foot"); sec.classList.remove("done"); out.innerHTML = "";
+    foot.textContent = "Scoring every option…";
+    if (mode === "gen") $("#gen-foot").textContent = "Waits for the logits to finish.";
+    const stop = clock(sec);
+    const res = await (await post("/v1/systemone", body)).json();
+    const ms = stop();
+    if (res.error) { foot.textContent = res.error.message; toast(res.error.message); return { ms, error: res.error.message }; }
+    renderAnswers(res, out);
+    const tokens = res.usage?.input_tokens;
+    const text = `${tokens ? tokens + " input tokens, 0 output · " : ""}a probability for every option`;
+    foot.textContent = text;
+    return { ms, answers: res.answers, res, foot: text };
+  }
 
   async function runGenerate(body) {
     const sec = $("#gen"), out = $("#gen-out"); sec.classList.remove("done"); out.textContent = "";
     $("#gen-foot").textContent = "Streaming…";
     const stop = clock(sec);
-    const reader = (await post("/v1/generate", body)).body.getReader(), dec = new TextDecoder(), t0 = performance.now(), chunks = [];
+    const reader = (await post("/v1/generate", { ...body, backend: pick.a })).body.getReader(), dec = new TextDecoder(), t0 = performance.now(), chunks = [];
     for (;;) { const { value, done } = await reader.read(); if (done) break; const text = dec.decode(value); chunks.push([performance.now() - t0, text]); out.textContent += text; }
     const ms = stop();
     let parsed = null;
@@ -210,39 +517,185 @@
     return { ms, parsed, chunks, text: out.textContent, foot };
   }
 
-  async function runJev(body) {
-    const sec = $("#jev"), out = $("#jev-out"); sec.classList.remove("done"); out.innerHTML = "";
-    $("#jev-foot").textContent = "Scoring every option…"; $("#gen-foot").textContent = "Waits for the logits to finish.";
-    const stop = clock(sec);
-    const res = await (await post("/v1/systemone", body)).json();
-    const ms = stop();
-    renderAnswers(res);
-    const foot = `${res.usage.input_tokens} input tokens, 0 output · a probability for every option`;
-    $("#jev-foot").textContent = foot;
-    return { ms, answers: res.answers, res, foot };
+  // poll the server while something downloads, so a long wait shows how far it is
+  function watch(key, label) {
+    const tick = async () => {
+      const x = (await (await fetch("/v1/progress")).json())[key]; if (!x) return;
+      const gb = (v) => (v / 1e9).toFixed(1);
+      $("#verdict").textContent = x.unit === "bytes"
+        ? `Downloading ${label} · ${gb(x.done)}${x.total ? ` of ${gb(x.total)} GB (${Math.min(99, Math.round(100 * x.done / x.total))}%)` : " GB"}`
+        : `Downloading ${label} · page ${Math.min(x.done + 1, x.total)} of ${x.total}`;
+    };
+    const t = setInterval(() => tick().catch(() => {}), 500);
+    return () => clearInterval(t);
   }
 
-  function renderAnswers(res) {
-    const out = $("#jev-out"); out.innerHTML = "";
-    for (const [id, a] of Object.entries(res.answers)) {
-      const probs = a.type === "noul" ? { yes: a.noul, no: +(1 - a.noul).toFixed(4) } : a.probabilities;
-      const best = answerOf(a);
-      const head = a.type === "score" ? `score ${a.score.toFixed(2)}` : a.type === "noul" ? `${best} · ${a.noul.toFixed(2)}` : a.choice;
-      const opts = Object.entries(probs).map(([k, p]) =>
-        `<div class="opt mono ${k === best ? "top" : ""}"><span>${a.type === "score" ? "level " + k : k}</span><span class="bar"><i data-w="${(p * 100).toFixed(1)}"></i></span><span>${p.toFixed(2)}</span></div>`).join("");
-      out.insertAdjacentHTML("beforeend", `<div class="row"><div class="q">${id}<b class="mono">${head}</b></div><div>${opts}</div></div>`);
-    }
-    requestAnimationFrame(() => out.querySelectorAll(".bar i").forEach((i) => (i.style.width = i.dataset.w + "%")));
+  async function ready(bid) {  // downloads a local model on first use, then loads it, so timing starts warm
+    const b = BK[bid];
+    if (!b) { $("#verdict").textContent = "Pick a model first."; return false; }
+    if (b.group === "local" && !b.ready) {
+      if (!confirm(`Download ${b.label}${b.gb ? ` (${b.gb} GB)` : ""} into ${b.path}?`)) return false;
+      $("#verdict").textContent = `Downloading ${b.label}. First time only; this can take minutes.`;
+    } else if (b.group === "local") $("#verdict").textContent = `Loading ${b.label}…`;
+    const stop = b.group === "local" && !b.ready ? watch(bid, b.label) : () => {};
+    const r = await post("/v1/load", { backend: bid }); stop();
+    if (!r.ok) { const m = (await r.json()).error.message; $("#verdict").textContent = m; toast(m); return false; }
+    if (!b.ready) await loadBackends();
+    return true;
   }
+
+  // correct / total questions against the dataset label; got maps question id -> answer
+  const judge = (got, t = item.truth) => { const ids = Object.keys(t); return [ids.filter((id) => got[id] !== undefined && right(got[id], t[id])).length, ids.length]; };
+  const picks = (answers) => Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, answerOf(v)]));
+  const count = (sides) => {
+    tally = tally ?? sides.map(([name]) => [name, 0, 0]);
+    sides.forEach(([, [c, n]], i) => { tally[i][1] += c; tally[i][2] += n; });
+    $("#tally").innerHTML = tally.map(([name, c, n]) => `${esc(name)} <b>${c}/${n}</b>`).join(" · ");
+  };
+
+  async function run() {
+    let body;
+    try { body = { state: JSON.parse($("#state").value), questions: JSON.parse($("#questions").value) }; }
+    catch { $("#verdict").textContent = "The state and the questions must both be valid JSON."; return false; }
+    const a = pick.a, b = pick.b, cmp = mode === "cmp";
+    if (!(await ready(a)) || (cmp && !(await ready(b)))) return false;
+    $("#verdict").textContent = "Running…"; $("#replay").disabled = true; clear();
+    if (cmp) {
+      // two backends on this machine would slow each other down, so they take turns; otherwise both run at once
+      const together = BK[a].group === "hosted" || BK[b].group === "hosted";
+      const left = () => runJev({ ...body, backend: a }, "gen", $("#gen-ans")), right = () => runJev({ ...body, backend: b });
+      const [L, R] = together ? await Promise.all([left(), right()]) : [await left(), await right()];
+      if (L.error || R.error) { $("#verdict").textContent = "One side failed; its message is under its panel."; return false; }
+      const diff = Object.keys(L.answers).filter((id) => R.answers[id] && answerOf(L.answers[id]) !== answerOf(R.answers[id]));
+      $("#verdict").innerHTML = `${esc(BK[a].label)} took <b>${L.ms} ms</b>, ${esc(BK[b].label)} <b>${R.ms} ms</b>` +
+        (diff.length ? `; they disagreed on <span class="miss">${esc(diff.join(", "))}</span>.` : "; they agreed on every answer.");
+      last = { L, R, verdict: $("#verdict").innerHTML }; $("#replay").disabled = false; faster(L.ms, R.ms);
+      const pickAnswers = (x) => Object.fromEntries(Object.entries(x.answers).map(([k, v]) => [k, answerOf(v)]));
+      if (item) count([[BK[a].label, judge(pickAnswers(L))], [BK[b].label, judge(pickAnswers(R))]]);
+      return true;
+    }
+    const j = await runJev({ ...body, backend: a });
+    if (j.error) { $("#verdict").textContent = j.error; return false; }
+    const g = await runGenerate(body);
+    last = { j, g }; $("#replay").disabled = false; faster(g.ms, j.ms);
+    if (!item) results[$("#examples .chip.on")?.dataset.name] = last;
+    const ratio = (g.ms / j.ms).toFixed(1);
+    const misses = g.parsed ? Object.entries(j.answers).filter(([id, x]) => !right(g.parsed[id], answerOf(x))).map(([id]) => id) : [];
+    $("#verdict").innerHTML = `Same weights. Reading the logits was <b>${ratio}× faster</b>` +
+      (g.parsed ? (misses.length ? ` and the generated text disagreed on <span class="miss">${esc(misses.join(", "))}</span>.` : " and both agreed on every answer.") : ", and the generated text was not valid JSON.");
+    last.verdict = $("#verdict").innerHTML;
+    if (item) count([["text", judge(g.parsed ?? {})], ["logits", judge(Object.fromEntries(Object.entries(j.answers).map(([k, v]) => [k, answerOf(v)])))]]);
+    return true;
+  }
+  let stopping = false;
+  const busy = (on) => { for (const b of document.querySelectorAll("#run, #next, #run-n, #run-all, #n")) b.disabled = on; };
+  $("#run").onclick = async () => {
+    busy(true);
+    try { await run(); } catch (err) { toast(`The run stopped: ${err.message}. Is the demo server still running?`); } finally { busy(false); }
+  };
+  // ---- batches: compare mode runs items headless, 8 at a time when both sides are hosted
+  const rows = []; let batchKey = "", batchLog = "";
+  const snippet = (state) => (typeof state === "string" ? state : Object.values(state).map((v) => typeof v === "string" ? v : JSON.stringify(v)).join(" · ")).slice(0, 160);
+  const cell = (res, truth) => {
+    if (res.error) return `<td class="miss">error</td>`;
+    const ids = Object.keys(truth);
+    if (ids.length === 1) {
+      const a = res.answers[ids[0]]; if (!a) return "<td>–</td>";
+      const got = answerOf(a), p = a.type === "noul" ? (got === "yes" ? a.noul : 1 - a.noul) : a.probabilities?.[a.choice];
+      const ok = right(got, truth[ids[0]]);
+      return `<td class="${ok ? "hit" : "miss"}">${esc(got)} <span>${p == null ? "" : p.toFixed(2)}</span> ${ok ? "✓" : "✗"}</td>`;
+    }
+    const [c, n] = judge(picks(res.answers), truth);
+    return `<td class="${c === n ? "hit" : "miss"}">${c}/${n} right</td>`;
+  };
+  function showItem(i) {  // put one finished item into the two panels
+    const { it, L, R } = rows[i]; item = it; fill(it);
+    for (const [id, out, side] of [["gen", $("#gen-ans"), L], ["jev", $("#jev-out"), R]]) {
+      $("#" + id).classList.add("done"); $(`#${id} .clock span`).textContent = side.ms;
+      if (side.res.error) { out.innerHTML = ""; $("#" + id + "-foot").textContent = side.res.error.message; }
+      else { renderAnswers(side.res, out, it.truth); $("#" + id + "-foot").textContent = `${side.res.usage?.input_tokens ?? "?"} input tokens · a probability for every option`; }
+    }
+    $("#source").textContent = `${ds} · ${it.source}`;
+    document.querySelectorAll("#log tbody tr").forEach((r) => r.classList.toggle("on", +r.dataset.i === i));
+  }
+  $("#log tbody").onclick = (e) => { const r = e.target.closest("tr"); if (r) showItem(+r.dataset.i); };
+  async function ask(backend, it, log) {
+    const t = performance.now();
+    const res = await (await post("/v1/systemone", { state: it.state, questions: it.questions, backend, log, truth: it.truth, source: it.source, dataset: ds })).json();
+    return { ms: res.latency_ms ?? Math.round(performance.now() - t), res };
+  }
+  async function batchCompare(n) {
+    const A = pick.a, B = pick.b;
+    if (!(await ready(A)) || !(await ready(B))) return;
+    const hostedA = BK[A].group === "hosted", hostedB = BK[B].group === "hosted";
+    const together = hostedA || hostedB, par = hostedA && hostedB ? 8 : 1;
+    // same set and same two backends: keep adding to the table, the score and the log file
+    const key = [ds, A, B].join("|");
+    if (key !== batchKey) {
+      batchKey = key; rows.length = 0; tally = null; $("#log tbody").innerHTML = "";
+      batchLog = `${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}-${ds}-${BK[A].label}-vs-${BK[B].label}`;
+    }
+    const log = batchLog;
+    $("#log").hidden = false; $("#log-a").textContent = BK[A].label; $("#log-b").textContent = BK[B].label;
+    $("#log-file").textContent = `saved locally · ${par > 1 ? par + " at a time" : together ? "both sides at once" : "one at a time"}`;
+    $("#log-file").title = "results/logs/demo/" + log.replace(/[^A-Za-z0-9._-]/g, "-") + ".jsonl";
+    $("#verdict").textContent = `Running ${n} more items…`;
+    let next = 0, done = 0;
+    const worker = async () => {
+      while (!stopping && next < n) {
+        next++;
+        const r = await post("/v1/sample", { dataset: ds }), it = await r.json();
+        if (!r.ok) { toast(it.error.message); stopping = true; break; }
+        const go = (bk) => ask(bk, it, log);
+        const [L, R] = together ? await Promise.all([go(A), go(B)]) : [await go(A), await go(B)];
+        if (L.res.error || R.res.error) toast((L.res.error ?? R.res.error).message);
+        const i = rows.push({ it, L, R }) - 1; done++;
+        const ok = (x) => x.res.error ? [0, Object.keys(it.truth).length] : judge(picks(x.res.answers), it.truth);
+        item = it; count([[BK[A].label, ok(L)], [BK[B].label, ok(R)]]);
+        $("#log tbody").insertAdjacentHTML("beforeend", `<tr data-i="${i}"><td><span>${i + 1}</span></td><td class="in" title="${esc(snippet(it.state))}">${esc(snippet(it.state))}</td>` +
+          `<td>${esc(Object.values(it.truth).join(", "))}</td>${cell(L.res, it.truth)}${cell(R.res, it.truth)}</tr>`);
+        showItem(i);
+        $("#verdict").textContent = `${done} of ${n} done.`; $("#log-n").textContent = `· ${rows.length} items`;
+      }
+    };
+    await Promise.all(Array.from({ length: par }, worker));
+    $("#verdict").textContent = `${done} of ${n} done. Click a row to see its answers.`;
+    $("#log tbody tr:last-child")?.scrollIntoView({ block: "nearest" });
+  }
+  $("#batch").onclick = async (e) => {
+    const b = e.target.closest("#run-n, #run-all"); if (!b) return;
+    const n = b.id === "run-all" ? +b.dataset.n : Math.max(1, Math.floor(+$("#n").value || 1));
+    busy(true); stopping = false; $("#stop").hidden = false;
+    try {
+      if (mode === "cmp") await batchCompare(n);
+      else for (let i = 0; i < n && !stopping; i++) {
+        $("#source").dataset.batch = ` · ${i + 1} of ${n}`;
+        if ((i && !(await nextItem())) || !(await run())) break;
+      }
+    } catch (err) {
+      toast(`The batch stopped: ${err.message}. Is the demo server still running?`);
+    } finally {
+      stopping = true; $("#stop").hidden = true; delete $("#source").dataset.batch; busy(false);
+    }
+  };
+  $("#stop").onclick = () => { stopping = true; $("#stop").hidden = true; };
 
   async function replay() {
-    const { j, g } = last;
-    const gen = $("#gen"), jev = $("#jev"), out = $("#gen-out");
-    gen.classList.remove("done"); jev.classList.remove("done"); out.textContent = ""; $("#jev-out").innerHTML = "";
     $("#replay").disabled = true; $("#run").disabled = true;
-    const verdict = $("#verdict").innerHTML; $("#verdict").textContent = "Replaying the recorded run, both at once…";
+    const verdict = last.verdict; $("#verdict").textContent = "Replaying the recorded run, both at once…";
+    if (last.L) {
+      for (const [id, out, side] of [["gen", $("#gen-ans"), last.L], ["jev", $("#jev-out"), last.R]]) {
+        const sec = $("#" + id); sec.classList.remove("done"); out.innerHTML = ""; $("#" + id + "-foot").textContent = "Scoring every option…";
+        const stop = clock(sec, side.ms);
+        setTimeout(() => { renderAnswers(side.res, out); stop(); $("#" + id + "-foot").textContent = side.foot; }, side.ms);
+      }
+      setTimeout(() => { $("#verdict").innerHTML = verdict; $("#replay").disabled = false; $("#run").disabled = false; }, Math.max(last.L.ms, last.R.ms));
+      return;
+    }
+    const { j, g } = last, out = $("#gen-out");
+    $("#gen").classList.remove("done"); $("#jev").classList.remove("done"); out.textContent = ""; $("#jev-out").innerHTML = "";
     $("#jev-foot").textContent = "Scoring every option…"; $("#gen-foot").textContent = "Streaming…";
-    const stopG = clock(gen, g.ms), stopJ = clock(jev, j.ms);
+    const stopG = clock($("#gen"), g.ms), stopJ = clock($("#jev"), j.ms);
     setTimeout(() => { renderAnswers(j.res); stopJ(); $("#jev-foot").textContent = j.foot; }, j.ms);
     for (const [t, text] of g.chunks) setTimeout(() => (out.textContent += text), t);
     setTimeout(() => { stopG(); $("#gen-foot").textContent = g.foot; $("#verdict").innerHTML = verdict;
@@ -250,24 +703,15 @@
   }
   $("#replay").onclick = replay;
 
-  $("#run").onclick = async () => {
-    let body;
-    try { body = { state: JSON.parse($("#state").value), questions: JSON.parse($("#questions").value) }; }
-    catch { $("#verdict").textContent = "The state and the questions must both be valid JSON."; return; }
-    $("#state").value = JSON.stringify(body.state, null, 2); $("#questions").value = JSON.stringify(body.questions, null, 2); fit();
-    $("#run").disabled = true; $("#replay").disabled = true; $("#verdict").textContent = "Running…";
-    for (const id of ["gen", "jev"]) { const sec = $("#" + id); sec.classList.remove("done"); sec.querySelector(".clock span").textContent = "0"; }
-    $("#gen-out").textContent = ""; $("#jev-out").innerHTML = "";
-    const j = await runJev(body);
-    const g = await runGenerate(body);
-    last = { j, g }; $("#replay").disabled = false;
-    results[$("#examples button.on").dataset.name] = last;
-    const ratio = (g.ms / j.ms).toFixed(1);
-    const norm = (v) => String(v ?? "").toLowerCase().trim().split(/[\s(:]/)[0];
-    const misses = g.parsed ? Object.entries(j.answers).filter(([id, a]) => norm(g.parsed[id]) !== answerOf(a)).map(([id]) => id) : [];
-    $("#verdict").innerHTML = `Same weights. Reading the logits was <b>${ratio}× faster</b>` +
-      (g.parsed ? (misses.length ? ` and the generated text disagreed on <span class="miss">${misses.join(", ")}</span>.` : " and both agreed on every answer.") : ", and the generated text was not valid JSON.");
-    last.verdict = $("#verdict").innerHTML;
-    $("#run").disabled = false;
-  };
+  $("#mode").onclick = (e) => { const b = e.target.closest("button"); if (!b || b.dataset.mode === mode) return;
+    mode = b.dataset.mode; const cmp = mode === "cmp";
+    document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("on", x === b));
+    $("#b").hidden = !cmp; $("#vs").hidden = !cmp; $("#gen-out").hidden = cmp; $("#gen-ans").hidden = !cmp;
+    $("#lede").textContent = cmp ? "The same questions to two backends, side by side." : "One model, two ways to ask it the same questions.";
+    if (!cmp) { $("#gen h2").innerHTML = "Write the answers as text<small>generate JSON one token at a time, then parse it</small>";
+      $("#jev h2").innerHTML = "Read the answers off the logits<small>one pass over the state, a probability for every option</small>"; }
+    tally = null; batchKey = ""; showDataset(); forget(); reset(); loadBackends(); };
+
+  fit(); loadBackends();
+  fetch("/v1/datasets").then((r) => r.json()).then((d) => { DS = d; drawDs(); });
 </script>
