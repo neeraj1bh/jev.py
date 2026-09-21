@@ -21,7 +21,9 @@ function ModelHeading({ name, state }: { name: string; state: PanelState }) {
   const ms = useElapsed(state);
   return (
     <th className={cn(tableHead, "min-w-[150px] align-bottom")}>
-      <span className="block text-[13px] font-semibold text-ink">{name}</span>
+      <span className="line-clamp-2 text-[13px] font-semibold text-ink" title={name}>
+        {name}
+      </span>
       <span
         className={cn(
           "font-mono text-xs tabular-nums transition-colors",
@@ -86,7 +88,7 @@ function AnswerCell({
         </span>
         {probability !== null && (
           <span className="mt-[3px] ml-auto flex flex-none items-center gap-2">
-            <span className="h-1 w-12 overflow-hidden rounded-full bg-bar">
+            <span className="hidden h-1 w-12 overflow-hidden rounded-full bg-bar sm:block">
               <span
                 className="block h-full rounded-full bg-ink/70"
                 style={{ width: `${probability * 100}%` }}
@@ -154,6 +156,9 @@ interface CompareTableProps {
 }
 
 const idle: PanelState = { status: "idle", footer: "" };
+/** snake_case names wrap after an underscore instead of spilling into the next column. */
+const breakable = (name: string) => name.replaceAll("_", "_\u200b");
+
 const rowCell = "border-b border-rule px-2 py-2 align-top";
 
 /** One column per model and one row per question; a row opens to show every option's probability. */
@@ -186,7 +191,11 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
         </div>
       )}
       <div className="overflow-x-auto">
-        <table className="w-full table-fixed border-collapse text-[13px]">
+        <table
+          className="w-full table-fixed border-collapse text-[13px]"
+          // On narrow screens the table keeps readable columns and scrolls inside its card.
+          style={{ minWidth: 176 + (truth ? 120 : 0) + 150 * names.length }}
+        >
           <colgroup>
             <col className="w-44" />
             {truth && <col className="w-[20%]" />}
@@ -215,7 +224,7 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
                           type="button"
                           aria-expanded={isOpen}
                           onClick={() => toggle(id)}
-                          className="inline-flex items-center gap-1 rounded-sm border-0 bg-transparent p-0 text-left text-ink"
+                          className="inline-flex max-w-full items-start gap-1 rounded-sm border-0 bg-transparent p-0 text-left text-ink"
                         >
                           <Icon
                             icon={ChevronRight}
@@ -225,10 +234,10 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
                               isOpen && "rotate-90",
                             )}
                           />
-                          {id}
+                          <span className="min-w-0 break-words">{breakable(id)}</span>
                         </button>
                       ) : (
-                        id
+                        <span className="break-words">{breakable(id)}</span>
                       )}
                     </td>
                     {truth && (

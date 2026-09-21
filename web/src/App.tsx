@@ -2,7 +2,6 @@ import { type ReactNode, useCallback, useRef, useState } from "react";
 
 import { fetchProgress, fetchRun, fetchRuns, loadModel, sampleItem } from "./api";
 import { isHosted, TEXTLESS } from "./backends";
-import { BatchTable } from "./components/BatchTable";
 import { EditDialog } from "./components/EditDialog";
 import { Header } from "./components/Header";
 import { InputBar, type InputSource } from "./components/InputBar";
@@ -12,10 +11,11 @@ import { ModelPicker } from "./components/ModelPicker";
 import { ModelsPicker } from "./components/ModelsPicker";
 import { type KindFilter, PastRuns } from "./components/PastRuns";
 import { CompareView, GenerateView } from "./components/ResultPanels";
-import { Summary } from "./components/Summary";
+import { ResultsView } from "./components/ResultsView";
 import { Toast } from "./components/Toast";
 import { EXAMPLES, type ExampleName, isExampleName } from "./examples";
 import { useBackends } from "./hooks/useBackends";
+import { useBatchReplay } from "./hooks/useBatchReplay";
 import { idlePanel, runningPanel, usePanels } from "./hooks/usePanels";
 import { isString, usePersistentState } from "./hooks/usePersistentState";
 import { useTheme } from "./hooks/useTheme";
@@ -71,8 +71,9 @@ export default function App() {
   const [columns, setColumns] = useState<string[]>([]);
   const [savedNames, setSavedNames] = useState<string[] | null>(null);
   const [tableVisible, setTableVisible] = useState(false);
+  const [resultsOpen, setResultsOpen] = useState(false);
+  const [liveBatch, setLiveBatch] = useState<{ startedAt: number; total: number } | null>(null);
   const [logFile, setLogFile] = useState({ text: "", path: "" });
-  const [summaryVisible, setSummaryVisible] = useState(false);
   const [recording, setRecording] = useState<Recording | null>(null);
   const [busy, setBusy] = useState(false);
   const [replaying, setReplaying] = useState(false);
@@ -92,7 +93,6 @@ export default function App() {
     open: boolean;
   } | null>(null);
   const [openMenu, setOpenMenu] = useState("");
-  const [replayRow, setReplayRow] = useState<number | null>(null);
   const [savedRuns, setSavedRuns] = useState<SavedRun[]>([]);
   const [runsPage, setRunsPage] = useState(1);
   const [runsLoading, setRunsLoading] = useState(false);
@@ -106,6 +106,7 @@ export default function App() {
   const logSession = useRef({ key: "", name: "" });
   const exampleResults = useRef<Record<string, Recording>>({});
   const panelsRef = useRef<HTMLDivElement>(null);
+  const batchReplay = useBatchReplay(rows);
 
   const isCompare = mode === "compare";
   const runKind: RunKind = mode === "generate" ? "gen" : "cmp";
@@ -155,7 +156,6 @@ export default function App() {
   const resetPanels = (count = isCompare ? compareNames.length : 2) => {
     resetPanelStates(count);
     setPanelsVisible(true);
-    if (!batchKey.current) setSummaryVisible(false);
     setVerdict("Run to compare.");
     setRecording(null);
   };
@@ -167,11 +167,12 @@ export default function App() {
 
   /** A new input, model or tab: the table, summary and any open saved run no longer apply. */
   const clearBatch = () => {
+    batchReplay.stop();
+    setResultsOpen(false);
     replaceRows([]);
     batchKey.current = "";
     setRecording(null);
     setTableVisible(false);
-    setSummaryVisible(false);
     setPanelsVisible(true);
     setOpenItem(null);
     closeSavedRun();
@@ -206,7 +207,6 @@ export default function App() {
     setMode(next);
     closeSavedRun();
     setTableVisible(false);
-    setSummaryVisible(false);
     if (next === "past") {
       setRunsLoading(true);
       fetchRuns()
@@ -416,7 +416,6 @@ export default function App() {
       response: result.failed ? undefined : response,
       footer,
     });
-    if (result.failed) toast.show(footer);
     return result;
   }
 
@@ -461,8 +460,11 @@ export default function App() {
       const sides = await runEach(models, isLocal, (id, i) =>
         readoutInto(i, { ...body, backend: id }),
       );
-      if (sides.some((side) => side.failed)) {
-        setVerdict("A model failed; its message is under its panel.");
+      const failed = sides.filter((side) => side.failed).length;
+      if (failed > 0) {
+        setVerdict(
+          `${failed === 1 ? "One model" : `${failed} models`} failed; the reason is below the table.`,
+        );
         return false;
       }
       const sentence = compareVerdict(models.map(shortName), sides);
@@ -565,7 +567,7 @@ export default function App() {
           : "one at a time";
     setColumns(names);
     setTableVisible(true);
-    setSummaryVisible(false);
+    setResultsOpen(true);
     setPanelsVisible(true);
     resetPanelStates(models.length);
     setLogFile({
@@ -614,7 +616,6 @@ export default function App() {
     });
 
     setVerdict(`${done} of ${total} done.${exhausted ? ` Stopped: ${exhausted}.` : ""}`);
-    setSummaryVisible(true);
     const allRows = rowsRef.current;
     const recorded = allRows.length ? rowRecording(allRows, allRows.length - 1, names) : null;
     if (recorded) setRecording(recorded);
@@ -623,18 +624,19 @@ export default function App() {
   async function runGenerateBatch(total: number) {
     generateBatch.current = true;
     replaceRows([]);
+    setResultsOpen(true);
     for (let i = 0; i < total && !stopRequested.current; i++) {
       setBatchProgress(` · ${i + 1} of ${total}`);
       const next = i === 0 ? item : await nextItem();
       if (!next || !(await run(next))) break;
     }
-    if (rowsRef.current.length) setSummaryVisible(true);
   }
 
   async function runBatch(all: boolean) {
     const total = all ? (remaining ?? 0) : Math.max(1, Math.floor(Number(batchSize) || 1));
     setBusy(true);
     setBatchRunning(true);
+    setLiveBatch({ startedAt: performance.now(), total });
     stopRequested.current = false;
     try {
       if (isCompare) await runCompareBatch(total);
@@ -685,6 +687,7 @@ export default function App() {
     setWrittenAsAnswers(target === "generate");
     setRemaining(null);
     setTableVisible(true);
+    setResultsOpen(true);
     setLogFile({ text: "loaded from disk", path: `results/logs/demo/${name}.jsonl` });
     setOpenItem(null);
     const lastRow = loaded.at(-1);
@@ -692,7 +695,6 @@ export default function App() {
       setItem(lastRow.item);
       setRecording(rowRecording(loaded, loaded.length - 1, names));
     }
-    setSummaryVisible(true);
     setPanelsVisible(false);
     setVerdict("Loaded from disk.");
   }
@@ -703,7 +705,6 @@ export default function App() {
     if (recording.sides && rows.length)
       panelsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     setReplaying(true);
-    setReplayRow(recording.row ?? null);
     setVerdict(
       recording.row === undefined
         ? "Replaying: every side starts together and stops at its recorded time."
@@ -711,7 +712,6 @@ export default function App() {
     );
     const startedAt = now();
     const finish = (ms: number[]) => {
-      setReplayRow(null);
       setVerdict(recording.verdict);
       markFastest(ms);
       setReplaying(false);
@@ -772,7 +772,7 @@ export default function App() {
   const backendList = Object.values(backends);
   const keyBackend = keyRequest ? backends[keyRequest.backend] : undefined;
   const questionCount = item ? Object.keys(item.truth).length : 0;
-  const tableNote = `· ${rows.length} done${remaining !== null && batchRunning ? ` · ${remaining} left in the set` : ""}`;
+  const tableNote = `· ${batchReplay.visibleRows.length} done${remaining !== null && batchRunning ? ` · ${remaining} left in the set` : ""}`;
 
   return (
     <div className="mx-auto max-w-[1280px] px-6 pt-7 pb-14 max-[600px]:px-4">
@@ -799,6 +799,54 @@ export default function App() {
           onPageChange={setRunsPage}
           onOpenRun={openSavedRun}
           backendLabel={columnName}
+        />
+      ) : resultsOpen && tableVisible ? (
+        <ResultsView
+          scoreboard={
+            batchReplay.replaying
+              ? {
+                  startedAt: batchReplay.startedAt,
+                  total: rows.length,
+                  pace: batchReplay.speed,
+                  label: `Replaying ${inputName} at ${batchReplay.speed}×`,
+                }
+              : liveBatch && batchRunning
+                ? { ...liveBatch, pace: 1, label: `Running ${inputName}` }
+                : null
+          }
+          dataset={inputName}
+          rows={batchReplay.visibleRows}
+          columns={columns}
+          note={tableNote}
+          file={logFile}
+          selected={
+            batchReplay.replaying ? batchReplay.visibleRows.length - 1 : (openItem?.index ?? null)
+          }
+          follow={batchReplay.replaying || !!openItem?.open}
+          running={batchRunning}
+          replaying={batchReplay.replaying}
+          speed={batchReplay.speed}
+          onSpeedChange={batchReplay.setSpeed}
+          onReplay={() =>
+            batchReplay.play(
+              isCompare && compareModels.every((id) => isHosted(backends[id]))
+                ? HOSTED_PARALLEL
+                : 1,
+            )
+          }
+          onStopReplay={batchReplay.stop}
+          onStopBatch={() => {
+            stopRequested.current = true;
+            setBatchRunning(false);
+          }}
+          onOpenRow={(index) => showItem(index)}
+          onBack={() => {
+            batchReplay.stop();
+            setResultsOpen(false);
+            setPanelsVisible(true);
+            closeSavedRun();
+            resetPanels();
+          }}
         />
       ) : (
         <>
@@ -886,8 +934,6 @@ export default function App() {
             {verdict}
           </p>
 
-          {summaryVisible && <Summary rows={rows} columns={columns} dataset={inputName} />}
-
           <div ref={panelsRef} hidden={!panelsVisible}>
             {isCompare ? (
               <CompareView
@@ -905,18 +951,6 @@ export default function App() {
               />
             )}
           </div>
-
-          {tableVisible && (
-            <BatchTable
-              rows={rows}
-              columns={columns}
-              note={tableNote}
-              file={logFile}
-              selected={openItem?.index ?? replayRow}
-              follow={!!openItem?.open || replayRow !== null}
-              onOpen={(index) => showItem(index)}
-            />
-          )}
         </>
       )}
 

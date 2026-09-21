@@ -18,6 +18,7 @@ function finishTimes(rows: Row[], workers: number) {
 /** Plays a finished batch back as it happened: rows appear at the moment they finished. */
 export function useBatchReplay(rows: Row[]) {
   const [shown, setShown] = useState<number[] | null>(null);
+  const [startedAt, setStartedAt] = useState(0);
   const [speed, setSpeed] = useState<ReplaySpeed>(1);
   const timers = useRef<number[]>([]);
 
@@ -31,6 +32,7 @@ export function useBatchReplay(rows: Row[]) {
     (workers: number) => {
       stop();
       setShown([]);
+      setStartedAt(performance.now());
       const schedule = finishTimes(rows, workers);
       for (const { index, end } of schedule) {
         timers.current.push(
@@ -45,6 +47,9 @@ export function useBatchReplay(rows: Row[]) {
 
   useEffect(() => stop, [stop]);
 
-  const visibleRows = shown === null ? rows : shown.flatMap((index) => rows[index] ?? []);
-  return { replaying: shown !== null, visibleRows, play, stop, speed, setSpeed };
+  const visibleRows =
+    shown === null
+      ? rows
+      : shown.flatMap((index) => (rows[index] ? [{ ...rows[index], isNew: true }] : []));
+  return { replaying: shown !== null, visibleRows, play, stop, speed, setSpeed, startedAt };
 }
