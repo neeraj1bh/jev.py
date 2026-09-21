@@ -17,6 +17,7 @@ import random
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock, Thread
@@ -27,7 +28,7 @@ from huggingface_hub.constants import HF_HUB_CACHE
 from transformers import TextIteratorStreamer
 
 from jev import DEFAULT_MODEL, SYSTEM, Jev, _options, _text
-from remote import BACKENDS, Remote, env
+from remote import BACKENDS, EXTRAS, Remote, env
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PAGE = os.path.join(HERE, "demo.html")
@@ -118,20 +119,40 @@ def dataset_path(name):
     return os.path.join(DATA, name.replace(" ", "-").lower() + ".json")
 
 
-def sample(name):
+class Exhausted(Exception):
+    pass
+
+
+def deal(name, n, fresh):
+    """The next unseen row index; a fresh deck on request, never a silent reshuffle."""
+    if fresh or name not in DECKS:
+        DECKS[name] = random.sample(range(n), n)
+    if not DECKS[name]:
+        raise Exhausted(f"all {n} items of {name} are done")
+    return DECKS[name].pop()
+
+
+def sample(name, fresh=False):
     """One random labelled item as a request, plus its truth. The first call per dataset
     downloads 300 rows (three random pages) into DATA; later calls deal from them."""
     if name == "TypeSafe cases":  # several questions per document, each with its consensus label
         import eval  # only this dataset needs it
 
         cases = eval.typesafe_rows()
-        if not DECKS.get(name):
-            DECKS[name] = random.sample(range(len(cases)), len(cases))
-        case, node, doc, qs, truth = cases[DECKS[name].pop()]
+        case, node, doc, qs, truth = cases[deal(name, len(cases), fresh)]
         truth = {k: {"true": "yes", "false": "no"}.get(v, v) for k, v in truth.items()}
         src = "TypeSafe · " + case
         pool = len(cases)
-        return {"state": doc, "questions": qs, "truth": truth, "source": src, "options": None, "pool": pool}
+        left = len(DECKS[name])
+        return {
+            "state": doc,
+            "questions": qs,
+            "truth": truth,
+            "source": src,
+            "options": None,
+            "pool": pool,
+            "left": left,
+        }
     hub, config, split, fields, question, label, yes = DATASETS[name]
     path = dataset_path(name)
     if not os.path.exists(path):
@@ -156,9 +177,7 @@ def sample(name):
         page = json.load(f)
     names = next(x["type"].get("names") for x in page["features"] if x["name"] == label)
     rows = [r for r in page["rows"] if r["row"][label] != -1]  # SNLI marks unlabelled pairs -1
-    if not DECKS.get(name):
-        DECKS[name] = random.sample(range(len(rows)), len(rows))
-    r = rows[DECKS[name].pop()]
+    r = rows[deal(name, len(rows), fresh)]
     row, value = r["row"], r["row"][label]
     value = names[value] if names else value
     state = {k: row[v] for k, v in fields.items()}
@@ -175,6 +194,7 @@ def sample(name):
         "source": f"{hub} · {split} row {r['row_idx']}",
         "options": 2 if yes is not None else len(names),
         "pool": len(rows),
+        "left": len(DECKS[name]),
     }
 
 
@@ -193,6 +213,53 @@ def where(model_id):
         if isinstance(found[0], str) and any(isinstance(x, str) for x in found[1:]):
             return cache, True
     return MODELS, False
+
+
+def answer(a):
+    """The answer a probability reply amounts to, in the label set's words."""
+    if a["type"] == "noul":
+        return "yes" if a["noul"] >= 0.5 else "no"
+    return a["choice"] if a["type"] == "choice" else str(round(a["score"]))
+
+
+def right(a, truth):
+    norm = {"true": "yes", "false": "no"}
+    return answer(a).lower().strip() == norm.get(str(truth).lower(), str(truth).lower().strip())
+
+
+def runs():
+    """The saved batches, newest first: set, the two backends, items and each side's score."""
+    out = []
+    if os.path.isdir(LOGS):
+        for f in sorted(os.listdir(LOGS), reverse=True):
+            if not f.endswith(".jsonl"):
+                continue
+            with open(os.path.join(LOGS, f)) as fh:
+                lines = [json.loads(x) for x in fh if x.strip()]
+            sides = list(dict.fromkeys(x["backend"] for x in lines))
+            items = len({(x["source"], json.dumps(x["state"], sort_keys=True)) for x in lines})
+            score = {b: [0, 0] for b in sides}
+            for x in lines:
+                for qid, t in x["truth"].items():
+                    score[x["backend"]][1] += 1
+                    score[x["backend"]][0] += qid in x["answers"] and right(x["answers"][qid], t)
+            ds = lines[0]["dataset"] if lines else ""
+            out.append({"name": f[:-6], "dataset": ds, "backends": sides, "items": items, "score": score})
+    return out
+
+
+def run_rows(name):
+    """One saved batch as items, each with both sides' answers, in the order they ran."""
+    path = os.path.join(LOGS, os.path.basename(name) + ".jsonl")
+    items = {}
+    with open(path) as fh:
+        for x in map(json.loads, filter(str.strip, fh)):
+            key = (x["source"], json.dumps(x["state"], sort_keys=True))
+            it = items.setdefault(
+                key, {"it": {k: x[k] for k in ("state", "questions", "truth", "source")}, "sides": {}}
+            )
+            it["sides"][x["backend"]] = {"ms": x["ms"], "res": {"answers": x["answers"]}}
+    return list(items.values())
 
 
 def folder_bytes(path):
@@ -332,9 +399,11 @@ def set_key(bid, key, save):
             f.write("\n".join(lines) + "\n")
 
 
-@torch.no_grad()
-def generate(jev, state, questions):
-    """Ask the model to write all answers as one JSON object; yield text as it comes."""
+TEXTLESS = {"remote:typesafe", "remote:vercel"}  # Jev returns probabilities only; it never writes text
+
+
+def messages(state, questions):
+    """The usual way: ask for every answer written out as one JSON object."""
     lines = []
     for qid, q in questions.items():
         labels, descs = _options(q)
@@ -344,7 +413,29 @@ def generate(jev, state, questions):
         f"STATE:\n{_text(state)}\n\nAnswer every question as one JSON object, "
         f"keys exactly as given, values from the allowed options:\n" + "\n".join(lines)
     )
-    msgs = [{"role": "system", "content": SYSTEM.split(" Read")[0]}, {"role": "user", "content": user}]
+    return [{"role": "system", "content": SYSTEM.split(" Read")[0]}, {"role": "user", "content": user}]
+
+
+def generate_remote(r, state, questions):
+    """The same request written out by a hosted model, streamed as it arrives."""
+    body = {"model": r.model_id, "messages": messages(state, questions), "stream": True}
+    body |= {"max_tokens": 24 * len(questions), **EXTRAS.get(r.backend, {})}
+    headers = {"authorization": f"Bearer {r.key}", "content-type": "application/json"}
+    req = urllib.request.Request(r.url, data=json.dumps(body).encode(), headers=headers)
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        for raw in resp:
+            line = raw.decode().strip()
+            if not line.startswith("data:") or line[5:].strip() == "[DONE]":
+                continue
+            choices = json.loads(line[5:])["choices"]
+            if choices and choices[0].get("delta", {}).get("content"):
+                yield choices[0]["delta"]["content"]
+
+
+@torch.no_grad()
+def generate(jev, state, questions):
+    """Ask the model to write all answers as one JSON object; yield text as it comes."""
+    msgs = messages(state, questions)
     text = jev.tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
     enc = jev.tok(text, return_tensors="pt").to(jev.device)
     streamer = TextIteratorStreamer(jev.tok, skip_prompt=True, skip_special_tokens=True)
@@ -377,6 +468,11 @@ def main(model_id=DEFAULT_MODEL, port=8080):
         def do_GET(self):
             if self.path.endswith("/backends"):
                 return self._send(200, json.dumps(backends([model_id])).encode())
+            if self.path.endswith("/runs"):
+                return self._send(200, json.dumps(runs()).encode())
+            if "/run?" in self.path:
+                name = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)["name"][0]
+                return self._send(200, json.dumps(run_rows(name)).encode())
             if self.path.endswith("/progress"):
                 return self._send(200, json.dumps(progress()).encode())
             if self.path.endswith("/datasets"):
@@ -398,7 +494,10 @@ def main(model_id=DEFAULT_MODEL, port=8080):
             try:
                 if self.path.endswith("/sample"):
                     with SAMPLE_LOCK:  # batches ask in parallel; one download and one deck per set
-                        item = sample(body["dataset"])
+                        try:
+                            item = sample(body["dataset"], body.get("fresh", False))
+                        except Exhausted as e:
+                            return self._send(409, json.dumps({"error": {"message": str(e)}}).encode())
                     return self._send(200, json.dumps(item).encode())
                 if self.path.endswith("/key"):
                     if self.client_address[0] not in ("127.0.0.1", "::1"):
@@ -409,13 +508,16 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 if self.path.endswith("/load"):  # downloads a local model the first time
                     return self._send(200, json.dumps({"device": jev.device}).encode())
                 if self.path.endswith("/generate"):
-                    if not isinstance(jev, Jev):
-                        raise ValueError("writing the answers as text needs a local model")
+                    if (body.get("backend") or model_id) in TEXTLESS:
+                        raise ValueError("Jev returns probabilities only; it does not write text")
+                    make = generate if isinstance(jev, Jev) else generate_remote
+                    pieces = make(jev, body["state"], body["questions"])
+                    head = next(pieces, "")  # errors surface here, before the stream starts
                     self.send_response(200)
                     self.send_header("content-type", "text/plain; charset=utf-8")
                     self.send_header("transfer-encoding", "chunked")
                     self.end_headers()
-                    for piece in generate(jev, body["state"], body["questions"]):
+                    for piece in [head, *pieces] if head else pieces:
                         chunk = piece.encode()
                         if not chunk:  # a zero-length chunk would end the stream
                             continue

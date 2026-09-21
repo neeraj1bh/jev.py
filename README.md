@@ -215,7 +215,9 @@ Hugging Face cache is used from there; anything else goes to `models/` (git-igno
 request, then used for the session and, if you tick the box, saved to `.env`. A rejected key shows
 up as a message and changes nothing.
 
-Bigger models run through llama.cpp. The GGUFs measured above (Q4_K_M):
+llama.cpp is optional. On NVIDIA, a Mac or a CPU the demo runs models through PyTorch as it is.
+Use llama.cpp for an AMD GPU, which PyTorch cannot use on Windows or WSL, or to run a 4-bit model
+too large to load otherwise. The GGUFs measured above (Q4_K_M):
 [Qwen2.5-7B](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF),
 [Qwen2.5-14B](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF),
 [Qwen3-30B-A3B](https://huggingface.co/unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF).

@@ -12,3 +12,4 @@ results/typesafe/
 models/
 results/eval-set.json
 data/
+temp/
