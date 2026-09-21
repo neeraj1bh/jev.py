@@ -34,6 +34,7 @@ SYSTEM = (
     "You are a calibrated decision engine. "
     "Read the STATE and answer the QUESTION with exactly one of the OPTIONS."
 )
+LETTERS = [chr(c) for c in range(65, 91)]
 
 
 def _confidence(p):
@@ -63,8 +64,9 @@ def _options(q):
 
 
 class Jev:
-    def __init__(self, model_id=DEFAULT_MODEL, device=None, dtype=None):
-        self.model_id = model_id
+    def __init__(self, model_id=DEFAULT_MODEL, device=None, dtype=None, readout="text"):
+        """readout="letter" labels the options A, B, C… and scores the letter instead of the words."""
+        self.model_id, self.readout = model_id, readout
         self.device = device or (
             "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
         )
@@ -73,16 +75,24 @@ class Jev:
         dtype = dtype or (torch.bfloat16 if self.device == "cuda" or cpu_bf16 else torch.float32)
         self.tok = AutoTokenizer.from_pretrained(model_id)
         self.model = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype).to(self.device).eval()
+        # one letter must be one token, or the letter readout would compare different lengths
+        bad = [c for c in LETTERS if len(self.tok.encode(c, add_special_tokens=False)) != 1]
+        assert readout != "letter" or not bad, f"{bad} are several tokens each in {model_id}"
 
     def _prompt(self, state, q, labels, descs):
         """Token ids of the prompt, and of each option's answer text."""
         names = [f"level {la}" if q["type"] == "score" else la for la in labels]
-        lines = [n + (f" — {_text(d)}" if d else "") for n, d in zip(names, descs, strict=True)]
+        letter = self.readout == "letter"
+        if letter and len(names) > len(LETTERS):
+            raise ValueError(f"the letter readout takes at most {len(LETTERS)} options, got {len(names)}")
+        shown = [f"{a} = {n}" for a, n in zip(LETTERS, names, strict=False)] if letter else names
+        lines = [n + (f" — {_text(d)}" if d else "") for n, d in zip(shown, descs, strict=True)]
         user = (
             f"STATE:\n{_text(state)}\n\nQUESTION: {_text(q['instructions'])}\nOPTIONS:\n- "
             + "\n- ".join(lines)
-            + "\nAnswer with one of the options."
+            + ("\nAnswer with the letter of one option." if letter else "\nAnswer with one of the options.")
         )
+        names = LETTERS[: len(names)] if letter else names
         msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]
         text = self.tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
         prompt = self.tok.encode(text, add_special_tokens=False)

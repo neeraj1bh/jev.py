@@ -6,3 +6,6 @@ __pycache__/
 .DS_Store
 .env
 results/logs/
+results/typesafe/
+.vscode/
+.specstory/

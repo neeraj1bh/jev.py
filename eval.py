@@ -10,7 +10,9 @@
              writes  noul    does it modify or delete anything?   truth: labelled by hand
   fields   one exam question per call, 40 each from ten MMLU subjects
              answer  choice  four answers, biology to law        truth: the exam key
-  public   100 items each from seven labelled datasets on the Hugging Face Hub
+  typesafe TypeSafe's published eval cases, fetched at run time, kept out of git
+             one document per call, its questions in one pass; truth: the published consensus
+  public   300 items each from seven labelled datasets on the Hugging Face Hub
              sentiment  noul    is the review positive?            SST-2
              phishing   noul    is the email a phishing attempt?   phishing-email-dataset
              entails    noul    does A entail B?                   GLUE RTE
@@ -214,27 +216,34 @@ NLI = ["entailment", "neutral", "contradiction"]
 TOX = ["not toxic", "mildly toxic", "toxic", "severely toxic"]
 
 
+def pages(n, step):
+    """Page offsets for n rows of a 100-row endpoint, `step` rows apart."""
+    return tuple(range(0, step * -(-n // 100), step))
+
+
 def public_rows(n):
     d = {}
     d["sentiment"] = [
-        (r["sentence"], r["label"] == 1) for r in hub("stanfordnlp/sst2", "default", "validation")
+        (r["sentence"], r["label"] == 1)
+        for r in hub("stanfordnlp/sst2", "default", "validation", pages(n, 100))
     ][:n]
     d["phishing"] = [
         (r["Email Text"][:1500], r["Email Type"] == "Phishing Email")
-        for r in hub("zefang-liu/phishing-email-dataset", "default", "train", (0, 9000))
+        for r in hub("zefang-liu/phishing-email-dataset", "default", "train", pages(n, 9000))
         if isinstance(r["Email Text"], str) and len(r["Email Text"]) > 40
     ][:n]
     d["entails"] = [
-        ((r["sentence1"], r["sentence2"]), r["label"] == 0) for r in hub("nyu-mll/glue", "rte", "validation")
+        ((r["sentence1"], r["sentence2"]), r["label"] == 0)
+        for r in hub("nyu-mll/glue", "rte", "validation", pages(n, 100))
     ][:n]
     d["snli"] = [
         ((r["premise"], r["hypothesis"]), NLI[r["label"]])
-        for r in hub("stanfordnlp/snli", "plain_text", "test", (0, 5000))
+        for r in hub("stanfordnlp/snli", "plain_text", "test", pages(n, 3000))
         if r["label"] >= 0
     ][:n]
-    d["topic"] = [(r["text"], AG[r["label"]]) for r in hub("fancyzhx/ag_news", "default", "test", (0, 3000))][
-        :n
-    ]
+    d["topic"] = [
+        (r["text"], AG[r["label"]]) for r in hub("fancyzhx/ag_news", "default", "test", pages(n, 3000))
+    ][:n]
     # the file is sorted by intent, about a thousand rows each: one page per thousand covers all 27
     bitext = hub(
         "bitext/Bitext-customer-support-llm-chatbot-training-dataset",
@@ -272,6 +281,60 @@ def field_rows(n):
     return rows
 
 
+PUBLIC_N = 300  # items per Hub task
+TYPESAFE = ("security_incidents", "agent_trace_observability", "invoice_processing", "customer_service")
+
+
+def typesafe_rows():
+    """TypeSafe's published eval cases: document, questions and consensus label.
+
+    Fetched from evals.typesafe.ai on first use into results/typesafe/ (git-ignored). Only the
+    case id and our answers reach the log. The consensus is the mean of the two reference sets.
+    """
+    cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", "typesafe")
+    os.makedirs(cache, exist_ok=True)
+    rows = []
+    for wf in TYPESAFE:
+        path = os.path.join(cache, wf + ".js")
+        if not os.path.exists(path):
+            req = urllib.request.Request(
+                f"https://evals.typesafe.ai/{wf}-cases.js", headers={"User-Agent": "Mozilla/5.0"}
+            )
+            with urllib.request.urlopen(req, timeout=60) as r, open(path, "wb") as f:
+                f.write(r.read())
+        with open(path) as f:
+            raw = f.read()
+        ev = json.loads(raw[raw.index("(") + 1 : raw.rindex(")")])["eval"]
+        for cid, case in ev["cases"].items():
+            refs = case["reference_answers"]
+            for node in case["models"]["typesafe"]["nodes"]:
+                if node["doc"] is None or node["node"] not in refs:
+                    continue
+                qs = {
+                    qid: ev["questions"][i]
+                    for qid, i in node["questions"].items()
+                    if qid in refs[node["node"]]
+                }
+                truth = {}
+                for qid in qs:
+                    sets = refs[node["node"]][qid]["sets"]
+                    if all(x.get("probabilities") for x in sets):
+                        keys = {k for x in sets for k in x["probabilities"]}
+                        mean = {k: sum(x["probabilities"].get(k, 0) for x in sets) / len(sets) for k in keys}
+                        truth[qid] = max(mean, key=mean.get)
+                    else:  # a value without a distribution
+                        truth[qid] = str(sets[0]["value"]).lower()
+                rows.append((f"{wf}/{cid}", node["node"], ev["documents"][node["doc"]], qs, truth))
+    return rows
+
+
+def dist(a):
+    """The answer as a distribution over the labels TypeSafe uses."""
+    if a["type"] == "noul":
+        return {"true": a["noul"], "false": 1 - a["noul"]}
+    return a["probabilities"]
+
+
 def load_set(n):
     """Fetch the items once and keep them, so every model is scored on the same set."""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", "eval-set.json")
@@ -279,6 +342,19 @@ def load_set(n):
     if os.path.exists(path):
         with open(path) as f:
             data = json.load(f)
+    if "public" in data and len(data["public"]["sentiment"]) < PUBLIC_N:  # widen, keeping every old row
+        fresh = public_rows(PUBLIC_N)
+        for task, rows in fresh.items():
+            old_rows = data["public"][task]
+            new_rows, rows = (old_rows[0], rows[0]) if task == "intent" else (old_rows, rows)
+            seen, add = {json.dumps(r) for r in new_rows}, []
+            for r in map(list, rows):
+                if json.dumps(r) not in seen and len(add) < PUBLIC_N - len(new_rows):
+                    seen.add(json.dumps(r))
+                    add.append(r)
+            data["public"][task] = (new_rows + add, old_rows[1]) if task == "intent" else new_rows + add
+        with open(path, "w") as f:
+            json.dump(data, f, indent=1)
     if all(k in data for k in ("hn", "commits", "shell", "fields", "public")):
         return data
     makers = {
@@ -286,7 +362,7 @@ def load_set(n):
         "commits": lambda: commit_rows(n),
         "shell": lambda: SHELL,
         "fields": lambda: field_rows(min(n, 40)),
-        "public": lambda: public_rows(100),
+        "public": lambda: public_rows(PUBLIC_N),
     }
     for key, make in makers.items():
         if key not in data:
@@ -297,13 +373,20 @@ def load_set(n):
     return data
 
 
-def record(log, jev, task, state, questions, truth):
+def record(log, jev, task, state, questions, truth, logged=None):
     """Ask, time it, and append one line per question with everything the model returned."""
     t = time.time()
     answers = jev.ask(state, questions)["answers"]
     ms = round((time.time() - t) * 1000)
     for qid, a in answers.items():
-        row = {"task": task, "question": qid, "state": state, "truth": truth.get(qid), "ms": ms, **a}
+        row = {
+            "task": task,
+            "question": qid,
+            "state": logged or state,
+            "truth": truth.get(qid),
+            "ms": ms,
+            **a,
+        }
         log.write(json.dumps(row, ensure_ascii=False) + "\n")
     return answers
 
@@ -313,7 +396,7 @@ def main(model=DEFAULT_MODEL, n=60):
     if model.startswith("remote:"):
         from remote import Remote
 
-        jev = Remote(model.split(":", 1)[1])
+        jev = Remote(*model.split(":")[1:3])  # remote:<backend>[:<model>]
     else:
         jev = Jev(model)
     t0, total, res = time.time(), 0, {}
@@ -456,6 +539,13 @@ def main(model=DEFAULT_MODEL, n=60):
         )["intent"]
         res.setdefault("intent", []).append((a["choice"], truth, a["confidence"]))
         total += 1
+    ts = []
+    for case, node, doc, qs, truth in typesafe_rows():
+        a = record(log, jev, "typesafe", doc, qs, truth, logged={"typesafe_case": case, "node": node})
+        for qid, ans in a.items():
+            ours = dist(ans)
+            ts.append(max(ours, key=ours.get) == truth[qid])
+        total += 1
     for name, kind in (
         ("show", "noul"),
         ("ask", "noul"),
@@ -472,6 +562,7 @@ def main(model=DEFAULT_MODEL, n=60):
         ("toxicity", "score"),
     ):
         report(name, res[name], kind)
+    print(f"typesafe  {len(ts)} questions  accuracy vs consensus={sum(ts) / len(ts):.3f}")
     print(
         "  by subject: "
         + "  ".join(f"{s.replace('college_', '')} {sum(res[s]) / len(res[s]):.2f}" for s in SUBJECTS)

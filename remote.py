@@ -20,7 +20,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-from jev import _confidence, _options, _text, demo, serve
+from jev import LETTERS, _confidence, _options, _text, demo, serve
 
 BACKENDS = {
     "deepseek": ("DEEPSEEK_API_KEY", "https://api.deepseek.com/chat/completions", "deepseek-flash"),
@@ -32,14 +32,21 @@ BACKENDS = {
     ),
     "openai": ("OPENAI_API_KEY", "https://api.openai.com/v1/chat/completions", "gpt-4o-mini"),
     "typesafe": ("TYPESAFE_API_KEY", "https://api.typesafe.ai/v1/systemone", "jev-latest"),
+    # Jev through Vercel's AI Gateway: same questions, "boolean" for noul, P(true) as "probability"
+    "vercel": (
+        "AI_GATEWAY_API_KEY",
+        "https://ai-gateway.vercel.sh/v4/ai/evaluation-model",
+        "typesafe-ai/jev",
+    ),
+    # llama.cpp's llama-server on this machine or the LAN; no key, LLAMACPP_URL overrides the address
+    "llamacpp": ("", "http://localhost:8080/v1/chat/completions", "local"),
 }
 # thinking must be off (else the first token is reasoning); each provider's accepted temperature
 EXTRAS = {
     "deepseek": {"thinking": {"type": "disabled"}, "temperature": 1},
     "moonshot": {"thinking": {"type": "disabled"}, "temperature": 0.6},
 }
-CONCURRENCY = {"moonshot": 2}
-LETTERS = [chr(c) for c in range(65, 91)]
+CONCURRENCY = {"moonshot": 2, "llamacpp": 4}  # llamacpp: match llama-server -np
 
 
 def env(name):
@@ -54,27 +61,32 @@ def env(name):
     return ""
 
 
-def post(url, key, body):
+def post(url, key, body, headers=None):
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode(),
-        headers={"authorization": f"Bearer {key}", "content-type": "application/json"},
+        headers={"authorization": f"Bearer {key}", "content-type": "application/json", **(headers or {})},
     )
-    for attempt in range(6):
+    for attempt in range(40):
         try:
             with urllib.request.urlopen(req, timeout=120) as r:
                 return json.load(r)
         except (urllib.error.URLError, TimeoutError) as e:
             rate_limited = isinstance(e, urllib.error.HTTPError) and e.code == 429
-            if (isinstance(e, urllib.error.HTTPError) and not rate_limited) or attempt == 5:
+            if (isinstance(e, urllib.error.HTTPError) and not rate_limited) or attempt == (
+                39 if rate_limited else 5
+            ):
                 raise
-            time.sleep(2**attempt)  # rate limited or slow: 1, 2, 4, 8, 16 s
+            wait = e.headers.get("retry-after", "") if rate_limited else ""
+            # slow or rate limited: honour retry-after, else 1, 2, 4 … s, capped at a minute
+            time.sleep(float(wait) if wait.replace(".", "", 1).isdigit() else min(60, 2**attempt))
 
 
 class Remote:
     def __init__(self, backend="deepseek", model=None):
         var, self.url, default = BACKENDS[backend]
-        self.backend, self.model_id, self.key = backend, model or default, env(var)
+        self.backend, self.model_id, self.key = backend, model or default, env(var) if var else "none"
+        self.url = env("LLAMACPP_URL") or self.url if backend == "llamacpp" else self.url
         self.device = backend
         if not self.key:
             raise SystemExit(f"{var} is not set: copy .env.example to .env and fill it in")
@@ -82,6 +94,8 @@ class Remote:
     def ask(self, state, questions):
         if self.backend == "typesafe":
             return post(self.url, self.key, {"model": self.model_id, "state": state, "questions": questions})
+        if self.backend == "vercel":
+            return self._vercel(state, questions)
         with ThreadPoolExecutor(CONCURRENCY.get(self.backend, 8)) as pool:
             probs = list(pool.map(lambda q: self._one(state, q), questions.values()))
         answers, tokens = {}, 0
@@ -112,6 +126,23 @@ class Remote:
             "answers": answers,
             "usage": {"input_tokens": tokens, "output_tokens": 0},
         }
+
+    def _vercel(self, state, questions):
+        qs = {k: {**q, "type": "boolean"} if q["type"] == "noul" else q for k, q in questions.items()}
+        headers = {
+            "ai-model-id": self.model_id,
+            "ai-evaluation-model-specification-version": "4",
+            "ai-gateway-protocol-version": "0.0.1",
+        }
+        res = post(self.url, self.key, {"state": state, "questions": qs}, headers)
+        answers = {}
+        for qid, a in res["answers"].items():
+            if a["type"] == "boolean":
+                answers[qid] = {"type": "noul", "noul": a["probability"]}
+            else:
+                p = a.get("probabilities") or {}
+                answers[qid] = {**a, "confidence": _confidence(list(p.values())) if p else None}
+        return {"model": self.model_id, "answers": answers, "usage": res.get("usage", {})}
 
     def _one(self, state, q):
         labels, descs = _options(q)
