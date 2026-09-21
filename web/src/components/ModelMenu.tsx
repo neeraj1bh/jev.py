@@ -9,6 +9,14 @@ import { Icon } from "./Icon";
 import { MenuHeading, MenuHint, MenuItem } from "./Menu";
 
 const MAX_MATCHES = 40;
+
+/** A gateway model's input price, and outside its maker's group, the maker too. */
+function priceText(backend: Backend, inTree: boolean) {
+  const price =
+    backend.free || backend.price === 0 ? "free" : backend.price ? `$${backend.price}/M` : "";
+  if (inTree) return price;
+  return [providerName(backend.provider), price].filter(Boolean).join(" · ");
+}
 const FREE = "free";
 
 /** Lower case with punctuation dropped, so "xai", "x-ai" and "X.AI" all match. */
@@ -91,7 +99,7 @@ export function ModelMenu(props: ModelMenuProps) {
             backend.label
           )
         }
-        detail={inGateway ? (inTree ? "" : providerName(backend.provider)) : detail(backend)}
+        detail={inGateway ? priceText(backend, inTree) : detail(backend)}
         highlightDetail={
           backend.ready && backend.group !== "gateway" && detail(backend) !== "compare only"
         }

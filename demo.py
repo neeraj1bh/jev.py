@@ -431,10 +431,12 @@ def check_gateway(ids):
     for n, bid in enumerate(ids):
         PROGRESS["gateway"] = [n, len(ids), "models"]
         try:
-            Remote("openrouter", model=bid.split(":", 1)[1]).ask({"text": "hello"}, question)
+            Remote("openrouter", model=bid.split(":", 1)[1], patient=False).ask({"text": "hello"}, question)
             CHECKED[bid] = True
         except urllib.error.HTTPError as e:
-            if e.code in (401, 403, 429):  # a bad key or a rate limit says nothing about the model
+            if e.code == 429:  # rate limited (free models allow 50 a day): leave it for another day
+                continue
+            if e.code in (401, 402, 403):  # bad key or no credit left: says nothing about any model
                 break
             CHECKED[bid] = False
         except (NoProbabilities, ValueError, KeyError, IndexError):
@@ -481,6 +483,7 @@ def gateway():
             "max": 26,
             "created": m.get("created", 0),
             "free": m["id"].endswith(":free"),  # OpenRouter marks its free variants this way
+            "price": round(float(m.get("pricing", {}).get("prompt") or 0) * 1e6, 3),  # $ per 1M input tokens
         }
         for m in GATEWAY["models"]
         if CHECKED.get("openrouter:" + m["id"])

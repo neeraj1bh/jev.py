@@ -68,7 +68,8 @@ def env(name):
     return ""
 
 
-def post(url, key, body, headers=None):
+def post(url, key, body, headers=None, patient=True):
+    """A request that waits out slow replies and rate limits; patient=False gives up on the first."""
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode(),
@@ -80,9 +81,8 @@ def post(url, key, body, headers=None):
                 return json.load(r)
         except (urllib.error.URLError, TimeoutError) as e:
             rate_limited = isinstance(e, urllib.error.HTTPError) and e.code == 429
-            if (isinstance(e, urllib.error.HTTPError) and not rate_limited) or attempt == (
-                39 if rate_limited else 5
-            ):
+            last = 39 if rate_limited else 5
+            if not patient or (isinstance(e, urllib.error.HTTPError) and not rate_limited) or attempt == last:
                 raise
             wait = e.headers.get("retry-after", "") if rate_limited else ""
             # slow or rate limited: honour retry-after, else 1, 2, 4 … s, capped at a minute
@@ -90,8 +90,9 @@ def post(url, key, body, headers=None):
 
 
 class Remote:
-    def __init__(self, backend="deepseek", model=None):
+    def __init__(self, backend="deepseek", model=None, patient=True):
         var, self.url, default = BACKENDS[backend]
+        self.patient = patient
         self.backend, self.model_id, self.key = backend, model or default, env(var) if var else "none"
         self.url = env("LLAMACPP_URL") or self.url if backend == "llamacpp" else self.url
         self.device = backend
@@ -100,7 +101,8 @@ class Remote:
 
     def ask(self, state, questions):
         if self.backend == "typesafe":
-            return post(self.url, self.key, {"model": self.model_id, "state": state, "questions": questions})
+            body = {"model": self.model_id, "state": state, "questions": questions}
+            return post(self.url, self.key, body, patient=self.patient)
         if self.backend == "vercel":
             return self._vercel(state, questions)
         with ThreadPoolExecutor(CONCURRENCY.get(self.backend, 8)) as pool:
@@ -141,7 +143,7 @@ class Remote:
             "ai-evaluation-model-specification-version": "4",
             "ai-gateway-protocol-version": "0.0.1",
         }
-        res = post(self.url, self.key, {"state": state, "questions": qs}, headers)
+        res = post(self.url, self.key, {"state": state, "questions": qs}, headers, patient=self.patient)
         answers = {}
         for qid, a in res["answers"].items():
             if a["type"] == "boolean":
@@ -181,6 +183,7 @@ class Remote:
                 "top_logprobs": 20,
                 **EXTRAS.get(self.backend, {"temperature": 0}),
             },
+            patient=self.patient,
         )
         content = (res["choices"][0].get("logprobs") or {}).get("content")
         if not content:  # some providers accept the parameter and send nothing back
