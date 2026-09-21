@@ -119,9 +119,9 @@
   .item-grid { flex: 0 1 auto; min-height: 0; overflow: auto; align-content: start; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; margin-top: 18px; border-top: 1px solid var(--color-rule); }
   .item-foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; margin-top: 8px; border-top: 1px solid var(--color-rule); }
   kbd { font: 11px var(--font-mono); padding: 1px 6px; border: 1px solid var(--color-rule); border-bottom-width: 2px; border-radius: 5px; color: var(--color-ink); }
-  .item-grid > div { padding-top: 14px; min-width: 0; }
-  .item-grid > div:first-child { padding-right: 24px; }
-  .item-grid > div + div { padding-left: 24px; border-left: 1px solid var(--color-rule); }
+  .item-grid { grid-template-columns: repeat(var(--per, 2), minmax(0, 1fr)) !important; }
+  .item-grid > div { padding: 14px 20px 0; min-width: 0; border-left: 1px solid var(--color-rule); }
+  .item-grid > div.first { border-left: 0; padding-left: 0; }
   .item-grid h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
   .item-grid h3 .ms { margin-left: auto; font: 500 13px var(--font-mono); color: var(--color-dim); }
   .pill { font: 500 12px var(--font-mono); padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
@@ -131,14 +131,15 @@
   .item-ans { min-width: 0; }
   @media (max-width: 860px) {
     .item-grid { grid-template-columns: minmax(0, 1fr); }
-    .item-grid > div:first-child { padding-right: 0; }
-    .item-grid > div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--color-rule); margin-top: 14px; }
+    .item-grid { grid-template-columns: minmax(0, 1fr) !important; }
+    .item-grid > div { padding-left: 0; padding-right: 0; border-left: 0; }
+    .item-grid > div + div { border-top: 1px solid var(--color-rule); margin-top: 14px; }
   }
   #keydlg h2 { margin: 0 0 14px; font-size: 15px; font-weight: 600; }
   #keydlg .label { display: block; margin-bottom: 6px; }
   #key-in { width: 100%; font: 14px var(--font-mono); padding: 8px 10px; color: var(--color-ink); background: var(--color-paper); border: 1px solid var(--color-rule); border-radius: var(--radius); }
   #key-in:focus-visible { outline: 2px solid var(--color-good); outline-offset: 1px; }
-  .check { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 13.5px; color: var(--color-dim); }
+  label.check { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 13.5px; color: var(--color-dim); }
   .err { margin: 12px 0 0; font-size: 13.5px; color: var(--color-warn); }
   .key-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
   #key-ok { background: var(--color-ink); color: var(--color-paper); border: 1px solid var(--color-ink); padding: 8px 16px; font-weight: 600; }
@@ -173,7 +174,23 @@
   .row .q { font-size: 13px; color: var(--color-dim); overflow-wrap: anywhere; }
   .row .q b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--color-ink); font-size: 14px; font-family: var(--font-mono); }
   .row .q .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  #jev-out, #gen-ans { max-height: 540px; overflow: auto; }
+  #jev-out, #gen-ans, #cols .ans { max-height: 540px; overflow: auto; }
+  #cols { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 14px; }
+  #cols.many .col { min-height: 300px; padding: 16px 18px; }
+  #cols.many .clock { font-size: 32px; margin: 10px 0 12px; }
+  #cols .ans { overflow-x: hidden; }
+  #cols.many .row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  #cols.many .opt { grid-template-columns: minmax(0, 96px) minmax(24px, 1fr) 36px; }
+  #cols.many .foot { font-size: 12px; }
+  #models > button { max-width: min(560px, 60vw); }
+  #models > button .sub { overflow: hidden; text-overflow: ellipsis; }
+  #models .menu { width: 340px; }
+  i.check { display: inline-block; width: 18px; color: var(--color-good); }
+  @media (max-width: 860px) { #cols { grid-template-columns: minmax(0, 1fr); } }
+  .slot { display: inline-flex; align-items: center; gap: 4px; }
+  .rm { width: 24px; height: 24px; padding: 0; border: 0; background: none; color: var(--color-dim); font-size: 16px; line-height: 1; border-radius: 50%; }
+  .rm:hover { color: var(--color-ink); background: var(--color-code); }
+  #add-model { padding: 6px 12px; }
   .row.fold { grid-template-columns: minmax(0, 1fr); padding: 7px 0; cursor: pointer; }
   .row.fold .opts { display: none; }
   .row.fold .q { display: flex; align-items: baseline; gap: 10px; }
@@ -206,7 +223,9 @@
   #past-kind .menu { left: auto; right: 0; width: 240px; }
   .tabs button { white-space: nowrap; flex: none; }
   @media (max-width: 600px) { .tabs { overflow: auto hidden; scrollbar-width: none; } }
-  #pastlist td.won span { color: var(--color-good); }
+  #pastlist .m { margin-right: 14px; white-space: nowrap; }
+  #pastlist .m i { font: 12px var(--font-mono); font-style: normal; color: var(--color-dim); }
+  #pastlist .m.won i { color: var(--color-good); }
   .pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; }
   .pager-btns { display: flex; gap: 8px; }
   .pager .ghost { padding: 6px 12px; }
@@ -245,7 +264,7 @@
   </header>
 
   <nav id="mode" class="tabs">
-    <button type="button" data-mode="cmp" class="label">Compare two</button>
+    <button type="button" data-mode="cmp" class="label">Compare</button>
     <button type="button" data-mode="gen" class="label on">Generate vs readout</button>
     <button type="button" data-mode="past" class="label">Past runs</button>
   </nav>
@@ -253,7 +272,7 @@
   <div id="pastlist" class="log" hidden>
     <div class="log-head"><h2>Past runs <span class="label">saved in results/logs/demo · opening one sends no requests</span></h2>
       <div class="dd" id="past-kind"></div></div>
-    <div class="log-scroll"><table><thead><tr><th>When</th><th>Input</th><th>Left</th><th>Right</th><th>Items</th></tr></thead><tbody></tbody></table></div>
+    <div class="log-scroll"><table><thead><tr><th>When</th><th>Input</th><th>Models</th><th>Items</th></tr></thead><tbody></tbody></table></div>
     <div class="pager"><span class="label" id="pager-count"></span><span class="pager-btns"><button type="button" class="ghost" id="pg-prev">‹ Prev</button><button type="button" class="ghost" id="pg-next">Next ›</button></span></div>
   </div>
 
@@ -261,8 +280,7 @@
   <div class="toolbar">
     <div class="pick">
       <div class="dd" id="a"></div>
-      <span class="vs label" id="vs" hidden>vs</span>
-      <div class="dd" id="b" hidden></div>
+      <div id="multi" class="pick" hidden></div>
     </div>
     <div class="actions">
       <button id="replay" class="ghost" disabled>Replay together</button>
@@ -335,6 +353,8 @@
 
   <div id="summary" class="summary" hidden></div>
 
+  <div id="cols" hidden></div>
+
   <main>
     <section id="gen">
       <h2>Write the answers as text<small>generate JSON one token at a time, then parse it</small></h2>
@@ -353,7 +373,7 @@
 
   <div id="log" class="log" hidden>
     <div class="log-head"><h2>Batch results <span id="log-n"></span><span id="tally"></span></h2><span class="label" id="log-file"></span></div>
-    <div class="log-scroll"><table><thead><tr><th>#</th><th>Input</th><th>Label</th><th id="log-a"></th><th id="log-b"></th></tr></thead><tbody></tbody></table></div>
+    <div class="log-scroll"><table><thead><tr></tr></thead><tbody></tbody></table></div>
   </div>
 </div>
 
@@ -367,10 +387,7 @@
     </div>
   </div>
   <details class="item-in"><summary class="label">Input</summary><pre id="item-state"></pre></details>
-  <div class="item-grid">
-    <div><h3 id="item-la"></h3><div id="item-a" class="item-ans"></div></div>
-    <div><h3 id="item-lb"></h3><div id="item-b" class="item-ans"></div></div>
-  </div>
+  <div class="item-grid"></div>
   <div class="item-foot label"><span><kbd>←</kbd> <kbd>→</kbd> previous / next</span><span><kbd>Esc</kbd> close</span></div>
 </dialog>
 
@@ -421,7 +438,9 @@
 
   let BK = {}, DS = [], mode = "gen", ds = "", item = null, tally = null, last = null;
   let batchKey = "", batchLog = "", setLeft = null;  // the batch table in view; items of the set not dealt yet
-  const pick = { a: "", b: "" };
+  const pick = { a: "" };  // the generate-vs-readout model
+  let sel = [];  // Compare: 2 to 6 models
+  let cols = [];  // the names of the sides in the table, summary and item view
   const results = {};  // finished runs of the built-in examples, generate mode
   const forget = () => { for (const k in results) delete results[k]; };
 
@@ -438,20 +457,24 @@
   const textless = (id) => id === "remote:typesafe" || id === "remote:vercel";  // Jev returns probabilities only
   const why = () => "";
   const menu = (html) => `<div class="menu" role="listbox">${html}</div>`;
+  const picked = (id) => id === "a" ? pick.a : sel[+id.slice(1)];
+  const isSlot = (id) => /^p\d$/.test(id);
   function drawPick(id) {
-    const el = $("#" + id), b = BK[pick[id]], open = el.classList.contains("open"), all = Object.values(BK);
+    const el = $("#" + id); if (!el) return;
+    const b = BK[picked(id)], open = el.classList.contains("open"), all = Object.values(BK);
+    const taken = (x) => isSlot(id) && sel.includes(x.id) && x.id !== picked(id);  // already in another slot
     const device = all.find((x) => x.group === "local")?.device ?? "";
     const heads = [["local", `On this machine · ${device}`], ["server", "Local server"], ["hosted", "Hosted"]];
     el.innerHTML = `<button type="button" aria-haspopup="listbox" aria-expanded="${open}" title="${esc(where(b))}"><i class="dot${b?.ready ? "" : " off"}"></i>${esc(b?.label ?? "Pick a model")}<span class="sub">${esc(status(b))}</span></button>` + (!open ? "" : menu(heads.map(([g, name]) =>
         `<h3 class="label">${name}</h3>` +
         all.filter((x) => x.group === g).sort((x, y) => rank(id, x) - rank(id, y)).map((x) =>
-          `<button type="button" role="option" data-id="${esc(x.id)}" aria-selected="${x.id === pick[id]}"${why(x)}${off(id, x) ? " disabled" : ""}>` +
-          `<span>${esc(x.label)}</span><span class="${x.ready && !(id === "a" && mode === "gen" && textless(x.id)) ? "ok" : ""}">${id === "a" && mode === "gen" && textless(x.id) ? "compare only" : meta(x)}</span></button>` +
+          `<button type="button" role="option" data-id="${esc(x.id)}" aria-selected="${x.id === picked(id)}"${why(x)}${off(id, x) || taken(x) ? " disabled" : ""}>` +
+          `<span>${esc(x.label)}</span><span class="${x.ready && !taken(x) && !(id === "a" && mode === "gen" && textless(x.id)) ? "ok" : ""}">${taken(x) ? "added" : id === "a" && mode === "gen" && textless(x.id) ? "compare only" : meta(x)}</span></button>` +
           (g === "server" && !x.ready && !(id === "a" && mode === "gen") ? `<div class="hint">start llama-server · see README</div>` : "")).join("") +
         (g === "hosted" ? `<div class="hint" title="See docs/providers.md">Claude, Groq: no probabilities</div>` : "")).join("")));
   }
   // a set with more options than a picked backend can read (letter readout: 26) cannot run there
-  const blocker = (set) => (mode === "cmp" ? [pick.a, pick.b] : [pick.a]).map((id) => BK[id]).find((b) => b?.max && set.options > b.max);
+  const blocker = (set) => (mode === "cmp" ? sel : [pick.a]).map((id) => BK[id]).find((b) => b?.max && set.options > b.max);
   const answers = (set) => set.options === 2 ? "yes / no" : set.options ? "pick 1 of " + set.options : "several questions each";
   function drawDs() {
     const el = $("#ds"), open = el.classList.contains("open");
@@ -468,7 +491,7 @@
   let RUNS = [], runNames = null;
   function clearBatch() {  // a new input, model or tab: the table, summary and any open saved run no longer apply
     rows.length = 0; tally = null; batchKey = ""; last = null;
-    $("#log tbody").innerHTML = ""; $("#log").hidden = true; $("#summary").hidden = true; $("main").hidden = mode === "past";
+    $("#log tbody").innerHTML = ""; $("#log").hidden = true; $("#summary").hidden = true; $("main").hidden = mode !== "gen"; $("#cols").hidden = mode !== "cmp";
     $("#replay").disabled = true;
     if (runNames) leaveRun();
   }
@@ -489,13 +512,13 @@
     pastPage = Math.min(pastPage, pages);
     const page = list.slice((pastPage - 1) * PER_PAGE, pastPage * PER_PAGE);
     const pct = (r, id) => { const [c, n] = r.score?.[id] ?? [0, 0]; return n ? c / n : -1; };
-    const side = (r, id) => { const [c, n] = r.score?.[id] ?? [0, 0], other = r.backends.find((x) => x !== id);
-      const won = n && other && pct(r, id) > pct(r, other);  // the higher score is green; a tie stays plain
-      return `<td class="${won ? "won" : ""}">${esc(label(id, r.mode))} <span>${n ? (100 * c / n).toFixed(1) + "% · " + c + "/" + n : ""}</span></td>`; };
+    const models = (r) => { const best = Math.max(...r.backends.map((id) => pct(r, id))), one = r.backends.filter((id) => pct(r, id) === best).length === 1;
+      return `<td>${r.backends.map((id) => { const [c, n] = r.score?.[id] ?? [0, 0];  // the single best score is green
+        return `<span class="m${one && n && pct(r, id) === best ? " won" : ""}">${esc(label(id, r.mode))} <i>${n ? (100 * c / n).toFixed(1) + "%" : ""}</i></span>`; }).join("")}</td>`; };
     $("#pastlist tbody").innerHTML = page.length ? page.map((r) =>
       `<tr data-name="${esc(r.name)}"><td><span>${esc(r.name.slice(5, 16).replace(/-(\d\d)-(\d\d)$/, " $1:$2"))}</span></td><td>${esc(r.dataset)}</td>` +
-      side(r, r.backends[0]) + (r.backends[1] ? side(r, r.backends[1]) : "<td></td>") + `<td>${r.items}</td></tr>`).join("")
-      : `<tr><td colspan="5">Nothing saved yet${pastKind ? " of this kind" : ""}.</td></tr>`;
+      models(r) + `<td>${r.items}</td></tr>`).join("")
+      : `<tr><td colspan="4">Nothing saved yet${pastKind ? " of this kind" : ""}.</td></tr>`;
     const from = list.length ? (pastPage - 1) * PER_PAGE + 1 : 0;
     $("#pager-count").textContent = list.length ? `${from}–${from + page.length - 1} of ${list.length}` : "";
     $("#pg-prev").disabled = pastPage <= 1; $("#pg-next").disabled = pastPage >= pages;
@@ -521,48 +544,88 @@
     }
     return logName;
   }
-  const saved = (sides) => ({ log: logFor(...sides), mode, dataset: ds || $("#examples .chip.on")?.dataset.name || "edited input",
+  const saved = (sides) => ({ log: logFor(...sides), mode, sides, dataset: ds || $("#examples .chip.on")?.dataset.name || "edited input",
     source: item?.source ?? "built-in example", truth: item?.truth ?? {} });
-  const draw = { a: () => drawPick("a"), b: () => drawPick("b"), ds: drawDs, "past-kind": drawKind };
+  const draw = (id) => id === "ds" ? drawDs() : id === "past-kind" ? drawKind() : id === "models" ? renderPicks() : drawPick(id);
+  const ids = () => ["a", "models", "ds", "past-kind"];
+  const sub = (name) => name?.endsWith("· text") ? "written answers, each counted as certain" : "one request, a probability for every option";
+  function renderPicks() {  // one dropdown for every compared model; check 2 to 6
+    const el = $("#models") ?? Object.assign(document.createElement("div"), { className: "dd", id: "models" });
+    if (!el.isConnected) $("#multi").replaceChildren(el);
+    const open = el.classList.contains("open"), all = Object.values(BK), device = all.find((x) => x.group === "local")?.device ?? "";
+    const names = sel.map((id) => BK[id]?.label ?? id);
+    const heads = [["local", `On this machine · ${device}`], ["server", "Local server"], ["hosted", "Hosted"]];
+    el.innerHTML = `<button type="button" aria-haspopup="listbox" aria-expanded="${open}" title="${esc(names.join(", "))}"><i class="dot"></i>` +
+      `${sel.length} models<span class="sub">${esc(names.join(", "))}</span></button>` + (!open ? "" : menu(
+      `<h3 class="label">Compare 2 to 6 · click to add or remove</h3>` + heads.map(([g, name]) => `<h3 class="label">${name}</h3>` +
+        all.filter((x) => x.group === g).sort((x, y) => rank("models", x) - rank("models", y)).map((x) => {
+          const on = sel.includes(x.id), locked = (on && sel.length <= 2) || (!on && sel.length >= 6) || off("", x);
+          return `<button type="button" role="option" data-id="${esc(x.id)}" aria-selected="${on}"${locked ? " disabled" : ""}>` +
+            `<span><i class="check">${on ? mark(true) : ""}</i>${esc(x.label)}</span><span class="${x.ready ? "ok" : ""}">${meta(x)}</span></button>`;
+        }).join("")).join("")));
+  }
+  function renderCols() {  // Compare: one panel per model
+    const names = runNames ?? sel.map((id) => BK[id]?.label ?? id);
+    $("#cols").style.setProperty("--cols", names.length <= 4 ? names.length : 3); $("#cols").classList.toggle("many", names.length > 2);
+    $("#cols").innerHTML = names.map((n, i) => `<section class="col" data-i="${i}"><h2>${esc(n)}<small>${sub(n)}</small></h2>` +
+      `<div class="clock mono"><span>0</span><small>ms</small></div><div class="ans"></div><div class="foot label">Waiting to run.</div></section>`).join("");
+  }
+  const col = (i) => $(`#cols .col[data-i="${i}"]`);
   const showInfo = () => {
-    drawPick("a"); drawPick("b");
-    if (mode === "cmp" || runNames) for (const [k, id, n] of [["a", "gen", 0], ["b", "jev", 1]])
-      $(`#${id} h2`).innerHTML = `${esc(runNames?.[n] ?? BK[pick[k]]?.label ?? "")}<small>${runNames?.[n]?.endsWith("· text") ? "written answers, each counted as certain" : "one request, a probability for every option"}</small>`;
+    drawPick("a");
+    if (mode === "cmp") { renderPicks(); renderCols(); }
+    else if (runNames) for (const [id, n] of [["gen", 0], ["jev", 1]]) $(`#${id} h2`).innerHTML = `${esc(runNames[n])}<small>${sub(runNames[n])}</small>`;
   };
   async function loadBackends() {
     BK = Object.fromEntries((await (await fetch("/v1/backends")).json()).map((b) => [b.id, b]));
     const all = Object.values(BK);
-    for (const id of ["a", "b"]) {
-      const keep = pick[id] || (id === "a" ? "{{model}}" : "");
-      const ok = (v) => BK[v] && !off(id, BK[v]) && (BK[v].ready || BK[v].group === "local") && !(id === "a" && mode === "gen" && textless(v));
-      const pref = (b) => ok(b.id) && (id === "b") === (b.group !== "local");
-      pick[id] = ok(keep) ? keep : (all.find(pref) ?? all.find((b) => ok(b.id)))?.id ?? "";
-    }
+    const usable = (v) => BK[v] && !off("", BK[v]) && (BK[v].ready || BK[v].group === "local");
+    const keep = pick.a || "{{model}}", okA = (v) => usable(v) && !textless(v);
+    pick.a = okA(keep) ? keep : all.find((b) => okA(b.id) && b.group === "local")?.id ?? all.find((b) => okA(b.id))?.id ?? "";
+    sel = sel.filter(usable);
+    if (!sel.length) sel.push(usable("{{model}}") ? "{{model}}" : all.find((b) => usable(b.id))?.id);
+    while (sel.length < 2) { const x = all.find((b) => usable(b.id) && b.group === "hosted" && !sel.includes(b.id)) ?? all.find((b) => usable(b.id) && !sel.includes(b.id)); if (!x) break; sel.push(x.id); }
+    sel = sel.filter(Boolean);
     showInfo();
   }
   document.addEventListener("click", async (e) => {
-    for (const id of ["a", "b", "ds", "past-kind"]) {
-      const el = $("#" + id), was = el.classList.contains("open");
-      if (!el.contains(e.target)) { if (was) { el.classList.remove("open"); draw[id](); } continue; }
+    const rm = e.target.closest("[data-rm]");
+    if (rm) { sel.splice(+rm.dataset.rm, 1); clearBatch(); forget(); reset(); showInfo(); return; }
+    if (e.target.closest("#add-model")) {
+      const x = Object.values(BK).find((b) => b.ready && b.group === "hosted" && !sel.includes(b.id)) ?? Object.values(BK).find((b) => (b.ready || b.group === "local") && !sel.includes(b.id));
+      if (x) { sel.push(x.id); clearBatch(); forget(); reset(); showInfo(); setTimeout(() => { const el = $(`#p${sel.length - 1}`); el?.classList.add("open"); drawPick(`p${sel.length - 1}`); }); }
+      return;
+    }
+    for (const id of ids()) {
+      const el = $("#" + id); if (!el) continue;
+      const was = el.classList.contains("open");
+      if (!el.contains(e.target)) { if (was) { el.classList.remove("open"); draw(id); } continue; }
       const opt = e.target.closest("[data-id]");
       if (opt && !opt.disabled) {
-        el.classList.remove("open"); draw[id]();
+        if (id === "models") {  // add or remove, the menu stays open for the next pick
+          const bid = opt.dataset.id;
+          if (!sel.includes(bid) && !BK[bid].ready && BK[bid].group === "hosted") { el.classList.remove("open"); renderPicks(); askKey("models", bid); return; }
+          sel = sel.includes(bid) ? sel.filter((x) => x !== bid) : [...sel, bid];
+          clearBatch(); forget(); reset(); showInfo(); $("#models").classList.add("open"); renderPicks(); checkSet(); return;
+        }
+        el.classList.remove("open"); draw(id);
         if (id === "ds") { ds = opt.dataset.id; drawDs(); useDataset(); }
         else if (id === "past-kind") { pastKind = opt.dataset.id; pastPage = 1; drawKind(); showPast(false); }
         else if (id === "a" && mode === "gen" && textless(opt.dataset.id)) toCompare(opt.dataset.id);
         else if (!BK[opt.dataset.id].ready) askKey(id, opt.dataset.id);
-        else { pick[id] = opt.dataset.id; clearBatch(); forget(); reset(); showInfo(); checkSet(); }
+        else { if (id === "a") pick.a = opt.dataset.id; else sel[+id.slice(1)] = opt.dataset.id; clearBatch(); forget(); reset(); showInfo(); checkSet(); }
       } else if (e.target.closest(".dd > button")) {
-        el.classList.toggle("open", !was); draw[id]();
+        el.classList.toggle("open", !was); draw(id);
       }
     }
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") for (const id of ["a", "b", "ds"]) { $("#" + id).classList.remove("open"); draw[id](); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") for (const id of ids()) { const el = $("#" + id); if (el?.classList.contains("open")) { el.classList.remove("open"); draw(id); } } });
 
   // generate mode needs a local model; picking anything else there moves it to the right side of Compare two
   function toCompare(bid) {
-    if (!BK[bid].ready) return askKey("b", bid);
-    pick.b = bid; $('#mode [data-mode="cmp"]').click();
+    if (!BK[bid].ready) return askKey("models", bid);
+    if (!sel.includes(bid)) sel[1] = bid;
+    $('#mode [data-mode="cmp"]').click();
   }
 
   // ---- a key typed into the page, checked by the server before it is used
@@ -581,8 +644,9 @@
     $("#key-ok").disabled = false; $("#key-ok").textContent = "Check and use";
     if (!r.ok) { $("#key-err").textContent = (await r.json()).error.message; $("#key-err").hidden = false; return; }
     $("#key-in").value = ""; $("#keydlg").close();
-    pick[side] = bid; forget(); reset(); await loadBackends();
-    if (side === "b" && mode === "gen") $('#mode [data-mode="cmp"]').click();
+    if (side === "a") pick.a = bid; else if (!sel.includes(bid)) sel = [...sel, bid].slice(-6);
+    forget(); reset(); await loadBackends();
+    if (side !== "a" && mode === "gen") $('#mode [data-mode="cmp"]').click();
   };
 
   // ---- inputs: built-in examples or a dataset item
@@ -621,13 +685,21 @@
     return () => { cancelAnimationFrame(raf); const ms = cap ?? Math.round(performance.now() - t0); el.textContent = ms; sec.classList.add("done"); return ms; };
   };
   const faster = (l, r) => { $("#gen").classList.toggle("win", l < r); $("#jev").classList.toggle("win", r < l); };
+  const fastest = (secs, ms) => {  // only a single fastest side turns green
+    const min = Math.min(...ms), one = ms.filter((x) => x === min).length === 1;
+    secs.forEach((sec, k) => sec?.classList.toggle("win", one && ms[k] === min));
+  };
+  const times = (names, ms) => { const min = Math.min(...ms), one = ms.filter((x) => x === min).length === 1;
+    return names.map((n, k) => `${esc(n)} ${one && ms[k] === min ? `<b>${ms[k]} ms</b>` : `${ms[k]} ms`}`).join(", "); };
   const clear = () => {
     faster(0, 0);
+    document.querySelectorAll("#cols .col").forEach((c) => { c.classList.remove("done", "win"); c.querySelector(".clock span").textContent = "0";
+      c.querySelector(".ans").innerHTML = ""; c.querySelector(".foot").textContent = "Waiting to run."; });
     for (const id of ["gen", "jev"]) { const sec = $("#" + id); sec.classList.remove("done"); sec.querySelector(".clock span").textContent = "0"; }
     $("#gen-out").textContent = ""; $("#jev-out").innerHTML = ""; $("#gen-ans").innerHTML = "";
   };
   const reset = () => {
-    clear(); $("main").hidden = false; if (!batchKey) $("#summary").hidden = true; $("#gen-foot").textContent = "Waiting to run."; $("#jev-foot").textContent = "Waiting to run.";
+    clear(); $("main").hidden = mode !== "gen"; $("#cols").hidden = mode !== "cmp"; if (!batchKey) $("#summary").hidden = true; $("#gen-foot").textContent = "Waiting to run."; $("#jev-foot").textContent = "Waiting to run.";
     $("#verdict").textContent = "Run to compare."; $("#replay").disabled = true; last = null;
   };
   const restore = (r) => {
@@ -667,6 +739,26 @@
     const text = `${tokens ? tokens + " input tokens, 0 output · " : ""}a probability for every option`;
     foot.textContent = text;
     return { ms, answers: res.answers, res, foot: text };
+  }
+
+  async function runCol(body, i) {
+    const sec = col(i), out = sec.querySelector(".ans"), foot = sec.querySelector(".foot");
+    sec.classList.remove("done", "win"); out.innerHTML = ""; foot.textContent = "Scoring every option…";
+    const stop = clock(sec);
+    const res = await (await post("/v1/systemone", body)).json();
+    const ms = stop();
+    if (res.error) { foot.textContent = res.error.message; toast(res.error.message); return { ms, error: res.error.message, res }; }
+    renderAnswers(res, out);
+    const tokens = res.usage?.input_tokens;
+    const text = `${tokens ? tokens + " input tokens, 0 output · " : ""}a probability for every option`;
+    foot.textContent = text;
+    return { ms, answers: res.answers, res, foot: text };
+  }
+  async function runAll(list, fn) {  // hosted models at once; models on this machine one after another
+    const out = [], local = list.map((_, i) => i).filter((i) => BK[list[i]]?.group !== "hosted");
+    await Promise.all([...list.map((_, i) => i).filter((i) => !local.includes(i)).map(async (i) => (out[i] = await fn(list[i], i))),
+      (async () => { for (const i of local) out[i] = await fn(list[i], i); })()]);
+    return out;
   }
 
   async function runGenerate(body) {
@@ -723,24 +815,21 @@
     let body;
     try { body = { state: JSON.parse($("#state").value), questions: JSON.parse($("#questions").value) }; }
     catch { $("#verdict").textContent = "The state and the questions must both be valid JSON."; return false; }
-    const a = pick.a, b = pick.b, cmp = mode === "cmp";
+    const a = pick.a, cmp = mode === "cmp";
     if (runNames) leaveRun();
-    if (!(await ready(a)) || (cmp && !(await ready(b)))) return false;
-    body = { ...body, ...saved(cmp ? [a, b] : [a]) };
+    for (const id of cmp ? sel : [a]) if (!(await ready(id))) return false;
+    body = { ...body, ...saved(cmp ? sel : [a]) };
     $("#verdict").textContent = "Running…"; $("#replay").disabled = true; clear();
     if (cmp) {
-      // two backends on this machine would slow each other down, so they take turns; otherwise both run at once
-      const together = BK[a].group === "hosted" || BK[b].group === "hosted";
-      const left = () => runJev({ ...body, backend: a }, "gen", $("#gen-ans")), right = () => runJev({ ...body, backend: b });
-      const [L, R] = together ? await Promise.all([left(), right()]) : [await left(), await right()];
-      if (L.error || R.error) { $("#verdict").textContent = "One side failed; its message is under its panel."; return false; }
-      const diff = Object.keys(L.answers).filter((id) => R.answers[id] && answerOf(L.answers[id]) !== answerOf(R.answers[id]));
-      const time = (ms, other) => ms < other ? `<b>${ms} ms</b>` : `${ms} ms`;  // only the faster time is green
-      $("#verdict").innerHTML = `${esc(BK[a].label)} took ${time(L.ms, R.ms)}, ${esc(BK[b].label)} ${time(R.ms, L.ms)}` +
-        (diff.length ? `; they disagreed on <span class="miss">${esc(diff.join(", "))}</span>.` : "; they agreed on every answer.");
-      last = { L, R, verdict: $("#verdict").innerHTML }; $("#replay").disabled = false; faster(L.ms, R.ms);
-      const pickAnswers = (x) => Object.fromEntries(Object.entries(x.answers).map(([k, v]) => [k, answerOf(v)]));
-      if (item) count([[BK[a].label, judge(pickAnswers(L))], [BK[b].label, judge(pickAnswers(R))]]);
+      const outs = await runAll(sel, (id, i) => runCol({ ...body, backend: id }, i));
+      if (outs.some((x) => x.error)) { $("#verdict").textContent = "A model failed; its message is under its panel."; return false; }
+      const names = sel.map((id) => BK[id].label), ms = outs.map((x) => x.ms);
+      const diff = Object.keys(outs[0].answers).filter((id) => new Set(outs.map((x) => x.answers[id] && answerOf(x.answers[id]))).size > 1);
+      $("#verdict").innerHTML = `${times(names, ms)}` +
+        (diff.length ? `; they disagreed on <span class="miss">${esc(diff.join(", "))}</span>.` : `; ${sel.length > 2 ? "all agreed" : "they agreed"} on every answer.`);
+      last = { sides: outs.map((x) => ({ ms: x.ms, res: x.res, foot: x.foot })), verdict: $("#verdict").innerHTML }; $("#replay").disabled = false;
+      fastest(sel.map((_, i) => col(i)), ms);
+      if (item) count(outs.map((x, i) => [names[i], judge(picks(x.answers))]));
       return true;
     }
     // a hosted model answers both ways at once; one on this machine takes turns so neither slows the other
@@ -758,11 +847,11 @@
       (both ? "" : " Run one after the other on this machine; Replay shows them side by side.");
     last.verdict = $("#verdict").innerHTML;
     if (item && batching) {  // a generate-vs-readout batch: one row per item, the written side on the left
-      if (!rows.length) { $("#log tbody").innerHTML = ""; tally = null; $("#log-a").textContent = label(a + "#text"); $("#log-b").textContent = label(a, "gen"); }
+      if (!rows.length) { $("#log tbody").innerHTML = ""; tally = null; setCols([label(a + "#text"), label(a, "gen")]); }
       $("#log").hidden = false; $("#log-file").textContent = both ? "saved locally · both ways at once" : "saved locally · one after the other";
       $("#log-file").title = `results/logs/demo/${logName}.jsonl`;
       const L = { ms: gen.ms, res: { answers: textAnswers(gen.parsed, body.questions) } }, R = { ms: j.ms, res: j.res };
-      const i = rows.push({ it: item, L, R }) - 1; addRow(i);
+      const i = rows.push({ it: item, sides: [L, R] }) - 1; addRow(i);
       count([[label(a + "#text"), judge(picks(L.res.answers))], [label(a, "gen"), judge(picks(R.res.answers))]]);
       $("#log-n").textContent = `· ${rows.length} done`;
     }
@@ -810,74 +899,79 @@
     }
     return out;
   }
+  function setCols(names) {  // the table's side columns
+    cols = names;
+    $("#log thead tr").innerHTML = "<th>#</th><th>Input</th><th>Label</th>" + names.map((n) => `<th>${esc(n)}</th>`).join("");
+  }
   function addRow(i) {
-    const { it, L, R } = rows[i];
+    const { it, sides } = rows[i];
     $("#log tbody").insertAdjacentHTML("beforeend", `<tr data-i="${i}"${loading ? "" : ' class="new"'}><td><span>${i + 1}</span></td><td class="in" title="${esc(snippet(it.state))}">${esc(snippet(it.state))}</td>` +
-      `<td>${Object.keys(it.truth).length > 1 ? `<span>${Object.keys(it.truth).length} questions</span>` : esc(Object.values(it.truth)[0])}</td>${cell(L.res, it.truth)}${cell(R.res, it.truth)}</tr>`);
+      `<td>${Object.keys(it.truth).length > 1 ? `<span>${Object.keys(it.truth).length} questions</span>` : esc(Object.values(it.truth)[0] ?? "")}</td>${sides.map((x) => cell(x.res, it.truth)).join("")}</tr>`);
   }
   async function loadRun(name) {  // rebuild a saved batch: table, score, summary and replay, with no new requests
     const run = RUNS.find((r) => r.name === name), got = await (await fetch("/v1/run?name=" + encodeURIComponent(name))).json();
-    const [A, B] = run.backends;
+    const B = run.backends;
     const target = run.mode === "gen" ? "gen" : "cmp";  // a saved run opens in the tab it was made in
     if (mode !== target) $(`#mode [data-mode="${target}"]`).click();
     ds = run.dataset; drawDs(); showDataset();
     document.querySelectorAll("#srcs button").forEach((x) => x.classList.toggle("on", x.dataset.src === "ds"));  // the run's input: its dataset
     document.querySelectorAll("#examples .chip").forEach((x) => x.classList.remove("on"));
     $("#examples").hidden = true; $("#dsrow").hidden = false;
-    const root = (id) => id?.replace(/#text$/, ""); if (BK[root(A)]) pick.a = root(A); if (BK[root(B)] && root(B) !== root(A)) pick.b = root(B); showInfo();
+    const root = (id) => id?.replace(/#text$/, "");
+    if (target === "gen") { if (BK[root(B[0])]) pick.a = root(B[0]); }
+    else { const got = B.map(root).filter((x) => BK[x]); if (got.length >= 2) sel = got; }
     rows.length = 0; tally = null; $("#log tbody").innerHTML = ""; $("#log").hidden = false;
-    batchKey = [ds, A, B].join("|"); batchLog = name; setLeft = null;
-    $("#log-a").textContent = label(A, run.mode); $("#log-b").textContent = B ? label(B, run.mode) : "";
-    runNames = [label(A, run.mode), B ? label(B, run.mode) : ""];
+    batchKey = [ds, ...B].join("|"); batchLog = name; setLeft = null;
+    setCols(B.map((b) => label(b, run.mode)));
+    runNames = cols.slice();
     if (target === "gen") { $("#gen-out").hidden = true; $("#gen-ans").hidden = false; }  // both sides are answer lists here
     showInfo();
     $("#log-file").textContent = "loaded from disk"; $("#log-file").title = `results/logs/demo/${name}.jsonl`;
     loading = true;
     for (const x of got) {
-      if (!x.sides[A] || !x.sides[B]) continue;
-      const i = rows.push({ it: x.it, L: x.sides[A], R: x.sides[B] }) - 1; addRow(i);
-      const ok = (s) => judge(picks(s.res.answers), x.it.truth);
-      item = x.it; count([[label(A, run.mode), ok(x.sides[A])], [label(B, run.mode), ok(x.sides[B])]]);
+      if (B.some((b) => !x.sides[b])) continue;
+      const i = rows.push({ it: x.it, sides: B.map((b) => x.sides[b]) }) - 1; addRow(i);
+      item = x.it; count(B.map((b, k) => [cols[k], judge(picks(x.sides[b].res.answers), x.it.truth)]));
     }
     loading = false;
     $("#log-n").textContent = `· ${rows.length} done`;
-    summary(); showItem(rows.length - 1, false); $("main").hidden = true; $("#log tbody tr.on")?.classList.remove("on");
+    summary(); showItem(rows.length - 1, false); $("main").hidden = true; $("#cols").hidden = true; $("#log tbody tr.on")?.classList.remove("on");
     $("#verdict").textContent = "Loaded from disk.";
   }
-  function summary() {  // the whole table so far, side by side
+  function summary() {  // the whole table so far, one column per side
     if (!rows.length) return;
-    const sides = [["L", $("#log-a").textContent], ["R", $("#log-b").textContent]];
     const stat = (k) => {
       let c = 0, n = 0, whole = 0; const ms = [];
       for (const r of rows) {
-        const x = r[k], t = r.it.truth; ms.push(x.ms);
+        const x = r.sides[k], t = r.it.truth; ms.push(x.ms);
         const [cc, nn] = x.res.error ? [0, Object.keys(t).length] : judge(picks(x.res.answers), t);
         c += cc; n += nn; whole += cc === nn ? 1 : 0;
       }
       ms.sort((a, b) => a - b);
       return { c, n, whole, avg: Math.round(ms.reduce((a, b) => a + b, 0) / ms.length), med: ms[ms.length >> 1] };
     };
-    const [a, b] = sides.map(([k]) => stat(k));
+    const st = cols.map((_, k) => stat(k));
     let same = 0, both = 0;
     for (const r of rows) for (const id of Object.keys(r.it.truth)) {
-      const x = r.L.res.answers?.[id], y = r.R.res.answers?.[id]; if (!x || !y) continue;
-      both++; same += answerOf(x) === answerOf(y) ? 1 : 0;
+      const got = r.sides.map((x) => x.res.answers?.[id]); if (got.some((x) => !x)) continue;
+      both++; same += new Set(got.map(answerOf)).size === 1 ? 1 : 0;
     }
     const pct = (c, n) => n ? (100 * c / n).toFixed(1) + "%" : "–";
-    const cell = (v, w, better) => `<td class="${v === w ? "" : better ? "best" : ""}"><b>${v}</b></td>`;
-    const row = (label, fa, fb, va, vb, higher = true) =>
-      `<tr><td>${label}</td>${cell(fa, fb, higher ? va > vb : va < vb)}${cell(fb, fa, higher ? vb > va : vb < va)}</tr>`;
-    const q = rows.length && Object.keys(rows[0].it.truth).length > 1 || a.n > rows.length;
-    $("#summary").innerHTML = `<table><tr><th>${esc(ds)} · ${rows.length} items</th><th>${esc(sides[0][1])}</th><th>${esc(sides[1][1])}</th></tr>` +
-      row(q ? "Questions right" : "Right", `${pct(a.c, a.n)} <span class="label">${a.c}/${a.n}</span>`, `${pct(b.c, b.n)} <span class="label">${b.c}/${b.n}</span>`, a.c / a.n, b.c / b.n) +
-      (q ? row("Items fully right", `${a.whole}/${rows.length}`, `${b.whole}/${rows.length}`, a.whole, b.whole) : "") +
-      row("Average time", `${a.avg.toLocaleString()} ms`, `${b.avg.toLocaleString()} ms`, a.avg, b.avg, false) +
-      row("Median time", `${a.med.toLocaleString()} ms`, `${b.med.toLocaleString()} ms`, a.med, b.med, false) +
-      `</table><p>They gave the same answer on ${pct(same, both)} of ${q ? "questions" : "items"}. Click a row to open it.</p>`;
+    const row = (label, shown, vals, higher = true) => {  // the single best value is green; a tie stays plain
+      const best = higher ? Math.max(...vals) : Math.min(...vals), one = vals.filter((v) => v === best).length === 1;
+      return `<tr><td>${label}</td>${shown.map((v, k) => `<td class="${one && vals[k] === best ? "best" : ""}"><b>${v}</b></td>`).join("")}</tr>`;
+    };
+    const q = rows.length && Object.keys(rows[0].it.truth).length > 1 || st[0].n > rows.length;
+    $("#summary").innerHTML = `<table><tr><th>${esc(ds)} · ${rows.length} items</th>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>` +
+      row(q ? "Questions right" : "Right", st.map((x) => `${pct(x.c, x.n)} <span class="label">${x.c}/${x.n}</span>`), st.map((x) => x.n ? x.c / x.n : 0)) +
+      (q ? row("Items fully right", st.map((x) => `${x.whole}/${rows.length}`), st.map((x) => x.whole)) : "") +
+      row("Average time", st.map((x) => `${x.avg.toLocaleString()} ms`), st.map((x) => x.avg), false) +
+      row("Median time", st.map((x) => `${x.med.toLocaleString()} ms`), st.map((x) => x.med), false) +
+      `</table><p>${cols.length > 2 ? `All ${cols.length} gave` : "They gave"} the same answer on ${pct(same, both)} of ${q ? "questions" : "items"}. Click a row to open it.</p>`;
     $("#summary").hidden = false;
   }
   function showItem(i, open = true) {  // one finished item: both sides in a modal
-    const { it, L, R } = rows[i]; item = it;
+    const { it, sides } = rows[i]; item = it;
     if ($("#itemdlg").open && i !== shown) {  // slide the answers in from the side we are moving towards
       const g = $(".item-grid"); g.classList.remove("from-r", "from-l"); void g.offsetWidth; g.classList.add(i > shown ? "from-r" : "from-l");
     }
@@ -886,19 +980,20 @@
     $("#item-src").textContent = `${ds} · ${it.source}`; $("#item-src").title = it.source;
     $("#item-state").textContent = typeof it.state === "string" ? it.state : JSON.stringify(it.state, null, 2);
     $("#item-prev").disabled = i === 0; $("#item-next").disabled = i === rows.length - 1;
-    for (const [h, box, side, name] of [["#item-la", "#item-a", L, $("#log-a").textContent], ["#item-lb", "#item-b", R, $("#log-b").textContent]]) {
-      const [c, n] = side.res.error ? [0, Object.keys(it.truth).length] : judge(picks(side.res.answers), it.truth);
-      $(h).innerHTML = `${esc(name)}<span class="pill ${c === n ? "hit" : "miss"}">${mark(c === n)} ${c}/${n}</span><span class="ms">${side.ms} ms</span>`;
-      if (side.res.error) $(box).textContent = side.res.error.message; else renderAnswers(side.res, $(box), it.truth);
-    }
+    const grid = $(".item-grid"), per = Math.min(sides.length, 3);  // up to three across, more wrap below
+    grid.style.setProperty("--per", per);
+    grid.innerHTML = sides.map((x, k) => `<div class="${k % per === 0 ? "first" : ""}"><h3></h3><div class="item-ans"></div></div>`).join("");
+    sides.forEach((x, k) => {
+      const box = grid.children[k], [c, n] = x.res.error ? [0, Object.keys(it.truth).length] : judge(picks(x.res.answers), it.truth);
+      box.querySelector("h3").innerHTML = `${esc(cols[k])}<span class="pill ${c === n ? "hit" : "miss"}">${mark(c === n)} ${c}/${n}</span><span class="ms">${x.ms} ms</span>`;
+      if (x.res.error) box.querySelector(".item-ans").textContent = x.res.error.message; else renderAnswers(x.res, box.querySelector(".item-ans"), it.truth);
+    });
     document.querySelectorAll("#log tbody tr").forEach((r) => r.classList.toggle("on", +r.dataset.i === i));
     if (open || $("#itemdlg").open) $("#log tbody tr.on")?.scrollIntoView({ block: "center", behavior: "smooth" });  // the table follows along
-    const [na, nb] = [$("#log-a").textContent, $("#log-b").textContent];
     const side = (x, name) => ({ ms: x.ms, res: x.res, foot: name.endsWith("· text") ? "written answers, each counted as certain"
       : x.res.usage?.input_tokens ? `${x.res.usage.input_tokens} input tokens · a probability for every option` : "a probability for every option" });
-    const time = (ms, other) => ms < other ? `<b>${ms} ms</b>` : `${ms} ms`;  // only the faster time is green
-    if (!L.res.error && !R.res.error) {
-      last = { L: side(L, na), R: side(R, nb), verdict: `Item ${i + 1}: ${esc(na)} took ${time(L.ms, R.ms)}, ${esc(nb)} ${time(R.ms, L.ms)}.` };
+    if (sides.every((x) => !x.res.error)) {
+      last = { sides: sides.map((x, k) => side(x, cols[k])), verdict: `Item ${i + 1}: ${times(cols, sides.map((x) => x.ms))}.` };
       $("#replay").disabled = false;
     }
     if (open) $("#itemdlg").showModal();
@@ -912,32 +1007,31 @@
     if (e.key === "ArrowLeft") $("#item-prev").click(); else if (e.key === "ArrowRight") $("#item-next").click();
   });
   $("#itemdlg").onclick = (e) => { if (e.target === $("#itemdlg")) $("#itemdlg").close(); };
-  for (const box of [$("#item-a"), $("#item-b")]) box.onclick = (e) => {
+  $(".item-grid").onclick = (e) => {
     const r = e.target.closest(".row.fold, .row.open"); if (!r) return; r.classList.toggle("fold"); r.classList.toggle("open");
   };
   $("#log tbody").onclick = (e) => { const r = e.target.closest("tr"); if (r) showItem(+r.dataset.i); };
   async function ask(backend, it, log) {
     const t = performance.now();
-    const res = await (await post("/v1/systemone", { state: it.state, questions: it.questions, backend, log, truth: it.truth, source: it.source, dataset: ds, mode })).json();
+    const res = await (await post("/v1/systemone", { state: it.state, questions: it.questions, backend, log, truth: it.truth, source: it.source, dataset: ds, mode, sides: sel })).json();
     return { ms: res.latency_ms ?? Math.round(performance.now() - t), res };
   }
   let fresh = false;
   async function batchCompare(n) {
-    const A = pick.a, B = pick.b;
-    if (!(await ready(A)) || !(await ready(B))) return;
-    const hostedA = BK[A].group === "hosted", hostedB = BK[B].group === "hosted";
-    const together = hostedA || hostedB, par = hostedA && hostedB ? 8 : 1;
-    // same set and same two backends: keep adding to the table, the score and the log file
-    const key = [ds, A, B].join("|");
+    const list = sel.slice();
+    for (const id of list) if (!(await ready(id))) return;
+    const hosted = list.filter((id) => BK[id].group === "hosted").length, par = hosted === list.length ? 8 : 1;
+    // same set and same backends: keep adding to the table, the score and the log file
+    const key = [ds, ...list].join("|");
     if (key !== batchKey) {
       batchKey = key; rows.length = 0; tally = null; $("#log tbody").innerHTML = ""; fresh = true; $("#summary").hidden = true;
     }
-    batchLog = logFor(A, B);
+    batchLog = logFor(...list);
     const log = batchLog;
-    $("#log").hidden = false; $("#log-a").textContent = BK[A].label; $("#log-b").textContent = BK[B].label;
-    $("#log-file").textContent = `saved locally · ${par > 1 ? par + " at a time" : together ? "both sides at once" : "one at a time"}`;
+    $("#log").hidden = false; setCols(list.map((id) => BK[id].label));
+    $("#log-file").textContent = `saved locally · ${par > 1 ? par + " at a time" : hosted ? "hosted at once, this machine one at a time" : "one at a time"}`;
     $("#log-file").title = "results/logs/demo/" + log.replace(/[^A-Za-z0-9._-]/g, "-") + ".jsonl";
-    $("#verdict").textContent = `Running ${n} more items…`; $("main").hidden = true; $("#summary").hidden = true;
+    $("#verdict").textContent = `Running ${n} more items…`; $("main").hidden = true; $("#cols").hidden = true; $("#summary").hidden = true;
     let next = 0, done = 0, running = 0, left = null, exhausted = "";
     const progress = () => {
       $("#verdict").textContent = `${done} of ${n} done${running ? ` · ${running} running` : ""}${n - done - running > 0 ? ` · ${n - done - running} waiting` : ""}.`;
@@ -952,12 +1046,11 @@
         if (r.status === 409) { stopping = true; exhausted = it.error.message; break; }
         if (!r.ok) { toast(it.error.message); stopping = true; break; }
         left = it.left; running++; progress();
-        const go = (bk) => ask(bk, it, log);
-        const [L, R] = together ? await Promise.all([go(A), go(B)]) : [await go(A), await go(B)];
-        if (L.res.error || R.res.error) toast((L.res.error ?? R.res.error).message);
-        const i = rows.push({ it, L, R }) - 1; done++; running--;
+        const outs = await runAll(list, (bk) => ask(bk, it, log));
+        const bad = outs.find((x) => x.res.error); if (bad) toast(bad.res.error.message);
+        const i = rows.push({ it, sides: outs }) - 1; done++; running--;
         const ok = (x) => x.res.error ? [0, Object.keys(it.truth).length] : judge(picks(x.res.answers), it.truth);
-        item = it; count([[BK[A].label, ok(L)], [BK[B].label, ok(R)]]);
+        item = it; count(outs.map((x, k) => [cols[k], ok(x)]));
         addRow(i);
         progress();
       }
@@ -989,16 +1082,20 @@
   $("#stop").onclick = () => { stopping = true; $("#stop").hidden = true; };
 
   async function replay() {
-    $("main").hidden = false; if (last?.L && rows.length) $("main").scrollIntoView({ behavior: "smooth", block: "start" });
+    const view = last?.sides && mode === "cmp" ? $("#cols") : $("main"); view.hidden = false;
+    if (last?.sides && rows.length) view.scrollIntoView({ behavior: "smooth", block: "start" });
     $("#replay").disabled = true; $("#run").disabled = true;
     const verdict = last.verdict; $("#verdict").textContent = "Replaying the recorded run, both at once…";
-    if (last.L) {
-      for (const [id, out, side] of [["gen", $("#gen-ans"), last.L], ["jev", $("#jev-out"), last.R]]) {
-        const sec = $("#" + id); sec.classList.remove("done"); out.innerHTML = ""; $("#" + id + "-foot").textContent = "Scoring every option…";
+    if (last.sides) {
+      const at = (k) => mode === "cmp" ? [col(k), col(k).querySelector(".ans"), col(k).querySelector(".foot")]
+        : [[$("#gen"), $("#gen-ans"), $("#gen-foot")], [$("#jev"), $("#jev-out"), $("#jev-foot")]][k];
+      last.sides.forEach((side, k) => {
+        const [sec, out, foot] = at(k); sec.classList.remove("done", "win"); out.innerHTML = ""; foot.textContent = "Scoring every option…";
         const stop = clock(sec, side.ms);
-        setTimeout(() => { renderAnswers(side.res, out); stop(); $("#" + id + "-foot").textContent = side.foot; }, side.ms);
-      }
-      setTimeout(() => { $("#verdict").innerHTML = verdict; faster(last.L.ms, last.R.ms); $("#replay").disabled = false; $("#run").disabled = false; }, Math.max(last.L.ms, last.R.ms));
+        setTimeout(() => { renderAnswers(side.res, out); stop(); foot.textContent = side.foot; }, side.ms);
+      });
+      setTimeout(() => { $("#verdict").innerHTML = verdict; fastest(last.sides.map((_, k) => at(k)[0]), last.sides.map((x) => x.ms));
+        $("#replay").disabled = false; $("#run").disabled = false; }, Math.max(...last.sides.map((x) => x.ms)));
       return;
     }
     const { j, g } = last, out = $("#gen-out");
@@ -1014,12 +1111,13 @@
 
   $("#mode").onclick = (e) => { const b = e.target.closest("button"); if (!b || b.dataset.mode === mode) return;
     mode = b.dataset.mode; runNames = null; const cmp = mode === "cmp", past = mode === "past";
-    for (const x of [".panel", "#verdict", "main"]) $(x).hidden = past;
+    for (const x of [".panel", "#verdict"]) $(x).hidden = past;
+    $("main").hidden = mode !== "gen"; $("#cols").hidden = mode !== "cmp";
     $("#pastlist").hidden = !past; $("#log").hidden = true; $("#summary").hidden = true;
     if (past) { document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("on", x === b)); $("#lede").textContent = "Batches you ran, saved on this machine."; showPast(); return; }
     document.querySelectorAll("#mode button").forEach((x) => x.classList.toggle("on", x === b));
-    $("#b").hidden = !cmp; $("#vs").hidden = !cmp; $("#gen-out").hidden = cmp; $("#gen-ans").hidden = !cmp;
-    $("#lede").textContent = cmp ? "The same questions to two backends, side by side." : "One model, two ways to ask it the same questions.";
+    $("#a").hidden = cmp; $("#multi").hidden = !cmp; $("#gen-out").hidden = false; $("#gen-ans").hidden = true;
+    $("#lede").textContent = cmp ? "The same questions to several models, side by side." : "One model, two ways to ask it the same questions.";
     if (!cmp) { $("#gen h2").innerHTML = "Write the answers as text<small>generate JSON one token at a time, then parse it</small>";
       $("#jev h2").innerHTML = "Read the answers off the logits<small>one pass over the state, a probability for every option</small>"; }
     clearBatch(); showDataset(); forget(); reset(); loadBackends(); };

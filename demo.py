@@ -307,7 +307,7 @@ def log_row(body, backend, answers, ms):
     """One answer of a run, appended to its session's file."""
     name = "".join(c if c.isalnum() or c in "._-" else "-" for c in body["log"])[:120]
     os.makedirs(LOGS, exist_ok=True)
-    row = {k: body.get(k) for k in ("dataset", "source", "state", "questions", "truth", "mode")}
+    row = {k: body.get(k) for k in ("dataset", "source", "state", "questions", "truth", "mode", "sides")}
     row |= {"backend": backend, "answers": answers, "ms": ms}
     with LOCK, open(os.path.join(LOGS, name + ".jsonl"), "a") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -337,6 +337,9 @@ def runs():
             sides = sorted(
                 dict.fromkeys(x["backend"] for x in lines), key=lambda b: not b.endswith("#text")
             )  # written side first
+            order = next((x["sides"] for x in lines if x.get("sides")), None)
+            if order and lines[0].get("mode") != "gen":  # compare: the order the models were picked in
+                sides.sort(key=lambda b: order.index(b) if b in order else len(order))
             items = len({(x["source"], json.dumps(x["state"], sort_keys=True)) for x in lines})
             score = {b: [0, 0] for b in sides}
             for x in lines:
