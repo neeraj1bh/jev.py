@@ -10,12 +10,21 @@ import { MenuHeading, MenuHint, MenuItem } from "./Menu";
 
 const MAX_MATCHES = 40;
 
-/** A gateway model's input price, and outside its maker's group, the maker too. */
-function priceText(backend: Backend, inTree: boolean) {
-  const price =
-    backend.free || backend.price === 0 ? "free" : backend.price ? `$${backend.price}/M` : "";
-  if (inTree) return price;
-  return [providerName(backend.provider), price].filter(Boolean).join(" · ");
+// One full run of the frozen set: about 4,000 questions, ~0.75M input tokens, one output token each.
+const RUN_INPUT_TOKENS = 750_000;
+const RUN_OUTPUT_TOKENS = 4_000;
+
+/** What one full run costs, which is what matters here; the tooltip carries both token prices. */
+function runCost(backend: Backend) {
+  if (backend.free || backend.price === 0)
+    return { text: "free", title: "Free on OpenRouter, rate-limited" };
+  if (backend.price === undefined) return { text: "", title: undefined };
+  const dollars =
+    ((backend.price ?? 0) * RUN_INPUT_TOKENS + (backend.price_out ?? 0) * RUN_OUTPUT_TOKENS) / 1e6;
+  return {
+    text: `≈ $${dollars < 1 ? dollars.toFixed(2) : dollars.toFixed(dollars < 10 ? 1 : 0)} a run`,
+    title: `Input $${backend.price}/M tokens · output $${backend.price_out ?? "?"}/M · a full run is ~0.75M input tokens`,
+  };
 }
 const FREE = "free";
 
@@ -99,7 +108,14 @@ export function ModelMenu(props: ModelMenuProps) {
             backend.label
           )
         }
-        detail={inGateway ? priceText(backend, inTree) : detail(backend)}
+        title={inGateway ? runCost(backend).title : undefined}
+        detail={
+          inGateway
+            ? [inTree ? "" : providerName(backend.provider), runCost(backend).text]
+                .filter(Boolean)
+                .join(" · ")
+            : detail(backend)
+        }
         highlightDetail={
           backend.ready && backend.group !== "gateway" && detail(backend) !== "compare only"
         }

@@ -21,8 +21,9 @@ export interface Backend {
   provider?: string;
   created?: number;
   free?: boolean;
-  /** Dollars per million input tokens, for gateway models. */
+  /** Dollars per million input and output tokens, for gateway models. */
   price?: number;
+  price_out?: number;
 }
 
 export interface Dataset {

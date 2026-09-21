@@ -74,18 +74,18 @@ function AnswerCell({
   const correct = truth === undefined ? null : matchesLabel(label, truth);
   return (
     <td className={cell}>
-      <span className="flex items-center gap-3">
+      <span className="flex items-start gap-3">
         <span
+          title={shown}
           className={cn(
-            "inline-flex min-w-0 items-center gap-1 truncate font-medium",
+            "line-clamp-2 min-w-0 flex-1 font-medium break-words",
             correct === null ? "text-ink" : correct ? "text-good" : "text-warn",
           )}
         >
-          {shown}
-          {correct !== null && <CheckMark ok={correct} />}
+          {shown} {correct !== null && <CheckMark ok={correct} />}
         </span>
         {probability !== null && (
-          <span className="ml-auto flex flex-none items-center gap-2">
+          <span className="mt-[3px] ml-auto flex flex-none items-center gap-2">
             <span className="h-1 w-12 overflow-hidden rounded-full bg-bar">
               <span
                 className="block h-full rounded-full bg-ink/70"
@@ -186,7 +186,14 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
         </div>
       )}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[13px]">
+        <table className="w-full table-fixed border-collapse text-[13px]">
+          <colgroup>
+            <col className="w-44" />
+            {truth && <col className="w-[20%]" />}
+            {names.map((name) => (
+              <col key={name} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               <th className={cn(tableHead, "align-bottom")}>Question</th>
@@ -224,7 +231,11 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
                         id
                       )}
                     </td>
-                    {truth && <td className={cn(rowCell, "text-dim")}>{truth[id] ?? "–"}</td>}
+                    {truth && (
+                      <td className={cn(rowCell, "text-dim")} title={truth[id]}>
+                        <span className="line-clamp-2 break-words">{truth[id] ?? "–"}</span>
+                      </td>
+                    )}
                     {names.map((name, k) => (
                       <AnswerCell
                         key={name}

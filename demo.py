@@ -484,6 +484,7 @@ def gateway():
             "created": m.get("created", 0),
             "free": m["id"].endswith(":free"),  # OpenRouter marks its free variants this way
             "price": round(float(m.get("pricing", {}).get("prompt") or 0) * 1e6, 3),  # $ per 1M input tokens
+            "price_out": round(float(m.get("pricing", {}).get("completion") or 0) * 1e6, 3),
         }
         for m in GATEWAY["models"]
         if CHECKED.get("openrouter:" + m["id"])
