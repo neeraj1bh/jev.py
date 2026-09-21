@@ -114,7 +114,7 @@
   }
   button:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid var(--color-good);
+    outline: 1.5px solid var(--color-dim);
     outline-offset: 2px;
   }
   pre {

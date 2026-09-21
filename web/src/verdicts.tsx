@@ -88,8 +88,8 @@ const sideFooter = (side: Side, name: string) =>
   name.endsWith("· text")
     ? "written answers, each counted as certain"
     : side.response.usage?.input_tokens
-      ? `${side.response.usage.input_tokens} input tokens · a probability for every option`
-      : "a probability for every option";
+      ? `${side.response.usage.input_tokens.toLocaleString()} input tokens`
+      : "";
 
 /** A finished batch row as something Replay can play back. */
 export function rowRecording(rows: Row[], index: number, names: string[]): Recording | null {

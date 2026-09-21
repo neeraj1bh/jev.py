@@ -1,5 +1,9 @@
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+
+import { usePersistentState } from "../hooks/usePersistentState";
 import { cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
 import type { RunKind, SavedRun } from "../types";
+import { Icon } from "./Icon";
 import { Dropdown, MenuItem } from "./Menu";
 import { Skeleton } from "./Skeleton";
 
@@ -19,6 +23,26 @@ const accuracy = (run: SavedRun, backend: string) => {
   return total ? correct / total : -1;
 };
 
+type SortColumn = "when" | "input" | "models" | "items";
+interface Sort {
+  column: SortColumn;
+  descending: boolean;
+}
+
+const isSort = (value: unknown): value is Sort =>
+  typeof value === "object" &&
+  value !== null &&
+  ["when", "input", "models", "items"].includes((value as Sort).column) &&
+  typeof (value as Sort).descending === "boolean";
+
+/** Ascending order for one column; run names start with their timestamp, so they sort by time. */
+function compare(a: SavedRun, b: SavedRun, column: SortColumn) {
+  if (column === "input") return a.dataset.localeCompare(b.dataset);
+  if (column === "models") return a.backends.length - b.backends.length;
+  if (column === "items") return a.items - b.items;
+  return a.name.localeCompare(b.name);
+}
+
 const runTime = (name: string) => name.slice(5, 16).replace(/-(\d\d)-(\d\d)$/, " $1:$2");
 
 interface PastRunsProps {
@@ -36,7 +60,41 @@ interface PastRunsProps {
 
 export function PastRuns(props: PastRunsProps) {
   const { runs, kind } = props;
-  const matching = runs.filter((run) => !kind || run.mode === kind);
+  const [sort, setSort] = usePersistentState<Sort>(
+    "runs-sort",
+    { column: "when", descending: true },
+    isSort,
+  );
+  const matching = runs
+    .filter((run) => !kind || run.mode === kind)
+    .sort((a, b) => (sort.descending ? -1 : 1) * compare(a, b, sort.column));
+  const header = (column: SortColumn, label: string) => {
+    const active = sort.column === column;
+    return (
+      <th
+        className={tableHead}
+        aria-sort={active ? (sort.descending ? "descending" : "ascending") : "none"}
+      >
+        <button
+          type="button"
+          onClick={() =>
+            setSort({ column, descending: active ? !sort.descending : column !== "input" })
+          }
+          className={cn(
+            "group inline-flex items-center gap-1 border-0 bg-transparent p-0 font-medium transition-colors hover:text-ink",
+            active ? "text-ink" : "text-dim",
+          )}
+        >
+          {label}
+          <Icon
+            icon={active ? (sort.descending ? ArrowDown : ArrowUp) : ArrowUpDown}
+            size={14}
+            className={cn(!active && "opacity-40 transition-opacity group-hover:opacity-100")}
+          />
+        </button>
+      </th>
+    );
+  };
   const pageCount = Math.max(1, Math.ceil(matching.length / PAGE_SIZE));
   const page = Math.min(props.page, pageCount);
   const shown = matching.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -72,10 +130,10 @@ export function PastRuns(props: PastRunsProps) {
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr>
-              <th className={tableHead}>When</th>
-              <th className={tableHead}>Input</th>
-              <th className={tableHead}>Models</th>
-              <th className={tableHead}>Items</th>
+              {header("when", "When")}
+              {header("input", "Input")}
+              {header("models", "Models")}
+              {header("items", "Items")}
             </tr>
           </thead>
           <tbody>

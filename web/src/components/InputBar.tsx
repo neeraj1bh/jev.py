@@ -135,7 +135,7 @@ export function InputBar(props: InputBarProps) {
                 onChange={(event) => props.onBatchSizeChange(event.target.value)}
                 disabled={busy || setExhausted}
                 aria-label="Items in the batch"
-                className="ml-2 w-16 rounded-full border border-rule bg-paper px-2 py-1 text-center font-mono text-[13.5px] text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-good"
+                className="ml-2 w-16 rounded-full border border-rule bg-paper px-2 py-1 text-center font-mono text-[13.5px] text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-dim"
               />
               <button
                 type="button"

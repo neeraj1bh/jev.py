@@ -91,7 +91,9 @@ export const inputSnippet = (state: unknown) =>
   ).slice(0, 160);
 
 export const readoutFooter = (response: Response) =>
-  `${response.usage?.input_tokens ? `${response.usage.input_tokens} input tokens, 0 output · ` : ""}a probability for every option`;
+  response.usage?.input_tokens
+    ? `${response.usage.input_tokens.toLocaleString()} input tokens`
+    : "";
 
 export const fastestIndexes = (ms: number[]) => {
   const min = Math.min(...ms);

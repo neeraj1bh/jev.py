@@ -7,9 +7,6 @@ import { AnswerSkeleton } from "./Skeleton";
 
 const idle: PanelState = { status: "idle", footer: "Waiting to run." };
 
-const READOUT_INFO =
-  "One request returns a probability for every option; the highest is the answer. The bars show how sure the model was.";
-
 const GENERATE_PANELS = [
   {
     key: "written",
@@ -39,27 +36,9 @@ interface CompareViewProps {
   truth?: Record<string, string>;
 }
 
+/** Every compare, two models or six, uses one table: a column per model, a row per question. */
 export function CompareView({ names, panels, questionIds, truth }: CompareViewProps) {
-  if (names.length > 2) {
-    return <CompareTable names={names} panels={panels} questionIds={questionIds} truth={truth} />;
-  }
-  return (
-    <div className="grid grid-cols-2 gap-3.5 max-[860px]:grid-cols-1">
-      {names.map((name, i) => (
-        <Panel
-          key={name}
-          title={name}
-          subtitle={panelSubtitle(name)}
-          info={name.endsWith("· text") ? undefined : READOUT_INFO}
-          state={panels[i] ?? idle}
-        >
-          <div className="max-h-[540px] overflow-x-hidden overflow-y-auto">
-            <PanelAnswers state={panels[i]} truth={truth} />
-          </div>
-        </Panel>
-      ))}
-    </div>
-  );
+  return <CompareTable names={names} panels={panels} questionIds={questionIds} truth={truth} />;
 }
 
 interface GenerateViewProps {

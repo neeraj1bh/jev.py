@@ -112,7 +112,9 @@ export default function App() {
   const compareNames = savedNames ?? compareModels.map((id) => backends[id]?.label ?? id);
   const inputName = dataset || example || "edited input";
   const labels = item && Object.keys(item.truth).length > 0 ? item.truth : undefined;
+  // The item on screen decides the questions; the editor only matters for hand-edited input.
   const questionIds = (() => {
+    if (item) return Object.keys(item.questions);
     try {
       const questions: unknown = JSON.parse(questionsText);
       return questions && typeof questions === "object" ? Object.keys(questions) : [];

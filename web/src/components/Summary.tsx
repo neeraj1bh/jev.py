@@ -1,7 +1,5 @@
-import type { ReactNode } from "react";
-
 import { answerLabel, percent, scoreResponse } from "../scoring";
-import { cn, labelText, panelBox } from "../styles";
+import { cn, labelText } from "../styles";
 import type { Answer, Row } from "../types";
 import { InfoTip } from "./InfoTip";
 
@@ -49,32 +47,42 @@ function agreementRate(rows: Row[]) {
   return percent(same, compared);
 }
 
-interface StatRowProps {
-  label: string;
-  info: ReactNode;
-  columns: string[];
-  values: number[];
-  cell: (column: number) => ReactNode;
-  higherIsBetter?: boolean;
+const INFO = {
+  right:
+    "How often the model's answer matched the dataset's own label, which people wrote. Higher is better.",
+  whole: "Items where every question on it was answered right.",
+  average: "Time from sending the item to getting every answer back, averaged over the batch.",
+  median:
+    "The middle time: half the items were faster. One slow request moves it less than the average.",
+};
+
+/** Index of the single best value, or -1 when there is a tie. */
+function bestIndex(values: number[], higherIsBetter: boolean) {
+  const best = higherIsBetter ? Math.max(...values) : Math.min(...values);
+  return values.filter((value) => value === best).length === 1 ? values.indexOf(best) : -1;
 }
 
-function StatRow({ label, info, columns, values, cell, higherIsBetter = true }: StatRowProps) {
-  const best = higherIsBetter ? Math.max(...values) : Math.min(...values);
-  const singleBest = values.filter((value) => value === best).length === 1;
+function StatLine({
+  label,
+  info,
+  value,
+  best,
+}: {
+  label: string;
+  info: string;
+  value: string;
+  best: boolean;
+}) {
   return (
-    <tr>
-      <td className="border-t border-rule py-[7px] pr-2 text-dim">
-        <span className="inline-flex items-center gap-1">
-          {label}
-          <InfoTip>{info}</InfoTip>
-        </span>
-      </td>
-      {columns.map((column, k) => (
-        <td key={column} className="border-t border-rule px-2 py-[7px] tabular-nums">
-          <b className={singleBest && values[k] === best ? "text-good" : "text-ink"}>{cell(k)}</b>
-        </td>
-      ))}
-    </tr>
+    <div className="flex items-center justify-between gap-3 border-t border-rule py-2 text-[13px]">
+      <span className="inline-flex items-center gap-1 text-dim">
+        {label}
+        <InfoTip>{info}</InfoTip>
+      </span>
+      <span className={cn("font-medium tabular-nums", best ? "text-good" : "text-ink")}>
+        {value}
+      </span>
+    </div>
   );
 }
 
@@ -84,87 +92,109 @@ interface SummaryProps {
   dataset: string;
 }
 
+/** One card per model: its share right up front, then the details, the best of each in green. */
 export function Summary({ rows, columns, dataset }: SummaryProps) {
   const [first] = rows;
   if (!first) return null;
   const stats = columns.map((_, k) => columnStats(rows, k));
-  const stat = (k: number) => stats[k] ?? columnStats([], k);
-  const labelled = stat(0).total > 0;
+  const labelled = (stats[0]?.total ?? 0) > 0;
   const byQuestion = Object.keys(first.item.questions).length > 1;
   const shares = stats.map((s) => (s.total ? s.correct / s.total : 0));
-  const bestShare = Math.max(...shares);
-  const singleBestShare = shares.filter((share) => share === bestShare).length === 1;
+  const best = {
+    share: bestIndex(shares, true),
+    whole: bestIndex(
+      stats.map((s) => s.fullyRight),
+      true,
+    ),
+    average: bestIndex(
+      stats.map((s) => s.averageMs),
+      false,
+    ),
+    median: bestIndex(
+      stats.map((s) => s.medianMs),
+      false,
+    ),
+  };
 
   return (
-    <div className={cn(panelBox, "mb-3.5 animate-fade motion-reduce:animate-none")}>
-      <table className="w-full border-collapse text-sm">
-        <tbody>
-          <tr>
-            <th className="pr-2 pb-2 text-left font-normal text-dim">
-              {dataset} · {rows.length} {rows.length === 1 ? "item" : "items"}
-            </th>
-            {columns.map((column) => (
-              <th key={column} className="px-2 pb-2 text-left font-semibold text-ink">
+    <section className="mb-3.5 animate-fade motion-reduce:animate-none">
+      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="m-0 text-sm font-semibold text-ink">
+          {dataset}{" "}
+          <span className="font-normal text-dim">
+            · {rows.length} {rows.length === 1 ? "item" : "items"}
+          </span>
+        </h2>
+        <p className={cn(labelText, "m-0")}>
+          {columns.length > 2 ? `All ${columns.length} gave` : "They gave"} the same answer on{" "}
+          {agreementRate(rows)} of {byQuestion ? "questions" : "items"}
+        </p>
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+        {columns.map((column, k) => {
+          const s = stats[k];
+          if (!s) return null;
+          return (
+            <article
+              key={column}
+              className="rounded-lg border border-rule bg-panel px-4 pt-3.5 pb-1.5"
+            >
+              <h3 className="m-0 truncate text-sm font-semibold text-ink" title={column}>
                 {column}
-              </th>
-            ))}
-          </tr>
-          {labelled && (
-            <StatRow
-              label={byQuestion ? "Questions right" : "Right"}
-              info="How often the model's answer matched the dataset's own label, which people wrote. Higher is better."
-              columns={columns}
-              values={shares}
-              cell={(k) => (
+              </h3>
+              {labelled ? (
                 <>
-                  {percent(stat(k).correct, stat(k).total)}{" "}
-                  <span className={labelText}>
-                    {stat(k).correct}/{stat(k).total}
-                  </span>
-                  <span className="mt-1.5 block h-1 w-full max-w-[160px] overflow-hidden rounded-full bg-bar">
+                  <p className="mt-2.5 mb-0 flex items-baseline gap-2">
+                    <span
+                      className={cn(
+                        "text-[26px] leading-none font-semibold tabular-nums",
+                        best.share === k ? "text-good" : "text-ink",
+                      )}
+                    >
+                      {percent(s.correct, s.total)}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[13px] text-dim">
+                      {s.correct}/{s.total} right
+                      <InfoTip>{INFO.right}</InfoTip>
+                    </span>
+                  </p>
+                  <span className="mt-2.5 mb-3 block h-1 overflow-hidden rounded-full bg-bar">
                     <span
                       className={cn(
                         "block h-full rounded-full transition-[width] duration-500",
-                        shares[k] === bestShare && singleBestShare ? "bg-good" : "bg-dim",
+                        best.share === k ? "bg-good" : "bg-dim",
                       )}
                       style={{ width: `${(shares[k] ?? 0) * 100}%` }}
                     />
                   </span>
+                  {byQuestion && (
+                    <StatLine
+                      label="Items fully right"
+                      info={INFO.whole}
+                      value={`${s.fullyRight}/${rows.length}`}
+                      best={best.whole === k}
+                    />
+                  )}
                 </>
+              ) : (
+                <p className={cn(labelText, "mt-2 mb-3")}>No labels to score against</p>
               )}
-            />
-          )}
-          {labelled && byQuestion && (
-            <StatRow
-              label="Items fully right"
-              info="Items where every question on it was answered right."
-              columns={columns}
-              values={stats.map((s) => s.fullyRight)}
-              cell={(k) => `${stat(k).fullyRight}/${rows.length}`}
-            />
-          )}
-          <StatRow
-            label="Average time"
-            info="Time from sending the item to getting every answer back, averaged over the batch."
-            columns={columns}
-            values={stats.map((s) => s.averageMs)}
-            cell={(k) => `${stat(k).averageMs.toLocaleString()} ms`}
-            higherIsBetter={false}
-          />
-          <StatRow
-            label="Median time"
-            info="The middle time: half the items were faster. One slow request moves it less than the average."
-            columns={columns}
-            values={stats.map((s) => s.medianMs)}
-            cell={(k) => `${stat(k).medianMs.toLocaleString()} ms`}
-            higherIsBetter={false}
-          />
-        </tbody>
-      </table>
-      <p className="mt-3 mb-0 text-sm text-dim">
-        {columns.length > 2 ? `All ${columns.length} gave` : "They gave"} the same answer on{" "}
-        {agreementRate(rows)} of {byQuestion ? "questions" : "items"}. Click a row to open it.
-      </p>
-    </div>
+              <StatLine
+                label="Average time"
+                info={INFO.average}
+                value={`${s.averageMs.toLocaleString()} ms`}
+                best={best.average === k}
+              />
+              <StatLine
+                label="Median time"
+                info={INFO.median}
+                value={`${s.medianMs.toLocaleString()} ms`}
+                best={best.median === k}
+              />
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }

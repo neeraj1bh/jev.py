@@ -1,8 +1,6 @@
-import { fastestIndexes, scoreResponse } from "../scoring";
+import { fastestIndexes } from "../scoring";
 import { cn, labelText } from "../styles";
 import type { PanelState, Row, Side } from "../types";
-import { Answers } from "./Answers";
-import { CheckMark } from "./CheckMark";
 import { CompareTable } from "./CompareTable";
 import { Modal } from "./Modal";
 
@@ -16,38 +14,6 @@ const asPanel = (side: Side, fastest: boolean): PanelState => ({
   response: side.response.error ? undefined : side.response,
   footer: side.response.error?.message ?? "",
 });
-
-function SideHeading({
-  name,
-  side,
-  truth,
-}: {
-  name: string;
-  side: Side;
-  truth?: Record<string, string>;
-}) {
-  const [correct, total] = truth ? scoreResponse(side.response, truth) : [0, 0];
-  const allRight = correct === total;
-  return (
-    <h3 className="mt-0 mb-1 flex items-center gap-2.5 text-sm font-semibold">
-      {name}
-      {total > 0 && (
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 text-[13px] font-medium tabular-nums",
-            allRight ? "text-good" : "text-warn",
-          )}
-        >
-          <CheckMark ok={allRight} />
-          {correct}/{total} right
-        </span>
-      )}
-      <span className="ml-auto font-mono text-[13px] font-medium text-dim tabular-nums">
-        {side.ms} ms
-      </span>
-    </h3>
-  );
-}
 
 interface ItemDialogProps {
   open: boolean;
@@ -66,6 +32,7 @@ export function ItemDialog(props: ItemDialogProps) {
   if (!row) return null;
   const { item, sides } = row;
   const truth = Object.keys(item.truth).length > 0 ? item.truth : undefined;
+  const fastest = fastestIndexes(sides.map((side) => side.ms));
   const isFirst = index === 0;
   const isLast = index === rows.length - 1;
 
@@ -139,42 +106,14 @@ export function ItemDialog(props: ItemDialogProps) {
           direction === "back" && "animate-from-l motion-reduce:animate-none",
         )}
       >
-        {sides.length > 2 ? (
-          <CompareTable
-            bare
-            names={columns}
-            panels={sides.map((side, k) =>
-              asPanel(side, fastestIndexes(sides.map((s) => s.ms)).includes(k)),
-            )}
-            questionIds={Object.keys(item.questions)}
-            truth={truth}
-          />
-        ) : (
-          <div className="grid grid-cols-2 max-[860px]:grid-cols-1">
-            {columns.map((column, k) => {
-              const side = sides[k];
-              if (!side) return null;
-              return (
-                <div
-                  key={column}
-                  className={cn(
-                    "min-w-0 pt-3.5",
-                    k === 0
-                      ? "pr-5 max-[860px]:pr-0"
-                      : "border-l border-rule pl-5 max-[860px]:mt-3.5 max-[860px]:border-t max-[860px]:border-l-0 max-[860px]:pl-0",
-                  )}
-                >
-                  <SideHeading name={column} side={side} truth={truth} />
-                  {side.response.error ? (
-                    <p className="text-[13px] text-warn">{side.response.error.message}</p>
-                  ) : (
-                    <Answers response={side.response} truth={truth} toggleable />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <CompareTable
+          key={index}
+          bare
+          names={columns}
+          panels={sides.map((side, k) => asPanel(side, fastest.includes(k)))}
+          questionIds={Object.keys(item.questions)}
+          truth={truth}
+        />
       </div>
 
       <div className={cn(labelText, "mt-2 flex justify-between gap-3 border-t border-rule pt-3")}>

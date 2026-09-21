@@ -47,7 +47,7 @@ export function KeyDialog({ backend, onCancel, onSaved }: KeyDialogProps) {
           required
           value={key}
           onChange={(event) => setKey(event.target.value)}
-          className="w-full rounded-md border border-rule bg-paper px-2.5 py-2 font-mono text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-good"
+          className="w-full rounded-md border border-rule bg-paper px-2.5 py-2 font-mono text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-dim"
         />
         <label className="mt-3 flex items-center gap-2 text-[13.5px] text-dim">
           <input

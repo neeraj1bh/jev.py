@@ -5,6 +5,9 @@ import { cn } from "../styles";
 import type { Answer, Response } from "../types";
 import { CheckMark } from "./CheckMark";
 
+/** snake_case names wrap after an underscore instead of mid-word. */
+const breakable = (name: string) => name.replaceAll("_", "_\u200b");
+
 function ProbabilityBar({ percent, top }: { percent: number; top: boolean }) {
   const [grown, setGrown] = useState(false);
 
@@ -31,11 +34,13 @@ interface AnswerRowProps {
   answer: Answer;
   truth?: string;
   collapsible: boolean;
-  toggleable?: boolean;
+  /** Set when a parent keeps rows open together, e.g. both sides of the item dialog. */
+  expanded?: boolean;
+  onToggle?: (id: string) => void;
 }
 
-function AnswerRow({ id, answer, truth, collapsible, toggleable }: AnswerRowProps) {
-  const [collapsed, setCollapsed] = useState(collapsible);
+function AnswerRow({ id, answer, truth, collapsible, expanded, onToggle }: AnswerRowProps) {
+  const collapsed = collapsible && !expanded;
   const probabilities =
     answer.type === "noul"
       ? { yes: answer.noul, no: +(1 - answer.noul).toFixed(4) }
@@ -50,7 +55,7 @@ function AnswerRow({ id, answer, truth, collapsible, toggleable }: AnswerRowProp
   const ranked = Object.entries(probabilities).sort((a, b) => b[1] - a[1]);
   const shown = ranked.length > 8 ? ranked.slice(0, 6) : Object.entries(probabilities);
   const correct = truth !== undefined && matchesLabel(best, truth);
-  const canToggle = toggleable && collapsible;
+  const canToggle = onToggle !== undefined && collapsible;
   const Heading = canToggle ? "button" : "div";
 
   return (
@@ -64,15 +69,16 @@ function AnswerRow({ id, answer, truth, collapsible, toggleable }: AnswerRowProp
         {...(canToggle && {
           type: "button",
           "aria-expanded": !collapsed,
-          onClick: () => setCollapsed(!collapsed),
+          onClick: () => onToggle?.(id),
         })}
         className={cn(
-          "text-[13px] [overflow-wrap:anywhere] text-dim",
+          "text-[13px] [overflow-wrap:break-word] text-dim",
           collapsed && "flex items-baseline gap-2.5",
-          canToggle && "w-full cursor-pointer border-0 bg-transparent p-0 text-left",
+          canToggle &&
+            "w-full cursor-pointer rounded-sm border-0 bg-transparent p-0 text-left focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-rule",
         )}
       >
-        {id}
+        {breakable(id)}
         <b
           className={cn(
             "font-mono text-ink",
@@ -128,10 +134,12 @@ function AnswerRow({ id, answer, truth, collapsible, toggleable }: AnswerRowProp
 interface AnswersProps {
   response: Response;
   truth?: Record<string, string>;
-  toggleable?: boolean;
+  /** Question ids shown open; with onToggle, the parent owns which rows are open. */
+  expanded?: string[];
+  onToggle?: (id: string) => void;
 }
 
-export function Answers({ response, truth, toggleable }: AnswersProps) {
+export function Answers({ response, truth, expanded = [], onToggle }: AnswersProps) {
   const entries = Object.entries(response.answers);
   const collapsible = entries.length > 4;
   return entries.map(([id, answer]) => (
@@ -141,7 +149,8 @@ export function Answers({ response, truth, toggleable }: AnswersProps) {
       answer={answer}
       truth={truth?.[id]}
       collapsible={collapsible}
-      toggleable={toggleable}
+      expanded={expanded.includes(id)}
+      onToggle={onToggle}
     />
   ));
 }
