@@ -32,13 +32,15 @@ export function RaceClocks({ names, panels }: { names: string[]; panels: PanelSt
       {panels.map((panel, k) => (
         <section
           key={names[k]}
-          className="min-w-0 rounded-lg border border-rule bg-panel px-5 py-4"
+          className="min-w-0 rounded-lg border border-rule bg-panel px-5 py-3.5"
         >
           <Tip content={names[k]}>
             <h2 className="m-0 truncate text-sm font-semibold text-ink">{names[k]}</h2>
           </Tip>
-          <Clock state={panel} />
-          <PlaceBadge place={places[k]} />
+          <div className="mt-2 flex items-baseline justify-between gap-3">
+            <Clock state={panel} className="text-[34px]" />
+            <PlaceBadge place={places[k]} className="m-0" />
+          </div>
         </section>
       ))}
     </div>

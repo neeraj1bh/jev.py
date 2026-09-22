@@ -73,7 +73,8 @@ interface BatchTableProps {
   onOpen: (index: number) => void;
 }
 
-const ROW_PX = 43;
+const ROW_PX = 35; // every row is one line and pinned to this height, so the scroll never corrects itself
+const NEW_ROWS = 6; // only the rows that just arrived rise in, not every row scrolled back into view
 const STRIP_AFTER = 6; // more models than this get one square each instead of a column each
 
 /** Every model's result on one item as a row of squares, in the ranked order, details on hover. */
@@ -94,7 +95,7 @@ function StripCell({ row, columns }: { row: Row; columns: string[] }) {
       <Tip key={columns[k]} content={`${columns[k]} · ${detail} · ${side.ms.toLocaleString()} ms`}>
         <span
           className={cn(
-            "size-3 flex-none rounded-[3px]",
+            "h-3.5 w-2 flex-none rounded-[2px] transition-transform duration-150 hover:scale-y-[1.3]",
             side.response.error ? "bg-bar" : ok ? "bg-good" : "bg-warn",
           )}
         />
@@ -104,14 +105,14 @@ function StripCell({ row, columns }: { row: Row; columns: string[] }) {
   return (
     <td className={cn(tableCell, "max-w-none")}>
       <span className="flex items-center gap-4">
-        <span className="flex flex-wrap gap-[3px]">{squares}</span>
+        <span className="flex flex-wrap gap-[2px]">{squares}</span>
         <span className="ml-auto font-mono text-xs text-dim tabular-nums">
           {right}/{row.sides.length}
         </span>
       </span>
     </td>
   );
-} // a first guess per row; each drawn row is then measured
+}
 
 export function BatchTable({
   rows,
@@ -143,9 +144,14 @@ export function BatchTable({
   const virtualRef = useRef(virtual);
   virtualRef.current = virtual;
   useEffect(() => {
-    if (selected !== null && follow)
-      virtualRef.current.scrollToIndex(selected, { align: "center" });
-  }, [selected, follow]);
+    if (selected === null || !follow) return;
+    // While rows arrive the table glides to its end, so a stream of updates reads as one motion;
+    // an item opened by hand is centred.
+    const box = scrollRef.current;
+    if (selected === rows.length - 1 && box)
+      box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
+    else virtualRef.current.scrollToIndex(selected, { align: "center" });
+  }, [selected, follow, rows.length]);
 
   return (
     <div className={cn(panelBox, "mt-3.5")}>
@@ -160,9 +166,9 @@ export function BatchTable({
       <div ref={scrollRef} className="max-h-[460px] overflow-auto">
         <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px]">
           <colgroup>
-            <col className="w-11" />
+            <col className="w-14" />
             <col className={strip ? "w-[32%]" : columns.length > 3 ? "w-[26%]" : "w-[38%]"} />
-            {labelled && <col className="w-28" />}
+            {labelled && <col className={strip ? "w-44" : "w-28"} />}
             {strip ? <col /> : columns.map((column) => <col key={column} />)}
           </colgroup>
           <thead>
@@ -197,13 +203,15 @@ export function BatchTable({
               return (
                 <tr
                   key={index}
-                  ref={virtual.measureElement}
                   data-index={index}
+                  style={{ height: ROW_PX }}
                   onClick={() => onOpen(index)}
                   className={cn(
                     "cursor-pointer transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md",
                     selected === index && "bg-lift",
-                    row.isNew && "animate-rise motion-reduce:animate-none",
+                    row.isNew &&
+                      index >= rows.length - NEW_ROWS &&
+                      "animate-rise motion-reduce:animate-none",
                   )}
                 >
                   <td className={tableCell}>

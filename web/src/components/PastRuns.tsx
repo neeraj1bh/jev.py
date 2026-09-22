@@ -273,7 +273,7 @@ export function PastRuns(props: PastRunsProps) {
                       </Tip>
                     )}
                   </td>
-                  <td className={tableCell}>
+                  <td className={cn(tableCell, "max-w-none")}>
                     {run.backends.slice(0, SHOWN_MODELS).map((backend) => (
                       <span key={backend} className="mr-3.5 whitespace-nowrap">
                         {props.backendLabel(backend, run.mode)} {score(backend)}
@@ -291,8 +291,8 @@ export function PastRuns(props: PastRunsProps) {
                           </span>
                         }
                       >
-                        <span className="cursor-default font-mono text-xs text-dim underline decoration-dotted underline-offset-2">
-                          +{run.backends.length - SHOWN_MODELS} more
+                        <span className="cursor-default text-[13px] text-dim transition-colors hover:text-ink">
+                          · {run.backends.length - SHOWN_MODELS} more
                         </span>
                       </Tip>
                     )}

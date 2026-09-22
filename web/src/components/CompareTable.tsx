@@ -45,14 +45,17 @@ function AnswerCell({
   id,
   truth,
   written,
+  open = false,
 }: {
   state: PanelState;
   id: string;
   truth?: string;
   /** A written answer has no probabilities to show. */
   written: boolean;
+  /** Its options are listed right below, so the bar here would only repeat the first of them. */
+  open?: boolean;
 }) {
-  const cell = "border-b border-rule px-2 py-2 align-top";
+  const cell = cn("border-b border-rule px-2 py-2 align-top", open && "border-b-0");
   if (state.status === "running" && !state.response) {
     return (
       <td className={cell}>
@@ -73,7 +76,7 @@ function AnswerCell({
   }
   const label = answerLabel(answer);
   const shown = answer.type === "score" ? answer.score.toFixed(2) : label;
-  const probability = written ? null : confidence(answer);
+  const probability = written || open ? null : confidence(answer);
   const correct = truth === undefined ? null : matchesLabel(label, truth);
   return (
     <td className={cell}>
@@ -220,7 +223,7 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
               return (
                 <Fragment key={id}>
                   <tr className="transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md">
-                    <td className={cn(rowCell, "text-ink")}>
+                    <td className={cn(rowCell, "text-ink", isOpen && "border-b-0")}>
                       {hasAnswers ? (
                         <button
                           type="button"
@@ -244,7 +247,7 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
                     </td>
                     {truth && (
                       <Tip content={truth[id]}>
-                        <td className={cn(rowCell, "text-dim")}>
+                        <td className={cn(rowCell, "text-dim", isOpen && "border-b-0")}>
                           <span className="line-clamp-2 break-words">{truth[id] ?? "–"}</span>
                         </td>
                       </Tip>
@@ -256,6 +259,7 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
                         id={id}
                         truth={truth?.[id]}
                         written={name.endsWith("· text")}
+                        open={isOpen}
                       />
                     ))}
                   </tr>
@@ -264,7 +268,7 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
                       <td className={rowCell} />
                       {truth && <td className={rowCell} />}
                       {names.map((name, k) => (
-                        <td key={name} className={cn(rowCell, "pb-3")}>
+                        <td key={name} className={cn(rowCell, "pt-0 pb-3")}>
                           <OptionBreakdown
                             answer={panels[k]?.response?.answers[id]}
                             written={name.endsWith("· text")}
@@ -307,8 +311,7 @@ export function ModelRowsTable({
       >
         <thead>
           <tr>
-            <th className={cn(tableHead, "w-8 align-bottom")}>#</th>
-            <th className={cn(tableHead, "align-bottom")}>Model</th>
+            <th className={cn(tableHead, "sticky left-0 z-[2] align-bottom")}>Model</th>
             <th className={cn(tableHead, "text-right align-bottom")}>Time</th>
             {questionIds.map((id) => (
               <th key={id} className={cn(tableHead, "align-bottom")}>
@@ -325,8 +328,17 @@ export function ModelRowsTable({
             const state = panels[k] ?? idle;
             return (
               <tr key={name} className="transition-colors hover:bg-lift">
-                <td className={cn(rowCell, "font-mono text-xs text-dim")}>{k + 1}</td>
-                <td className={cn(rowCell, "font-semibold text-ink")}>{name}</td>
+                <td
+                  className={cn(
+                    rowCell,
+                    "sticky left-0 z-[1] bg-panel font-semibold whitespace-nowrap text-ink",
+                  )}
+                >
+                  <span className="mr-2.5 inline-block w-5 font-mono text-xs font-normal text-dim">
+                    {k + 1}
+                  </span>
+                  {name}
+                </td>
                 <td
                   className={cn(
                     rowCell,

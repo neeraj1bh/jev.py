@@ -6,13 +6,20 @@ import type { PanelState } from "../types";
 import { InfoTip } from "./InfoTip";
 import type { Place } from "./RaceClocks";
 
-export function Clock({ state }: { state: PanelState }) {
+export function Clock({
+  state,
+  className = "mt-3.5 mb-4",
+}: {
+  state: PanelState;
+  className?: string;
+}) {
   const ms = useElapsed(state);
   return (
     <div
       className={cn(
-        "mt-3.5 mb-4 font-mono text-[40px] leading-none font-[650] tabular-nums transition-colors",
+        "font-mono text-[40px] leading-none font-[650] tabular-nums transition-colors",
         state.fastest ? "text-good" : "text-ink",
+        className,
       )}
     >
       <span>{ms}</span>
@@ -24,9 +31,15 @@ export function Clock({ state }: { state: PanelState }) {
 const ordinal = (n: number) =>
   `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10 < 4 ? n % 10 : 0]}`;
 
-export function PlaceBadge({ place }: { place?: Place }) {
+export function PlaceBadge({
+  place,
+  className = "-mt-2 mb-3",
+}: {
+  place?: Place;
+  className?: string;
+}) {
   return (
-    <p className="-mt-2 mb-3 min-h-5 font-mono text-[13px] text-dim tabular-nums">
+    <p className={cn("min-h-5 font-mono text-[13px] text-dim tabular-nums", className)}>
       {place && (
         <>
           <span className={cn("font-semibold", place.place === 1 ? "text-good" : "text-ink")}>

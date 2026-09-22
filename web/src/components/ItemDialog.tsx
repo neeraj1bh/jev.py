@@ -1,4 +1,6 @@
-import { fastestIndexes } from "../scoring";
+import { useMemo } from "react";
+
+import { fastestIndexes, rankColumns } from "../scoring";
 import { cn, labelText } from "../styles";
 import type { PanelState, Row, Side } from "../types";
 import { CompareTable, ModelRowsTable } from "./CompareTable";
@@ -29,9 +31,13 @@ interface ItemDialogProps {
 
 export function ItemDialog(props: ItemDialogProps) {
   const { open, index, direction, rows, columns, dataset, onClose, onNavigate } = props;
+  // The same winner-first order as the summary and the table behind it.
+  const order = useMemo(() => rankColumns(rows, columns.length), [rows, columns.length]);
   const row = rows[index];
   if (!row) return null;
-  const { item, sides } = row;
+  const { item } = row;
+  const sides = order.flatMap((k) => (row.sides[k] ? [row.sides[k]] : []));
+  const names = order.map((k) => columns[k] ?? "");
   const truth = Object.keys(item.truth).length > 0 ? item.truth : undefined;
   const fastest = fastestIndexes(sides.map((side) => side.ms));
   const isFirst = index === 0;
@@ -48,7 +54,7 @@ export function ItemDialog(props: ItemDialogProps) {
         if (event.key === "ArrowLeft" && !isFirst) onNavigate(index - 1);
         else if (event.key === "ArrowRight" && !isLast) onNavigate(index + 1);
       }}
-      className="mx-auto h-auto max-h-[calc(88vh-32px)] w-[min(1100px,calc(100vw-32px))] px-[26px] pt-[22px] pb-3.5 [inset:12vh_0_auto] backdrop:animate-fade focus:outline-none open:flex open:animate-pop open:flex-col motion-reduce:animate-none"
+      className="mx-auto h-auto max-h-[calc(92vh-16px)] w-[min(1440px,calc(100vw-32px))] px-[26px] pt-[22px] pb-3.5 [inset:5vh_0_auto] backdrop:animate-fade focus:outline-none open:flex open:animate-pop open:flex-col motion-reduce:animate-none"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -107,9 +113,9 @@ export function ItemDialog(props: ItemDialogProps) {
           direction === "back" && "animate-from-l motion-reduce:animate-none",
         )}
       >
-        {columns.length > 4 ? (
+        {names.length > 4 ? (
           <ModelRowsTable
-            names={columns}
+            names={names}
             panels={sides.map((side, k) => asPanel(side, fastest.includes(k)))}
             questionIds={Object.keys(item.questions)}
             truth={truth}
@@ -118,7 +124,7 @@ export function ItemDialog(props: ItemDialogProps) {
           <CompareTable
             key={index}
             bare
-            names={columns}
+            names={names}
             panels={sides.map((side, k) => asPanel(side, fastest.includes(k)))}
             questionIds={Object.keys(item.questions)}
             truth={truth}
