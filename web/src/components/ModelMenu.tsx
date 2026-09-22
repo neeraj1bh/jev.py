@@ -17,7 +17,7 @@ function runCost(backend: Backend) {
   if (dollars === null) return { text: "", title: undefined };
   return {
     text: `≈ ${dollarText(dollars)} a run`,
-    title: `Input $${backend.price}/M tokens · output $${backend.price_out ?? "?"}/M · a full run is ~0.75M input tokens`,
+    title: `Input $${backend.price}/M tokens · output $${backend.price_out ?? "?"}/M · a full run of the frozen set is ~2.25M input tokens`,
   };
 }
 const FREE = "free";

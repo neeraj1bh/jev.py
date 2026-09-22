@@ -4,8 +4,8 @@ import { useState } from "react";
 import {
   dollarText,
   isOffline,
+  itemsDollars,
   providerName,
-  RUN_QUESTIONS,
   runDollars,
   statusText,
 } from "../backends";
@@ -136,12 +136,10 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
   // Models on this machine cost nothing; hosted ones without a listed price are named, not guessed.
   const onMachine = (backend: Backend) => backend.group === "local" || backend.group === "server";
   const unpriced = chosen.filter((backend) => !onMachine(backend) && runDollars(backend) === null);
-  const dollars =
-    chosen.reduce(
-      (sum, backend) => sum + (onMachine(backend) ? 0 : (runDollars(backend) ?? 0)),
-      0,
-    ) *
-    (items / RUN_QUESTIONS);
+  const dollars = chosen.reduce(
+    (sum, backend) => sum + (onMachine(backend) ? 0 : (itemsDollars(backend, items) ?? 0)),
+    0,
+  );
   const names = chosen.map((backend) => backend.label);
   const unpricedNote = unpriced.length
     ? `; ${unpriced.map((backend) => backend.label).join(", ")} ${unpriced.length === 1 ? "has no listed price here and is" : "have no listed price here and are"} not counted`

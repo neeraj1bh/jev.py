@@ -90,16 +90,25 @@ const PROVIDER_NAMES: Record<string, string> = {
 
 export const providerName = (slug = "") => PROVIDER_NAMES[slug] ?? slug;
 
-// One full run of the frozen set: about 4,000 questions, ~0.75M input tokens, one output token each.
-export const RUN_QUESTIONS = 4_000;
-const RUN_INPUT_TOKENS = 750_000;
+// Measured 2026-09-22 by rendering every letter-readout prompt of the frozen set with the Qwen
+// tokenizer: 4,055 requests, 2.25M input tokens, one output token each. TypeSafe's cases are 1.75M
+// of it, since each question resends its document; the other questions average 135 tokens.
+const RUN_QUESTIONS = 4_055;
+const RUN_INPUT_TOKENS = 2_250_000;
+const ITEM_INPUT_TOKENS = 135;
 
-/** Dollars for one full run: 0 when free, null when the price is unknown. */
-export function runDollars(backend: Backend) {
+const dollars = (backend: Backend, input: number, output: number) => {
   if (backend.free || backend.price === 0) return 0;
   if (backend.price === undefined) return null;
-  return ((backend.price ?? 0) * RUN_INPUT_TOKENS + (backend.price_out ?? 0) * RUN_QUESTIONS) / 1e6;
-}
+  return ((backend.price ?? 0) * input + (backend.price_out ?? 0) * output) / 1e6;
+};
+
+/** Dollars for one full frozen-set run: 0 when free, null when the price is unknown. */
+export const runDollars = (backend: Backend) => dollars(backend, RUN_INPUT_TOKENS, RUN_QUESTIONS);
+
+/** Dollars for `items` one-question items of a demo set; long sets such as TypeSafe's cost more. */
+export const itemsDollars = (backend: Backend, items: number) =>
+  dollars(backend, ITEM_INPUT_TOKENS * items, items);
 
 export const dollarText = (dollars: number) =>
   `$${dollars < 1 ? dollars.toFixed(2) : dollars.toFixed(dollars < 10 ? 1 : 0)}`;
