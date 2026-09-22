@@ -50,7 +50,33 @@ function shareItems(a: SavedRun, b: SavedRun) {
   return true;
 }
 
-export const runTime = (name: string) => name.slice(5, 16).replace(/-(\d\d)-(\d\d)$/, " $1:$2");
+const STAMP = /^(\d{4})-(\d\d)-(\d\d)-(\d\d)-(\d\d)-(\d\d)/;
+const SHORT_TIME = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+const FULL_TIME = new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "long" });
+
+/** A saved run's name starts with the UTC time it was saved at. */
+function runDate(name: string) {
+  const parts = STAMP.exec(name)?.slice(1).map(Number);
+  if (!parts || parts.length < 6) return null;
+  const [year = 0, month = 1, day = 1, hour = 0, minute = 0, second = 0] = parts;
+  return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+}
+
+/** When a run was saved, in the viewer's own time zone and clock style. */
+export const runTime = (name: string) => {
+  const date = runDate(name);
+  return date ? SHORT_TIME.format(date) : name;
+};
+
+const runTimeInFull = (name: string) => {
+  const date = runDate(name);
+  return date ? FULL_TIME.format(date) : undefined;
+};
 
 interface PastRunsProps {
   runs: SavedRun[];
@@ -276,7 +302,9 @@ export function PastRuns(props: PastRunsProps) {
                     </Tip>
                   </td>
                   <td className={tableCell}>
-                    <span className={monoDim}>{runTime(run.name)}</span>
+                    <Tip content={runTimeInFull(run.name)}>
+                      <span className={cn(monoDim, "whitespace-nowrap")}>{runTime(run.name)}</span>
+                    </Tip>
                   </td>
                   <td className={tableCell}>
                     {run.dataset}
