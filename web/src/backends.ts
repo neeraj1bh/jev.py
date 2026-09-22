@@ -61,6 +61,7 @@ const DIRECT_GROUPS: [BackendGroup, string][] = [
 export function groupBackends(backends: Backend[]) {
   const rank = (backend: Backend) => (backend.ready || backend.group === "local" ? 0 : 1);
   const device = backends.find((backend) => backend.group === "local")?.device ?? "";
+  // A group with nothing in it, such as a local server nobody runs, gets no heading.
   return DIRECT_GROUPS.map(([group, name]) => ({
     group,
     heading: group === "local" ? `${name} · ${device}` : name,
@@ -68,7 +69,7 @@ export function groupBackends(backends: Backend[]) {
     backends: backends
       .filter((backend) => backend.group === group && backend.id !== OPENROUTER)
       .sort((a, b) => rank(a) - rank(b)),
-  }));
+  })).filter((entry) => entry.backends.length > 0);
 }
 
 const PROVIDER_NAMES: Record<string, string> = {

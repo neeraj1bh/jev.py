@@ -35,21 +35,21 @@ export function useBackends() {
         const local = list.find((b) => canGenerate(b.id) && b.group === "local");
         return (local ?? list.find((b) => canGenerate(b.id)))?.id ?? "";
       });
+      // Defaults come only from models that are ready now, so a fresh machine never starts a
+      // download or a keyless request just by pressing Run; the viewer's own picks are kept.
+      const ready = (id?: string) => usable(id) && !!id && !!byId[id]?.ready;
       setCompareModels((previous) => {
         let picked = previous.filter(usable);
-        if (!picked.length) {
-          const first = usable(startupModel) ? startupModel : list.find((b) => usable(b.id))?.id;
-          if (first) picked = [first];
-        }
+        if (!picked.length && ready(startupModel)) picked = [startupModel];
         while (picked.length < 2) {
           const hosted = list.find(
-            (b) => usable(b.id) && b.group === "hosted" && !picked.includes(b.id),
+            (b) => ready(b.id) && b.group === "hosted" && !picked.includes(b.id),
           );
-          const next = hosted ?? list.find((b) => usable(b.id) && !picked.includes(b.id));
+          const next = hosted ?? list.find((b) => ready(b.id) && !picked.includes(b.id));
           if (!next) break;
           picked = [...picked, next.id];
         }
-        return picked;
+        return picked.length >= 2 ? picked : previous.filter(usable);
       });
     },
     [setCompareModels, setGenerateModel],

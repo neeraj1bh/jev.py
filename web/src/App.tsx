@@ -384,6 +384,13 @@ export default function App() {
 
   async function chooseDataset(name: string) {
     setOpenMenu("");
+    if (datasets.find((set) => set.name === name)?.needs_token) {
+      setKeysOpen(true);
+      toast.show(
+        `${name} is behind a Hugging Face login: add a read token here, and accept its terms on its Hugging Face page.`,
+      );
+      return;
+    }
     setDataset(name);
     setExample("");
     clearBatch();
