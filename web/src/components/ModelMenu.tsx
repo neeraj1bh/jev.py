@@ -131,7 +131,7 @@ export function ModelMenu(props: ModelMenuProps) {
             backend.label
           )
         }
-        title={inGateway ? runCost(backend).title : undefined}
+        title={inGateway ? runCost(backend).title : backend.label}
         detail={
           inGateway
             ? [inTree ? "" : providerName(backend.provider), runCost(backend).text]

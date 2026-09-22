@@ -46,7 +46,7 @@ def scan(dirs):
                 stem = SHARD.sub("", name) if shard else name[: -len(".gguf")]
                 parts = [f for f in files if SHARD.sub("", f) == stem] if shard else [name]
                 found["gguf:" + os.path.join(folder, name)] = {
-                    "label": stem,
+                    "label": re.sub("-instruct", "", stem, flags=re.IGNORECASE),
                     "gb": _gb(folder, parts),
                     "kind": "gguf",
                 }
@@ -112,3 +112,68 @@ def set_llama_server(path):
     values = settings()
     values["llama_server"] = path
     _save(values)
+
+
+def _holds_models(folder, depth=2):
+    """A quick look, two levels down, used to mark folders worth opening."""
+    try:
+        entries = list(os.scandir(folder))
+    except OSError:
+        return False
+    if any(e.name == "config.json" or e.name.lower().endswith(".gguf") for e in entries):
+        return True
+    return depth > 1 and any(
+        _holds_models(e.path, depth - 1)
+        for e in entries
+        if e.is_dir(follow_symlinks=False) and e.name[0] != "."
+    )
+
+
+def roots():
+    """Where browsing starts: the home folder, the top of the file system, and the drives."""
+    places = [os.path.expanduser("~"), os.path.abspath(os.sep)]
+    if os.name == "nt":
+        places += [f"{letter}:\\" for letter in "CDEFGH" if os.path.isdir(f"{letter}:\\")]
+    elif os.path.isdir("/mnt"):  # WSL mounts the Windows drives here
+        places += sorted(os.path.join("/mnt", d) for d in os.listdir("/mnt") if len(d) == 1)
+    if os.path.isdir("/Volumes"):  # macOS disks
+        places += sorted(os.path.join("/Volumes", d) for d in os.listdir("/Volumes"))
+    return [p for p in dict.fromkeys(places) if _has_entries(p)]
+
+
+def _has_entries(folder):
+    """An unused WSL drive letter is an empty folder."""
+    try:
+        return os.path.isdir(folder) and any(os.scandir(folder))
+    except OSError:
+        return False
+
+
+def browse(path, files=False):
+    """One folder's subfolders, and with files=True its llama-server programs, for the page's picker."""
+    path = _local(path) if path else os.path.expanduser("~")
+    if not os.path.isdir(path):
+        raise ValueError(f"No folder at {path}")
+    try:
+        entries = sorted(os.scandir(path), key=lambda e: e.name.lower())
+    except PermissionError:
+        raise ValueError(f"No permission to open {path}") from None
+    visible = [e for e in entries if not e.name.startswith((".", "$"))]
+    return {
+        "path": path,
+        "parent": os.path.dirname(path) if os.path.dirname(path) != path else None,
+        "roots": roots(),
+        "folders": [
+            {"name": e.name, "path": e.path, "models": _holds_models(e.path)}
+            for e in visible
+            if e.is_dir(follow_symlinks=False)
+        ],
+        "files": [
+            {"name": e.name, "path": e.path}
+            for e in visible
+            if files and e.is_file() and e.name.lower() in ("llama-server", "llama-server.exe")
+        ]
+        if files
+        else [],
+        "models": _holds_models(path),
+    }

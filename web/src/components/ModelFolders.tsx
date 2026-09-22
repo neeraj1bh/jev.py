@@ -1,18 +1,15 @@
 import { X } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { changeFolders, type FolderState, fetchFolders } from "../api";
 import { cn, ghostButton } from "../styles";
+import { FolderPicker } from "./FolderPicker";
 import { Icon } from "./Icon";
-
-const field =
-  "min-w-0 flex-1 rounded-md border border-rule bg-paper px-3 py-1.5 font-mono text-[13px] text-ink outline-none placeholder:text-dim focus:border-dim";
 
 /** Folders on this machine that already hold models, and the llama-server that runs GGUF files. */
 export function ModelFolders({ onChanged }: { onChanged: () => void }) {
   const [state, setState] = useState<FolderState | null>(null);
-  const [folder, setFolder] = useState("");
-  const [server, setServer] = useState("");
+  const [picking, setPicking] = useState<"folder" | "program" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -25,18 +22,13 @@ export function ModelFolders({ onChanged }: { onChanged: () => void }) {
     setError("");
     try {
       setState(await changeFolders(request));
-      setFolder("");
-      setServer("");
+      setPicking(null);
       onChanged();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
       setBusy(false);
     }
-  };
-  const submit = (event: FormEvent, request: Parameters<typeof changeFolders>[0]) => {
-    event.preventDefault();
-    change(request);
   };
 
   return (
@@ -63,54 +55,44 @@ export function ModelFolders({ onChanged }: { onChanged: () => void }) {
           ))}
         </ul>
       )}
-      <form onSubmit={(event) => submit(event, { add: folder })} className="flex gap-2">
-        <input
-          value={folder}
-          onChange={(event) => setFolder(event.target.value)}
-          placeholder="/path/to/models"
-          aria-label="Folder with models"
-          spellCheck={false}
-          className={field}
+      {picking ? (
+        <FolderPicker
+          pick={picking}
+          onPick={(path) => change(picking === "folder" ? { add: path } : { llama_server: path })}
+          onCancel={() => setPicking(null)}
         />
-        <button
-          type="submit"
-          disabled={busy || !folder.trim()}
-          className={cn(ghostButton, "w-16 px-0 py-1.5 text-sm")}
-        >
-          Add
-        </button>
-      </form>
-      {state?.has_gguf && (
-        <form onSubmit={(event) => submit(event, { llama_server: server })} className="mt-3">
-          <p className="mt-0 mb-1 text-xs text-dim">
-            {state.llama_server ? (
-              <>
-                GGUF files run with <span className="font-mono">{state.llama_server}</span>
-              </>
-            ) : (
-              "GGUF files need llama.cpp's llama-server program"
-            )}
-          </p>
-          {!state.llama_server && (
-            <div className="flex gap-2">
-              <input
-                value={server}
-                onChange={(event) => setServer(event.target.value)}
-                placeholder="/path/to/llama-server"
-                aria-label="llama-server program"
-                spellCheck={false}
-                className={field}
-              />
-              <button
-                type="submit"
-                disabled={busy || !server.trim()}
-                className={cn(ghostButton, "w-16 px-0 py-1.5 text-sm")}
-              >
-                Set
-              </button>
-            </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            className={cn(ghostButton, "px-3 py-1.5 text-sm")}
+            onClick={() => setPicking("folder")}
+          >
+            Choose a folder…
+          </button>
+          {state?.has_gguf && !state.llama_server && (
+            <button
+              type="button"
+              disabled={busy}
+              className={cn(ghostButton, "px-3 py-1.5 text-sm")}
+              onClick={() => setPicking("program")}
+            >
+              Choose llama-server…
+            </button>
           )}
-        </form>
+        </div>
+      )}
+      {state?.has_gguf && (
+        <p className="mt-2 mb-0 text-xs text-dim">
+          {state.llama_server ? (
+            <>
+              GGUF files run with <span className="font-mono break-all">{state.llama_server}</span>
+            </>
+          ) : (
+            "GGUF files need llama.cpp's llama-server program."
+          )}
+        </p>
       )}
       {error && <p className="mt-2 mb-0 text-xs text-warn">{error}</p>}
     </section>

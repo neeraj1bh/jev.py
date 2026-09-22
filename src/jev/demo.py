@@ -1214,6 +1214,17 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 return self._send(200, json.dumps(progress()).encode())
             if self.path.endswith("/folders"):
                 return self._send(200, json.dumps(folder_state()).encode())
+            if "/browse" in self.path:
+                if self.client_address[0] not in ("127.0.0.1", "::1"):
+                    return self._send(
+                        403, b'{"error": {"message": "folders can only be browsed from this machine"}}'
+                    )
+                query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                try:
+                    listing = folders.browse(query.get("path", [""])[0], files="files" in query)
+                except ValueError as e:
+                    return self._send(400, json.dumps({"error": {"message": str(e)}}).encode())
+                return self._send(200, json.dumps(listing).encode())
             if self.path.endswith("/presets"):
                 return self._send(200, json.dumps(presets()).encode())
             if self.path.endswith("/keys"):
@@ -1292,6 +1303,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     add_model(body["id"].strip())
                     return self._send(200, b"{}")
                 if self.path.endswith("/folders"):
+                    if self.client_address[0] not in ("127.0.0.1", "::1"):
+                        raise ValueError("folders can only be changed from this machine")
                     if "add" in body:
                         folders.add(body["add"])
                     elif "remove" in body:

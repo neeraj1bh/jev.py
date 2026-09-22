@@ -75,6 +75,22 @@ export const fetchFolders = () => getJson<FolderState>("/v1/folders");
 export const changeFolders = (
   change: { add: string } | { remove: string } | { llama_server: string },
 ) => postOrThrow<FolderState>("/v1/folders", change);
+export interface Listing {
+  path: string;
+  parent: string | null;
+  roots: string[];
+  folders: { name: string; path: string; models: boolean }[];
+  files: { name: string; path: string }[];
+  models: boolean;
+}
+/** One folder on the machine running jev.py, for the page's folder picker. */
+export async function browse(path: string, files = false) {
+  const query = new URLSearchParams({ path, ...(files ? { files: "1" } : {}) });
+  const response = await fetch(`/v1/browse?${query}`);
+  const data = (await response.json()) as Listing & { error?: { message?: string } };
+  if (!response.ok) throw new ApiError(data.error?.message ?? response.statusText, response.status);
+  return data;
+}
 export const fetchKeys = () => getJson<KeyInfo[]>("/v1/keys");
 /** Forgets a key for this session and removes it from .env. */
 export const clearKey = (backend: string) =>

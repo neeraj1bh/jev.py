@@ -53,15 +53,16 @@ uv run jev-eval Qwen/Qwen2.5-7B-Instruct    # public eval
 ## Models in other folders
 
 Models already somewhere else on the machine can be listed without copying them: in **Add a
-model**, under *From a folder on this machine*, enter the folder's path (in WSL, `C:\models`
-works as well as `/mnt/c/models`). The folders are remembered in `data/model-folders.json`, and
+model**, under *From a folder on this machine*, choose **Choose a folder…** and click through to it.
+The browser starts at the home folder and lists the drives (`/mnt/c`, `/mnt/d` in WSL, `/Volumes`
+on a Mac, `C:\` on Windows); folders that hold models are marked. The folders are remembered in `data/model-folders.json`, and
 the menu lists what they hold:
 
 - **Hugging Face model folders** (a `config.json` and `.safetensors` weights) under *On this
   machine*; they run through PyTorch like any other.
 - **GGUF files** under *GGUF files · llama.cpp*. Split files (`-00001-of-00003.gguf`) count as one
-  model. They need llama.cpp's `llama-server`: one on the PATH is found by itself, otherwise the
-  dialog asks for the program's path. Picking a GGUF model starts llama-server with it on port
+  model. They need llama.cpp's `llama-server`: one on the PATH is found by itself, otherwise
+  **Choose llama-server…** picks the program the same way. Picking a GGUF model starts llama-server with it on port
   8082, on the GPU, and stops the GGUF model it ran before; jev.py stops it when it exits.
 
 One GGUF model runs at a time, so comparing two of them restarts llama-server between them; the
