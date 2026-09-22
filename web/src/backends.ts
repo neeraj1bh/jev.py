@@ -4,7 +4,9 @@ import type { Backend, BackendGroup, Dataset } from "./types";
 export const OPENROUTER = "remote:openrouter";
 export const TEXTLESS = new Set(["remote:typesafe", "remote:vercel"]);
 
-export const isOffline = (backend: Backend) => !backend.ready && backend.group === "server";
+/** A llama.cpp server that is not running, or a GGUF file with no llama-server program set. */
+export const isOffline = (backend: Backend) =>
+  !backend.ready && (backend.group === "server" || backend.group === "gguf");
 
 export const isUsable = (backend?: Backend) =>
   !!backend && !isOffline(backend) && (backend.ready || backend.group === "local");
@@ -17,6 +19,8 @@ export function statusText(backend: Backend) {
     return backend.ready ? `${backend.gb ? `${backend.gb} GB · ` : ""}on disk` : `download${size}`;
   }
   if (backend.group === "server") return backend.ready ? "running" : "not running";
+  if (backend.group === "gguf")
+    return backend.ready ? `${backend.gb} GB` : "set llama-server in Keys";
   const model = backend.model ? `${backend.model} · ` : "";
   return model + (backend.ready ? "key set" : "add key");
 }
@@ -27,6 +31,7 @@ export function pickerSubtitle(backend?: Backend) {
     return `${backend.device}${backend.gb ? ` · ${backend.gb} GB` : ""}${backend.ready ? "" : " · download"}`;
   }
   if (backend.group === "gateway") return "via OpenRouter";
+  if (backend.group === "gguf") return "llama.cpp";
   if (backend.group === "server") return backend.ready ? "running" : "not running";
   return backend.model ?? "direct API";
 }
@@ -34,6 +39,7 @@ export function pickerSubtitle(backend?: Backend) {
 export function location(backend?: Backend) {
   if (!backend) return "";
   if (backend.group === "server") return `llama.cpp at ${backend.url}`;
+  if (backend.group === "gguf") return `${backend.path}, run by llama-server`;
   if (backend.group === "hosted") return `Key from ${backend.key}`;
   const need =
     backend.need_gb && backend.have_gb
@@ -53,6 +59,7 @@ export const panelSubtitle = (name?: string) =>
 
 const DIRECT_GROUPS: [BackendGroup, string][] = [
   ["local", "On this machine"],
+  ["gguf", "GGUF files · llama.cpp"],
   ["server", "Local server"],
   ["hosted", "Direct APIs · one pinned model each"],
 ];

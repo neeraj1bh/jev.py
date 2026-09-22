@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export type Mode = "compare" | "generate" | "benchmark" | "past";
 export type RunKind = "cmp" | "gen";
-export type BackendGroup = "local" | "server" | "hosted" | "gateway";
+export type BackendGroup = "local" | "gguf" | "server" | "hosted" | "gateway";
 
 export interface Backend {
   id: string;

@@ -50,6 +50,21 @@ uv run jev serve Qwen/Qwen2.5-7B-Instruct   # API on :8080
 uv run jev-eval Qwen/Qwen2.5-7B-Instruct    # public eval
 ```
 
+## Models in other folders
+
+Under Keys, **Model folders** names more folders to look in, comma-separated (for example
+`/path/to/models`). The menu then lists what it finds there:
+
+- **Hugging Face model folders** (a `config.json` and `.safetensors` weights) under *On this
+  machine*; they run through PyTorch like any other.
+- **GGUF files** under *GGUF files · llama.cpp*. Split files (`-00001-of-00003.gguf`) count as one
+  model. Set **llama-server program** under Keys, and picking one starts llama-server with it on
+  port 8082 on the GPU, stopping the GGUF model it ran before. jev.py stops it when it exits.
+
+One GGUF model runs at a time, so comparing two of them restarts llama-server between them; the
+restart is not counted in the times. From WSL, the Windows `llama-server.exe` works as the program:
+jev.py passes it Windows paths and reaches it at the Windows address, as below.
+
 ## llama.cpp
 
 The page detects a `llama-server` on `localhost:8081` and lists it as **llama.cpp server**. A

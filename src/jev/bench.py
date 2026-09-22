@@ -154,7 +154,7 @@ def load(part="main"):
 
 def reads_wide(model):
     """Letter-reading backends answer 26 options at most; Jev and local models read any number."""
-    if model.startswith("openrouter:"):
+    if model.startswith(("openrouter:", "gguf:")):
         return False
     kind, _, name = model.partition(":")
     return kind != "remote" or name.split(":")[0] not in demo.LETTER

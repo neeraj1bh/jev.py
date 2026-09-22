@@ -480,6 +480,7 @@ export default function App() {
       await Promise.all(missing.map((backend) => loadModel(backend.id)));
       for (const backend of picked) {
         if (backend.group === "local") setVerdict(`Loading ${backend.label}…`);
+        if (backend.group === "gguf") setVerdict(`Starting llama-server with ${backend.label}…`);
         await loadModel(backend.id);
       }
     } catch (error) {

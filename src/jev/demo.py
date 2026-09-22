@@ -19,6 +19,7 @@ import json
 import mimetypes
 import os
 import random
+import signal
 import sys
 import time
 import urllib.error
@@ -31,7 +32,7 @@ import torch
 from huggingface_hub.constants import HF_HUB_CACHE
 from transformers import TextIteratorStreamer
 
-from jev import cache, downloads, hub
+from jev import cache, downloads, folders, hub, llamaserver
 from jev.core import DEFAULT_MODEL, ROOT, SYSTEM, Jev, _options, _text
 from jev.eval import typesafe_rows
 from jev.remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env
@@ -852,20 +853,26 @@ def on_disk():
     return cache.on_disk((HF_HUB_CACHE, MODELS))
 
 
+def model_dirs():
+    return [d.strip() for d in (env("MODEL_DIRS") or "").split(",") if d.strip()]
+
+
 def local_ids(extra):
     """Chat models already on this machine, the ones added in the page, and the built-in starters
     until three models are on disk."""
     disk = on_disk()
     starters = list(LOCAL) if len(disk) < 3 else []
-    return list(dict.fromkeys([*disk, *added(), *starters, *extra])), disk
+    in_folders = folders.scan(model_dirs())
+    return list(dict.fromkeys([*disk, *added(), *starters, *in_folders, *extra])), disk
 
 
 def backends(extra):
     """Everything the page can pick, with what it needs before it can run."""
     out, mem = [], memory_gb()
     ids, disk = local_ids(extra)
+    in_folders = folders.scan(model_dirs())
     for m in ids:
-        if m.startswith("remote:"):
+        if m.startswith("remote:") or m in in_folders:
             continue
         found = disk.get(m)
         folder = found[0] if found else MODELS
@@ -884,6 +891,14 @@ def backends(extra):
                 "tested": m in LOCAL,
             }
         )
+    for fid, found in in_folders.items():
+        gguf = found["kind"] == "gguf"
+        entry = {"id": fid, "label": found["label"], "gb": found["gb"], "path": fid.removeprefix("gguf:")}
+        if gguf:  # read by letter through a llama-server started for it
+            out.append(entry | {"group": "gguf", "ready": bool(env("LLAMA_SERVER")), "max": 26})
+        else:
+            need = round(found["gb"] * (1 if BF16 else 2) * 1.3, 1)
+            out.append(entry | {"group": "local", "ready": True, "device": DEVICE, "need_gb": need})
     url = llamacpp_url()
     try:
         with urllib.request.urlopen(url.split("/v1/")[0] + "/health", timeout=0.5) as r:
@@ -926,7 +941,15 @@ LOADED, LOCK = {}, Lock()  # backend id -> Jev or Remote; at most two local mode
 
 
 def get(bid):
-    if not bid.startswith(("remote:", "openrouter:")) and bid not in LOADED:
+    if bid.startswith("gguf:"):
+        if not env("LLAMA_SERVER"):
+            raise ValueError("Set the llama-server program under Keys to run GGUF models")
+        url = llamaserver.serve(bid.removeprefix("gguf:"), env("LLAMA_SERVER"))
+        remote = LOADED.get(bid) or Remote("llamacpp", model=os.path.basename(bid))
+        remote.url = url + "/v1/chat/completions"
+        LOADED[bid] = remote
+        return remote
+    if not bid.startswith(("remote:", "openrouter:")) and bid not in LOADED and not os.path.isdir(bid):
         folder, have = where(bid)
         if not have:  # outside LOCK, so other models keep answering while this one downloads
             if env("HF_TOKEN"):  # a gated model downloads with the token saved under Keys
@@ -966,6 +989,12 @@ KEYS = {
         "https://huggingface.co/settings/tokens",
     ),
     "LLAMACPP_URL": ("llama.cpp server", "a llama-server address instead of the default", ""),
+    "MODEL_DIRS": ("Model folders", "folders with GGUF files or model folders, comma-separated", ""),
+    "LLAMA_SERVER": (
+        "llama-server program",
+        "runs the GGUF models found in the model folders",
+        "https://github.com/ggml-org/llama.cpp/releases",
+    ),
 }
 HF_WHOAMI = "https://huggingface.co/api/whoami-v2"
 
@@ -999,6 +1028,13 @@ def check_key(name, key):
         with urllib.request.urlopen(key.split("/v1/")[0] + "/health", timeout=5) as r:
             if json.loads(r.read()).get("status") != "ok":
                 raise ValueError("that address answered, but not as a llama-server")
+    elif name == "MODEL_DIRS":
+        missing = [d for d in model_dirs() if not os.path.isdir(d)]
+        if missing or not model_dirs():
+            raise ValueError(f"no such folder: {', '.join(missing) or key}")
+    elif name == "LLAMA_SERVER":
+        if not (os.path.isfile(key) and os.access(key, os.X_OK)):
+            raise ValueError(f"{key} is not a program this machine can run")
     elif name == "remote:openrouter":  # its key endpoint checks the key alone, whatever a model can do
         request = urllib.request.Request(OPENROUTER_KEY_URL, headers={"Authorization": "Bearer " + key})
         urllib.request.urlopen(request, timeout=15).close()
@@ -1342,6 +1378,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
 
     print(f"open http://localhost:{port}  ({DEVICE}; models in {HF_HUB_CACHE} or {MODELS})")
     Thread(target=runs, daemon=True).start()  # summarise the saved runs before Past runs is opened
+    # `kill` ends the server like Ctrl+C does, so exit handlers run and stop llama-server.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     server = ThreadingHTTPServer(("", port), H)
     try:
         server.serve_forever()
