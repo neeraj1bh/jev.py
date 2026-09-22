@@ -38,10 +38,10 @@ uv run jev                                   # self-check; downloads Qwen2.5-1.5
 uv run jev serve                             # HTTP on http://localhost:8080/v1/systemone
 uv run jev serve Qwen/Qwen2.5-7B-Instruct    # any chat model on the Hub
 uv run jev request.json                      # one request from a file
-uv run jev-demo                              # the comparison page, see Demo
 ```
 
-It uses CUDA, Apple MPS or the CPU, whichever is there, in bf16 where the hardware has it.
+Needs [uv](https://docs.astral.sh/uv/). It uses CUDA, Apple MPS or the CPU, whichever is there,
+in bf16 where the hardware has it.
 
 On Linux without an NVIDIA GPU, skip the 2.5 GB of CUDA libraries and install once:
 
@@ -52,7 +52,7 @@ uv pip install transformers && uv pip install -e . --no-deps
 uv run --no-sync jev          # --no-sync goes before the command, or uv installs CUDA again
 ```
 
-Without uv: `pip install -e .`, then `jev`, `jev-demo` and the rest are on your path.
+On that setup, write `uv run --no-sync` wherever this README says `uv run`.
 
 Requests and responses follow the [TypeSafe System One API](https://docs.typesafe.ai/api), so a
 client written for it only needs a base URL change.
@@ -187,8 +187,8 @@ latency figure. DeepSeek is V4.1-Flash, hosted.
 
 `benchmarks/core-v1.json` fixes one set of items for every model. It is a **draft**, a balanced
 random pick made on 2026-09-22; the final list is the one that survives review (below).
-- **Items:** 50 from each of the 34 labelled sets in the demo, plus every TypeSafe step, for
-  1,745 items in all.
+- **Items:** 50 from each of the 45 labelled sets in the demo, plus every TypeSafe step, for
+  2,295 items in all.
 - **Balance:** equal yes and no, equal counts per label, and the right answer spread evenly across
   positions.
 - **Pointers, not text:** the file stores each item's dataset, split, row and a fingerprint.
@@ -196,30 +196,27 @@ random pick made on 2026-09-22; the final list is the one that survives review (
 
 Banking77, CLINC150 and LEDGAR have more than 26 options, and letter-reading backends answer 26 at
 most. So these three sets' 150 items run only for models that read every option, Jev and local
-models. Everyone else answers the other 1,595, and every comparison stays paired.
+models. Everyone else answers the other 2,145, and every comparison stays paired.
 
 ```sh
-uv run --no-sync jev-bench run remote:deepseek              # one model, saved to Past runs
-uv run --no-sync jev-bench run Qwen/Qwen2.5-1.5B-Instruct   # a local model, wide items included
+uv run jev-bench run remote:deepseek              # one model, saved to Past runs
+uv run jev-bench run Qwen/Qwen2.5-1.5B-Instruct   # a local model, wide items included
+uv run jev-bench export                           # every item with its text, into local/review/
 ```
 
-Before it counts as final, every item goes through review:
-- `uv run --no-sync jev-bench export` writes each item with its text and label to `local/review/`
-  (git-ignored);
-- two strong models check each label, flag ambiguous or trivial items, and suggest replacements;
-- people settle their disagreements;
-- what survives is frozen as the final version.
-
-Run each model separately, then open the runs together in Past runs to compare them. The models
-to run, with prices on the day, are in `benchmarks/core-v1-models.json`. A new set means a new
-version (core v2); v1 never changes, so its results stay comparable.
+Run each model separately, then open the runs together in Past runs. The models to run are in
+`benchmarks/core-v1-models.json`. Before the list is final, two strong models check every label
+and people settle where they disagree. After that v1 never changes; new items make a v2.
 
 ## Demo
 
 ```sh
-cd web && pnpm install && pnpm build && cd ..   # Node 20.19+ and pnpm, once
-uv run jev-demo                                  # http://localhost:8080
+cd web && pnpm install && pnpm build && cd ..   # Node 20.19+ and pnpm; again after a pull
+uv run prod                                      # http://localhost:8080
+uv run prod Qwen/Qwen2.5-7B-Instruct             # also lists any Hugging Face chat model
 ```
+
+Any Hugging Face model, or a llama.cpp server: [docs/local-models.md](docs/local-models.md).
 
 - **Compare.** The same request to several models at once (2–6 picked by hand, any number from
   Benchmark): local, a llama.cpp server, a direct API or any OpenRouter model that returns
@@ -234,24 +231,12 @@ uv run jev-demo                                  # http://localhost:8080
   request. You can search, filter by kind and set, and compare runs that share items side by side.
   Replay plays a run back at its recorded times, at 1×–100× or fitted into 30 seconds.
 
-The input is a built-in example, your own JSON, or an item from a labelled public set. With a
-set, each answer is marked against the label. Sets are downloaded into `data/` on first use:
-[SST-2](https://huggingface.co/datasets/stanfordnlp/sst2),
-[RTE](https://huggingface.co/datasets/nyu-mll/glue),
-[BoolQ](https://huggingface.co/datasets/google/boolq),
-[SNLI](https://huggingface.co/datasets/stanfordnlp/snli),
-[AG News](https://huggingface.co/datasets/fancyzhx/ag_news),
-[tweet emotion](https://huggingface.co/datasets/cardiffnlp/tweet_eval),
-[Banking77](https://huggingface.co/datasets/legacy-datasets/banking77),
-[CLINC150](https://huggingface.co/datasets/clinc/clinc_oos),
-[MMLU](https://huggingface.co/datasets/cais/mmlu),
-[MMLU-Pro](https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro),
-[ARC-Challenge](https://huggingface.co/datasets/allenai/ai2_arc),
-[HellaSwag](https://huggingface.co/datasets/Rowan/hellaswag),
-[TruthfulQA](https://huggingface.co/datasets/truthfulqa/truthful_qa)
-and TypeSafe's published cases.
+The input is a built-in example, your own JSON, or an item from one of 45 labelled public sets on
+the Hugging Face Hub (listed in the page, defined in `src/jev/demo.py`) or TypeSafe's published
+cases. With a set, each answer is marked against the label. GPQA Diamond is behind a login: accept
+its terms on the Hub and add `HF_TOKEN` under Keys.
 
-Nothing downloads until you pick it. A model already in the Hugging Face cache is used from there;
+Nothing downloads until you pick it; sets go to `data/`. A model already in the Hugging Face cache is used from there;
 anything else goes to `models/` (git-ignored; `JEV_MODELS` moves it). A backend without a key asks
 for one in the page, checks it with one tiny request, and saves it to `.env` only if you tick the
 box.
@@ -267,8 +252,8 @@ box.
 | TypeSafe (Jev) | passed straight through, any number of options | `TYPESAFE_API_KEY` |
 
 Letter backends label the options A, B, C… and read each letter's probability from the API's
-`top_logprobs`, so they take at most 26 options. The demo greys out Banking77 and CLINC150 for
-them. Thinking is turned off per provider, since otherwise the first token is reasoning, not the
+`top_logprobs`, so they take at most 26 options. The demo greys out the sets with more (Banking77,
+CLINC150, LEDGAR) for them. Thinking is turned off per provider, since otherwise the first token is reasoning, not the
 answer.
 
 OpenRouter's model list overstates which models return probabilities: 44 of the 139 checked
@@ -283,17 +268,9 @@ uv run jev-eval remote:deepseek                # the eval on a hosted model
 uv run jev-eval remote:llamacpp:qwen2.5-7b-q4  # a model in llama-server
 ```
 
-llama.cpp is optional. On NVIDIA, a Mac or a CPU, PyTorch runs the models as it is. Use llama.cpp
-for an AMD GPU, which PyTorch cannot use on Windows or WSL, or for a 4-bit model too large to load
-otherwise. The GGUFs measured above are Q4_K_M:
-[Qwen2.5-7B](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF),
-[Qwen2.5-14B](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF),
-[Qwen3-30B-A3B](https://huggingface.co/unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF).
-
-```sh
-llama-server -m qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf --port 8081
-echo "LLAMACPP_URL=http://localhost:8081/v1/chat/completions" >> .env
-```
+llama.cpp is optional: use it for an AMD GPU, which PyTorch cannot use on Windows or WSL, or for a
+4-bit model too large to load otherwise. The GGUFs measured above are Q4_K_M. Installing it and
+running it on macOS, Linux, Windows and WSL: [docs/local-models.md](docs/local-models.md).
 
 ## Limitations
 
@@ -306,17 +283,13 @@ echo "LLAMACPP_URL=http://localhost:8081/v1/chat/completions" >> .env
   recorded.
 - **A few tasks are small.** `writes` has 40 items, and the TypeSafe set has 354 questions from
   20 cases.
-- **NVIDIA and Apple Silicon** are supported through PyTorch but not measured yet.
 
 ## Development
 
-Only for changing the code. To use jev.py, [Run](#run) and [Demo](#demo) are all you need.
-
 ```sh
-uv run jev                         # self-check against the example ticket
 uvx ruff format . && uvx ruff check .
 cd web && pnpm check               # Biome, the type check and the build
-cd web && pnpm dev                 # the page on :3000, reloading as you edit; run jev-demo alongside
+cd web && pnpm dev                 # the page on :3000, reloading as you edit; keep uv run prod running
 ```
 
 | path | what |
@@ -325,8 +298,10 @@ cd web && pnpm dev                 # the page on :3000, reloading as you edit; r
 | `src/jev/eval.py` | the frozen evaluation set and the eval |
 | `src/jev/readout.py` | letter vs option-text readout, and how often answers flip when the options are reversed |
 | `src/jev/remote.py` | hosted and llama.cpp backends |
+| `src/jev/bench.py` | Core v1: freeze, run, export |
 | `src/jev/demo.py`, `web/` | the demo server and its React page |
 | `results/` | one summary per model run |
 | `docs/providers.md` | which hosted providers return probabilities |
+| `docs/local-models.md` | Hugging Face models and llama.cpp on each platform |
 
 MIT.
