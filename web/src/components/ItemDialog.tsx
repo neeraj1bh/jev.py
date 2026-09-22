@@ -1,7 +1,7 @@
 import { fastestIndexes } from "../scoring";
 import { cn, labelText } from "../styles";
 import type { PanelState, Row, Side } from "../types";
-import { CompareTable } from "./CompareTable";
+import { CompareTable, ModelRowsTable } from "./CompareTable";
 import { Modal } from "./Modal";
 import { Tip } from "./Tip";
 
@@ -107,14 +107,23 @@ export function ItemDialog(props: ItemDialogProps) {
           direction === "back" && "animate-from-l motion-reduce:animate-none",
         )}
       >
-        <CompareTable
-          key={index}
-          bare
-          names={columns}
-          panels={sides.map((side, k) => asPanel(side, fastest.includes(k)))}
-          questionIds={Object.keys(item.questions)}
-          truth={truth}
-        />
+        {columns.length > 4 ? (
+          <ModelRowsTable
+            names={columns}
+            panels={sides.map((side, k) => asPanel(side, fastest.includes(k)))}
+            questionIds={Object.keys(item.questions)}
+            truth={truth}
+          />
+        ) : (
+          <CompareTable
+            key={index}
+            bare
+            names={columns}
+            panels={sides.map((side, k) => asPanel(side, fastest.includes(k)))}
+            questionIds={Object.keys(item.questions)}
+            truth={truth}
+          />
+        )}
       </div>
 
       <div className={cn(labelText, "mt-2 flex justify-between gap-3 border-t border-rule pt-3")}>

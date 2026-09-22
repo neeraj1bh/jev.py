@@ -33,14 +33,20 @@ export const answerLabels = (answers: Record<string, Answer>) =>
   Object.fromEntries(Object.entries(answers).map(([id, answer]) => [id, answerLabel(answer)]));
 
 /** Correct and total questions of one response against the dataset's labels. */
+// A response belongs to one item, so its score never changes; replays re-score every row per frame.
+const SCORES = new WeakMap<Response, [number, number]>();
+
 export function scoreResponse(response: Response, truth: Record<string, string>): [number, number] {
+  const cached = SCORES.get(response);
+  if (cached) return cached;
   const ids = Object.keys(truth);
-  if (response.error) return [0, ids.length];
-  const got = answerLabels(response.answers);
-  return [
+  const got = response.error ? {} : answerLabels(response.answers);
+  const score: [number, number] = [
     ids.filter((id) => got[id] !== undefined && matchesLabel(got[id], truth[id])).length,
     ids.length,
   ];
+  SCORES.set(response, score);
+  return score;
 }
 
 export const percent = (correct: number, total: number) =>

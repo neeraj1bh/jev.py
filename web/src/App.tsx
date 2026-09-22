@@ -845,228 +845,230 @@ export default function App() {
         onPreferenceChange={theme.setPreference}
       />
 
-      {mode === "benchmark" ? (
-        <Benchmark
-          backends={backendList}
-          datasets={datasets}
-          runs={savedRuns}
-          backendLabel={columnName}
-          onSetUp={setUpBenchmark}
-        />
-      ) : mode === "past" ? (
-        <PastRuns
-          runs={savedRuns}
-          loading={runsLoading}
-          page={runsPage}
-          kind={runsKind}
-          menuOpen={openMenu === "kind"}
-          onMenuOpenChange={menuHandler("kind")}
-          onKindChange={(kind) => {
-            setRunsKind(kind);
-            setRunsPage(1);
-            setOpenMenu("");
-          }}
-          onPageChange={setRunsPage}
-          onOpenRun={(name) => openSavedRuns([name])}
-          onCompareRuns={openSavedRuns}
-          backendLabel={columnName}
-        />
-      ) : resultsOpen && tableVisible ? (
-        <ResultsView
-          scoreboard={
-            batchReplay.replaying
-              ? {
-                  startedAt: batchReplay.startedAt,
-                  total: rows.length,
-                  pace: batchReplay.pace,
-                  label: `Replaying ${inputName} at ${Math.round(batchReplay.pace)}×`,
-                }
-              : liveBatch && batchRunning
-                ? { ...liveBatch, pace: 1, label: `Running ${inputName}` }
-                : null
-          }
-          stage={
-            isCompare ? undefined : batchReplay.replaying ? (
-              <GenerateReplay
-                rows={rows}
-                startedAt={batchReplay.startedAt}
-                pace={batchReplay.pace}
-                onePass={onePass}
-              />
-            ) : batchRunning ? (
-              <GenerateView
-                panels={panels}
-                savedNames={null}
-                writtenAsAnswers={writtenAsAnswers}
-                onePass={onePass}
-                truth={labels}
-              />
-            ) : undefined
-          }
-          dataset={inputName}
-          rows={batchReplay.visibleRows}
-          columns={columns}
-          note={tableNote}
-          file={logFile}
-          selected={
-            batchReplay.replaying ? batchReplay.visibleRows.length - 1 : (openItem?.index ?? null)
-          }
-          follow={batchReplay.replaying || !!openItem?.open}
-          running={batchRunning}
-          replaying={batchReplay.replaying}
-          speed={batchReplay.speed}
-          onSpeedChange={batchReplay.setSpeed}
-          onReplay={() =>
-            batchReplay.play(
-              isCompare && compareModels.every((id) => isHosted(backends[id]))
-                ? HOSTED_PARALLEL
-                : 1,
-            )
-          }
-          onStopReplay={batchReplay.stop}
-          onStopBatch={() => {
-            stopRequested.current = true;
-            setBatchRunning(false);
-          }}
-          onOpenRow={(index) => showItem(index)}
-          onBack={() => {
-            batchReplay.stop();
-            setResultsOpen(false);
-            setPanelsVisible(true);
-            closeSavedRun();
-            resetPanels();
-          }}
-        />
-      ) : (
-        <>
-          <div className="rounded-lg border border-rule bg-panel px-4 py-3.5">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-                {isCompare ? (
-                  <>
-                    <ModelsPicker
-                      backends={backendList}
-                      selected={compareModels}
-                      onToggle={toggleCompareModel}
-                      open={openMenu === "models"}
-                      onOpenChange={menuHandler("models")}
-                    />
-                    {compareModels.length > 0 && (
-                      <button
-                        type="button"
-                        className="border-0 bg-transparent px-1.5 py-1 text-[13px] text-dim hover:text-ink"
-                        onClick={() => {
-                          setCompareModels([]);
-                          clearBatch();
-                          resetPanels(0);
-                        }}
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <ModelPicker
-                    backends={backendList}
-                    value={generateModel}
-                    onPick={pickGenerateModel}
-                    open={openMenu === "model"}
-                    onOpenChange={menuHandler("model")}
-                  />
-                )}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className={ghostButton}
-                  disabled={!recording || replaying || busy}
-                  onClick={replay}
-                >
-                  Replay together
-                </button>
-                <Tip
-                  content={
-                    isCompare && compareModels.length < 2 ? "Pick at least two models" : undefined
+      <div key={mode} className="animate-fade motion-reduce:animate-none">
+        {mode === "benchmark" ? (
+          <Benchmark
+            backends={backendList}
+            datasets={datasets}
+            runs={savedRuns}
+            backendLabel={columnName}
+            onSetUp={setUpBenchmark}
+          />
+        ) : mode === "past" ? (
+          <PastRuns
+            runs={savedRuns}
+            loading={runsLoading}
+            page={runsPage}
+            kind={runsKind}
+            menuOpen={openMenu === "kind"}
+            onMenuOpenChange={menuHandler("kind")}
+            onKindChange={(kind) => {
+              setRunsKind(kind);
+              setRunsPage(1);
+              setOpenMenu("");
+            }}
+            onPageChange={setRunsPage}
+            onOpenRun={(name) => openSavedRuns([name])}
+            onCompareRuns={openSavedRuns}
+            backendLabel={columnName}
+          />
+        ) : resultsOpen && tableVisible ? (
+          <ResultsView
+            scoreboard={
+              batchReplay.replaying
+                ? {
+                    startedAt: batchReplay.startedAt,
+                    total: rows.length,
+                    pace: batchReplay.pace,
+                    label: `Replaying ${inputName} at ${Math.round(batchReplay.pace)}×`,
                   }
-                >
+                : liveBatch && batchRunning
+                  ? { ...liveBatch, pace: 1, label: `Running ${inputName}` }
+                  : null
+            }
+            stage={
+              isCompare ? undefined : batchReplay.replaying ? (
+                <GenerateReplay
+                  rows={rows}
+                  startedAt={batchReplay.startedAt}
+                  pace={batchReplay.pace}
+                  onePass={onePass}
+                />
+              ) : batchRunning ? (
+                <GenerateView
+                  panels={panels}
+                  savedNames={null}
+                  writtenAsAnswers={writtenAsAnswers}
+                  onePass={onePass}
+                  truth={labels}
+                />
+              ) : undefined
+            }
+            dataset={inputName}
+            rows={batchReplay.visibleRows}
+            columns={columns}
+            note={tableNote}
+            file={logFile}
+            selected={
+              batchReplay.replaying ? batchReplay.visibleRows.length - 1 : (openItem?.index ?? null)
+            }
+            follow={batchReplay.replaying || !!openItem?.open}
+            running={batchRunning}
+            replaying={batchReplay.replaying}
+            speed={batchReplay.speed}
+            onSpeedChange={batchReplay.setSpeed}
+            onReplay={() =>
+              batchReplay.play(
+                isCompare && compareModels.every((id) => isHosted(backends[id]))
+                  ? HOSTED_PARALLEL
+                  : 1,
+              )
+            }
+            onStopReplay={batchReplay.stop}
+            onStopBatch={() => {
+              stopRequested.current = true;
+              setBatchRunning(false);
+            }}
+            onOpenRow={(index) => showItem(index)}
+            onBack={() => {
+              batchReplay.stop();
+              setResultsOpen(false);
+              setPanelsVisible(true);
+              closeSavedRun();
+              resetPanels();
+            }}
+          />
+        ) : (
+          <>
+            <div className="rounded-lg border border-rule bg-panel px-4 py-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+                  {isCompare ? (
+                    <>
+                      <ModelsPicker
+                        backends={backendList}
+                        selected={compareModels}
+                        onToggle={toggleCompareModel}
+                        open={openMenu === "models"}
+                        onOpenChange={menuHandler("models")}
+                      />
+                      {compareModels.length > 0 && (
+                        <button
+                          type="button"
+                          className="border-0 bg-transparent px-1.5 py-1 text-[13px] text-dim hover:text-ink"
+                          onClick={() => {
+                            setCompareModels([]);
+                            clearBatch();
+                            resetPanels(0);
+                          }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <ModelPicker
+                      backends={backendList}
+                      value={generateModel}
+                      onPick={pickGenerateModel}
+                      open={openMenu === "model"}
+                      onOpenChange={menuHandler("model")}
+                    />
+                  )}
+                </div>
+                <div className="flex gap-2">
                   <button
                     type="button"
-                    className={solidButton}
-                    disabled={busy || replaying || (isCompare && compareModels.length < 2)}
-                    onClick={onRun}
+                    className={ghostButton}
+                    disabled={!recording || replaying || busy}
+                    onClick={replay}
                   >
-                    Run
+                    Replay together
                   </button>
-                </Tip>
+                  <Tip
+                    content={
+                      isCompare && compareModels.length < 2 ? "Pick at least two models" : undefined
+                    }
+                  >
+                    <button
+                      type="button"
+                      className={solidButton}
+                      disabled={busy || replaying || (isCompare && compareModels.length < 2)}
+                      onClick={onRun}
+                    >
+                      Run
+                    </button>
+                  </Tip>
+                </div>
               </div>
-            </div>
-            <InputBar
-              source={source}
-              onSourceChange={chooseSource}
-              example={dataset ? "" : example}
-              onExampleChange={(name) => {
-                setOpenMenu("");
-                chooseExample(name);
-              }}
-              exampleMenuOpen={openMenu === "example"}
-              onExampleMenuOpenChange={menuHandler("example")}
-              dataset={dataset}
-              datasets={datasets}
-              onDatasetChange={chooseDataset}
-              pickedBackends={(isCompare ? compareModels : [generateModel]).map(
-                (id) => backends[id],
+              <InputBar
+                source={source}
+                onSourceChange={chooseSource}
+                example={dataset ? "" : example}
+                onExampleChange={(name) => {
+                  setOpenMenu("");
+                  chooseExample(name);
+                }}
+                exampleMenuOpen={openMenu === "example"}
+                onExampleMenuOpenChange={menuHandler("example")}
+                dataset={dataset}
+                datasets={datasets}
+                onDatasetChange={chooseDataset}
+                pickedBackends={(isCompare ? compareModels : [generateModel]).map(
+                  (id) => backends[id],
+                )}
+                datasetMenuOpen={openMenu === "dataset"}
+                onDatasetMenuOpenChange={menuHandler("dataset")}
+                busy={busy}
+                remaining={remaining}
+                batchSize={batchSize}
+                onBatchSizeChange={setBatchSize}
+                onNextItem={() => nextItem()}
+                onRunBatch={runBatch}
+                batchRunning={batchRunning}
+                onStop={() => {
+                  stopRequested.current = true;
+                  setBatchRunning(false);
+                }}
+                onEdit={() => setEditing(true)}
+              />
+              {item && dataset && (
+                <p className={cn(labelText, "mt-2.5 mb-0")}>
+                  {dataset} · {item.source} · {questionCount} question{questionCount > 1 ? "s" : ""}
+                  {item.options ? `, ${item.options} options` : ""}
+                  {batchProgress}
+                </p>
               )}
-              datasetMenuOpen={openMenu === "dataset"}
-              onDatasetMenuOpenChange={menuHandler("dataset")}
-              busy={busy}
-              remaining={remaining}
-              batchSize={batchSize}
-              onBatchSizeChange={setBatchSize}
-              onNextItem={() => nextItem()}
-              onRunBatch={runBatch}
-              batchRunning={batchRunning}
-              onStop={() => {
-                stopRequested.current = true;
-                setBatchRunning(false);
-              }}
-              onEdit={() => setEditing(true)}
-            />
-            {item && dataset && (
-              <p className={cn(labelText, "mt-2.5 mb-0")}>
-                {dataset} · {item.source} · {questionCount} question{questionCount > 1 ? "s" : ""}
-                {item.options ? `, ${item.options} options` : ""}
-                {batchProgress}
-              </p>
-            )}
-          </div>
+            </div>
 
-          <p className="mt-[18px] mb-0 min-h-[26px] text-sm text-ink [&_b]:font-semibold [&_b]:text-good">
-            {verdict}
-          </p>
+            <p className="mt-[18px] mb-0 min-h-[26px] text-sm text-ink [&_b]:font-semibold [&_b]:text-good">
+              {verdict}
+            </p>
 
-          <div ref={panelsRef} hidden={!panelsVisible}>
-            {isCompare && panels.some((panel) => panel.status !== "idle") && (
-              <RaceClocks names={compareNames} panels={panels} />
-            )}
-            {isCompare ? (
-              <CompareView
-                names={compareNames}
-                panels={panels}
-                questionIds={questionIds}
-                truth={labels}
-              />
-            ) : (
-              <GenerateView
-                panels={panels}
-                savedNames={savedNames}
-                writtenAsAnswers={writtenAsAnswers}
-                onePass={onePass}
-                truth={labels}
-              />
-            )}
-          </div>
-        </>
-      )}
+            <div ref={panelsRef} hidden={!panelsVisible}>
+              {isCompare && panels.some((panel) => panel.status !== "idle") && (
+                <RaceClocks names={compareNames} panels={panels} />
+              )}
+              {isCompare ? (
+                <CompareView
+                  names={compareNames}
+                  panels={panels}
+                  questionIds={questionIds}
+                  truth={labels}
+                />
+              ) : (
+                <GenerateView
+                  panels={panels}
+                  savedNames={savedNames}
+                  writtenAsAnswers={writtenAsAnswers}
+                  onePass={onePass}
+                  truth={labels}
+                />
+              )}
+            </div>
+          </>
+        )}
+      </div>
 
       {openItem && (
         <ItemDialog

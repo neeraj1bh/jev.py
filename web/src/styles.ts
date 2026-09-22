@@ -4,12 +4,12 @@ export const cn = (...classes: (string | false | null | undefined)[]) =>
 export const labelText = "text-[13px] text-dim";
 export const panelBox = "rounded-lg border border-rule bg-panel px-5 py-4";
 export const ghostButton =
-  "rounded-md border border-rule bg-transparent px-3.5 py-2 text-ink hover:enabled:border-dim";
+  "rounded-md border border-rule bg-transparent px-3.5 py-2 text-ink transition-colors duration-150 hover:enabled:border-dim";
 export const solidButton =
-  "rounded-md border border-ink bg-ink px-5 py-2 font-semibold text-paper hover:enabled:opacity-[0.88] active:enabled:translate-y-px";
+  "rounded-md border border-ink bg-ink px-5 py-2 font-semibold text-paper transition-[opacity,transform] duration-150 hover:enabled:opacity-[0.88] active:enabled:translate-y-px";
 export const chipButton = (active = false) =>
   cn(
-    "rounded-full border px-3 py-1 text-[13.5px]",
+    "rounded-full border px-3 py-1 text-[13.5px] transition-colors duration-150",
     active
       ? "border-ink bg-ink text-paper"
       : "border-rule bg-transparent text-dim hover:enabled:border-dim",

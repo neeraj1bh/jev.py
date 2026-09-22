@@ -6,6 +6,7 @@ import type { Row } from "../types";
 export type ReplaySpeed = 1 | 4 | 10 | 50 | 100 | "fit";
 export const FIT = "fit";
 export const FIT_MS = 30_000;
+const UPDATE_MS = 50;
 
 /** When each row finished, rebuilt from the recorded times: `workers` rows ran at once, in order. */
 function finishTimes(rows: Row[], workers: number) {
@@ -45,11 +46,18 @@ export function useBatchReplay(rows: Row[]) {
       setStartedAt(start);
       setShown([]);
       let done = 0;
+      let shownDone = 0;
+      let lastShown = 0;
       const tick = () => {
-        const elapsed = (performance.now() - start) * rate;
-        const before = done;
+        const now = performance.now();
+        const elapsed = (now - start) * rate;
         while (done < schedule.length && (schedule[done]?.end ?? 0) <= elapsed) done++;
-        if (done !== before) setShown(schedule.slice(0, done).map((step) => step.index));
+        // Rows reach the page at most every UPDATE_MS; the clocks and counts glide in between.
+        if (done !== shownDone && (now - lastShown >= UPDATE_MS || done === schedule.length)) {
+          shownDone = done;
+          lastShown = now;
+          setShown(schedule.slice(0, done).map((step) => step.index));
+        }
         if (elapsed < last + 800 * rate) frame.current = requestAnimationFrame(tick);
         else setShown(null);
       };

@@ -291,3 +291,65 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
     </div>
   );
 }
+
+/** Many models on one item: a row per model and a column per question, so nothing is squeezed. */
+export function ModelRowsTable({
+  names,
+  panels,
+  questionIds,
+  truth,
+}: Omit<CompareTableProps, "bare">) {
+  return (
+    <div className="overflow-x-auto">
+      <table
+        className="w-full border-collapse text-[13px]"
+        style={{ minWidth: 300 + 190 * questionIds.length }}
+      >
+        <thead>
+          <tr>
+            <th className={cn(tableHead, "w-8 align-bottom")}>#</th>
+            <th className={cn(tableHead, "align-bottom")}>Model</th>
+            <th className={cn(tableHead, "text-right align-bottom")}>Time</th>
+            {questionIds.map((id) => (
+              <th key={id} className={cn(tableHead, "align-bottom")}>
+                <span className="block break-words text-ink">{breakable(id)}</span>
+                {truth?.[id] !== undefined && (
+                  <span className="block truncate text-xs font-normal">label: {truth[id]}</span>
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="[&>tr:last-child>td]:border-b-0">
+          {names.map((name, k) => {
+            const state = panels[k] ?? idle;
+            return (
+              <tr key={name} className="transition-colors hover:bg-lift">
+                <td className={cn(rowCell, "font-mono text-xs text-dim")}>{k + 1}</td>
+                <td className={cn(rowCell, "font-semibold text-ink")}>{name}</td>
+                <td
+                  className={cn(
+                    rowCell,
+                    "text-right font-mono text-xs tabular-nums",
+                    state.fastest ? "text-good" : "text-dim",
+                  )}
+                >
+                  {state.ms === undefined ? "–" : `${state.ms.toLocaleString()} ms`}
+                </td>
+                {questionIds.map((id) => (
+                  <AnswerCell
+                    key={id}
+                    state={state}
+                    id={id}
+                    truth={truth?.[id]}
+                    written={name.endsWith("· text")}
+                  />
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
