@@ -1,8 +1,8 @@
-import { ExternalLink } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { clearKey, fetchKeys } from "../api";
-import { chipButton, cn, labelText } from "../styles";
+import { cn, ghostButton } from "../styles";
 import type { KeyInfo } from "../types";
 import { Icon } from "./Icon";
 import { KeyForm } from "./KeyForm";
@@ -27,46 +27,49 @@ export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
   }, [open]);
 
   return (
-    <Modal open={open} onClose={onClose} className="w-[min(620px,calc(100vw-32px))] px-6 py-5">
+    <Modal open={open} onClose={onClose} className="w-[min(520px,calc(100vw-32px))] px-6 py-5">
       <h2 className="mt-0 mb-1 text-[15px] font-semibold">Keys and tokens</h2>
-      <p className={cn(labelText, "mt-0 mb-4")}>
-        Each is checked with one small request before it is used. Values never leave this machine
-        and are not shown again.
+      <p className="mt-0 mb-3 text-xs text-dim">
+        Kept on this machine. Each is checked with one small request first.
       </p>
       <ul className="m-0 list-none p-0">
         {keys === null &&
           ["a", "b", "c", "d"].map((k) => (
-            <li key={k} className="border-t border-rule py-3">
+            <li key={k} className="border-b border-rule py-2.5 last:border-b-0">
               <Skeleton className="w-48" />
             </li>
           ))}
         {keys?.map((key) => (
-          <li key={key.var} className="border-t border-rule py-3 first:border-t-0">
+          <li key={key.var} className="border-b border-rule py-2.5 last:border-b-0">
             <div className="flex items-center gap-3">
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-ink">{key.label}</span>
-                <span className={cn(labelText, "block")}>
-                  {key.unlocks} · <span className="font-mono text-xs">{key.var}</span>
-                </span>
+              <span
+                role="img"
+                aria-label={key.set ? "set" : "not set"}
+                className={cn("size-1.5 shrink-0 rounded-full", key.set ? "bg-good" : "bg-rule")}
+              />
+              <span className="min-w-0 flex-1" title={key.unlocks}>
+                <span className="block text-sm text-ink">{key.label}</span>
+                <span className="block font-mono text-[11.5px] text-dim">{key.var}</span>
               </span>
-              <span className={cn("text-xs", key.set ? "text-good" : "text-dim")}>
-                {key.set ? "set" : "not set"}
-              </span>
-              {key.url && (
+              {!key.set && key.url && (
                 <a
                   href={key.url}
                   target="_blank"
                   rel="noreferrer"
-                  aria-label={`Get a ${key.label} key`}
-                  className="grid size-7 place-items-center rounded-md text-dim transition-colors hover:bg-lift hover:text-ink"
+                  className="text-xs text-dim underline-offset-2 hover:text-ink hover:underline"
                 >
-                  <Icon icon={ExternalLink} size={14} />
+                  Get a key
                 </a>
               )}
               {key.set && (
                 <button
                   type="button"
-                  className="border-0 bg-transparent px-1.5 py-1 text-[13px] text-dim transition-colors hover:text-warn"
+                  aria-label={`Remove the ${key.label} key`}
+                  title={clearing === key.var ? "Click again to remove it from .env" : "Remove"}
+                  className={cn(
+                    "rounded-md border-0 bg-transparent p-1.5 transition-colors hover:bg-lift",
+                    clearing === key.var ? "text-warn" : "text-dim hover:text-warn",
+                  )}
                   onClick={async () => {
                     if (clearing !== key.var) {
                       setClearing(key.var);
@@ -79,15 +82,15 @@ export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
                   }}
                   onBlur={() => setClearing("")}
                 >
-                  {clearing === key.var ? "Clear from .env?" : "Clear"}
+                  <Icon icon={Trash2} size={14} />
                 </button>
               )}
               <button
                 type="button"
-                className={chipButton(editing === key.var)}
+                className={cn(ghostButton, "w-20 px-0 py-1 text-xs")}
                 onClick={() => setEditing(editing === key.var ? "" : key.var)}
               >
-                {key.set ? "Replace" : "Set"}
+                {key.set ? "Replace" : "Add"}
               </button>
             </div>
             {editing === key.var && (
