@@ -22,6 +22,7 @@ from threading import Lock, Thread
 
 READY_SECONDS = 600  # a 30B model can take minutes to load from a slow disk
 BUDGET = 0.7  # models running together may take this much of the machine's memory
+FREED_SECONDS = 5  # how long the memory of a stopped model takes to come back
 IDLE_SECONDS = 15 * 60  # an unused model gives its memory back after this long
 CONTEXT = "8192"
 LOG = os.path.join(tempfile.gettempdir(), "jev-llama-server.log")
@@ -125,6 +126,16 @@ def _remember():
         json.dump([server["process"].pid for server in SERVERS.values()], f)
 
 
+def _last_words():
+    """The end of llama-server's log, which says why it stopped."""
+    try:
+        with open(LOG) as f:
+            lines = [line.strip() for line in f if line.strip()]
+    except OSError:
+        return f"see {LOG}"
+    return (lines[-1][-160:] if lines else "") + f" (see {LOG})"
+
+
 def _ready(url):
     try:
         with urllib.request.urlopen(url + "/health", timeout=2) as r:
@@ -163,8 +174,12 @@ def _make_room(gb, binary):
             "Pick a smaller one, or one quantized further."
         )
     oldest = sorted(running(), key=lambda f: SERVERS[f]["used"])
+    made_room = False
     while oldest and gb + sum(SERVERS[f]["gb"] or 0 for f in running()) > budget:
         stop(oldest.pop(0))
+        made_room = True
+    if made_room:
+        time.sleep(FREED_SECONDS)  # the memory of a stopped model comes back a moment later
 
 
 def serve(gguf, binary, gb=None):
@@ -183,7 +198,7 @@ def serve(gguf, binary, gb=None):
         while time.time() < deadline:
             if process.poll() is not None:
                 stop(gguf)
-                raise ValueError(f"llama-server stopped while loading {os.path.basename(gguf)}; see {LOG}")
+                raise ValueError(f"llama-server stopped loading {os.path.basename(gguf)}: {_last_words()}")
             if _ready(url):
                 return url
             time.sleep(1)
