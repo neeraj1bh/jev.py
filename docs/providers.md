@@ -1,11 +1,11 @@
 # Hosted providers
 
-`remote.py` asks a hosted model for one token with the options labelled A, B, C… and reads the
+`src/jev/remote.py` asks a hosted model for one token with the options labelled A, B, C… and reads the
 probability of each letter from the API's `top_logprobs`. A provider works only if its API returns
 the probabilities of the most likely next tokens, and only if the model answers straight away
 instead of reasoning first. Checked against each provider's API reference on 2026-09-21.
 
-| provider | probabilities | in `remote.py` | notes |
+| provider | probabilities | in `src/jev/remote.py` | notes |
 |---|---|---|---|
 | DeepSeek | top 20 | yes | thinking turned off per request |
 | Kimi (Moonshot) | top 20 | yes | Kimi K3 cannot stop reasoning first, so it does not work; earlier Kimi models do |

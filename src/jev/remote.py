@@ -6,9 +6,9 @@ returned log-probabilities. `typesafe` is passed straight through to the real Je
 
 Keys come from .env (see .env.example) or the environment.
 
-    python remote.py deepseek              # self-check
-    python remote.py deepseek serve 8080   # TypeSafe-compatible server backed by DeepSeek
-    python eval.py remote:deepseek         # the public eval on a hosted model
+    uv run jev-remote deepseek             # self-check
+    uv run jev-remote deepseek serve 8080  # TypeSafe-compatible server backed by DeepSeek
+    uv run jev-eval remote:deepseek        # the public eval on a hosted model
 """
 
 import json
@@ -20,7 +20,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-from jev import LETTERS, _confidence, _options, _text, demo, serve
+from jev.core import LETTERS, ROOT, _confidence, _options, _text, demo, serve
 
 
 class NoProbabilities(ValueError):
@@ -59,7 +59,7 @@ CONCURRENCY = {"moonshot": 2, "llamacpp": 4}  # llamacpp: match llama-server -np
 def env(name):
     if name in os.environ:
         return os.environ[name]
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    path = os.path.join(ROOT, ".env")
     if os.path.exists(path):
         for line in open(path):
             k, _, v = line.partition("=")
@@ -199,7 +199,7 @@ class Remote:
         return [round(x / sum(w), 4) for x in w], res.get("usage", {}).get("prompt_tokens", 0)
 
 
-if __name__ == "__main__":
+def cli():
     a = sys.argv[1:]
     backend = a[0] if a and a[0] in BACKENDS else "deepseek"
     rest = a[1:] if a and a[0] in BACKENDS else a
@@ -207,3 +207,7 @@ if __name__ == "__main__":
         serve(jev=Remote(backend), **({"port": int(rest[1])} if len(rest) > 1 else {}))
     else:
         demo(jev=Remote(backend))
+
+
+if __name__ == "__main__":
+    cli()

@@ -6,7 +6,7 @@ state is prefilled once. Writes results/<model>-readout.jsonl and prints, per ta
 accuracy in order, accuracy reversed, flip rate (the top answer changes) and mean |Δp| of the
 true option; then a paired letter-vs-text McNemar test on the in-order answers.
 
-    uv run readout.py Qwen/Qwen2.5-1.5B-Instruct
+    uv run jev-readout Qwen/Qwen2.5-1.5B-Instruct
 """
 
 import json
@@ -16,8 +16,8 @@ import random
 import sys
 import time
 
-from eval import AG, COMMIT_TYPES, KIND_DESC, NLI, load_set
-from jev import DEFAULT_MODEL, Jev
+from jev.core import DEFAULT_MODEL, ROOT, Jev
+from jev.eval import AG, COMMIT_TYPES, KIND_DESC, NLI, load_set
 
 
 def items(data):
@@ -66,8 +66,7 @@ def mcnemar(b, c):
 
 def main(model=DEFAULT_MODEL):
     jev = Jev(model, readout="letter")  # checks every letter is one token; the loop switches readouts
-    here = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.join(here, "results", model.split("/")[-1].lower() + "-readout.jsonl")
+    path = os.path.join(ROOT, "results", model.split("/")[-1].lower() + "-readout.jsonl")
     t0, rows = time.time(), []
     with open(path, "w") as log:
         todo = list(items(load_set(60)))
@@ -109,9 +108,13 @@ def main(model=DEFAULT_MODEL):
     c = sum(le and not t for t, le in zip(text, letter, strict=True))
     print(f"\nall tasks, in order: text {sum(text) / len(text):.3f}, letter {sum(letter) / len(letter):.3f}")
     print(f"McNemar: text-only right {b}, letter-only right {c}, exact p = {mcnemar(b, c):.3g}")
-    print(f"every answer: {os.path.relpath(path, here)}")
+    print(f"every answer: {os.path.relpath(path, ROOT)}")
+
+
+def cli():
+    assert mcnemar(0, 0) == 1.0 and abs(mcnemar(0, 10) - 2 / 1024) < 1e-12
+    main(*sys.argv[1:2])
 
 
 if __name__ == "__main__":
-    assert mcnemar(0, 0) == 1.0 and abs(mcnemar(0, 10) - 2 / 1024) < 1e-12
-    main(*sys.argv[1:2])
+    cli()

@@ -7,6 +7,17 @@ license = "MIT"
 requires-python = ">=3.10"
 dependencies = ["torch>=2.4", "transformers>=4.45"]
 
+[project.scripts]
+jev = "jev.core:cli"
+jev-demo = "jev.demo:cli"
+jev-eval = "jev.eval:cli"
+jev-readout = "jev.readout:cli"
+jev-remote = "jev.remote:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [tool.ruff]
 line-length = 110
 

@@ -24,7 +24,7 @@
 Prints accuracy, Brier score and a reliability table (how often a 0.9 was actually a yes), and
 writes every answer with its probabilities and latency to results/logs/<model>.jsonl for later comparison.
 
-    python eval.py [model_id] [n]        # n per class, default 60
+    uv run jev-eval [model_id] [n]       # n per class, default 60
 
 The item set is saved to results/eval-set.json on first run and reused after,
 so every model is scored on the same items.
@@ -39,7 +39,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from jev import DEFAULT_MODEL, Jev
+from jev.core import DEFAULT_MODEL, ROOT, Jev
 
 
 def get(url):
@@ -291,7 +291,7 @@ def typesafe_rows():
     Fetched from evals.typesafe.ai on first use into results/typesafe/ (git-ignored). Only the
     case id and our answers reach the log. The consensus is the mean of the two reference sets.
     """
-    cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", "typesafe")
+    cache = os.path.join(ROOT, "results", "typesafe")
     os.makedirs(cache, exist_ok=True)
     rows = []
     for wf in TYPESAFE:
@@ -337,7 +337,7 @@ def dist(a):
 
 def load_set(n):
     """Fetch the items once and keep them, so every model is scored on the same set."""
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", "eval-set.json")
+    path = os.path.join(ROOT, "results", "eval-set.json")
     data = {}
     if os.path.exists(path):
         with open(path) as f:
@@ -495,18 +495,17 @@ def items(data):
 def main(model=DEFAULT_MODEL, n=60):
     data = load_set(n)
     if model.startswith("remote:"):
-        from remote import Remote
+        from jev.remote import Remote
 
         jev = Remote(*model.split(":")[1:3])  # remote:<backend>[:<model>]
     else:
         jev = Jev(model)
     t0, total = time.time(), 0
-    here = os.path.dirname(os.path.abspath(__file__))
     slug = (getattr(jev, "backend", "") + "-" if hasattr(jev, "backend") else "") + jev.model_id.split("/")[
         -1
     ].lower()
-    os.makedirs(os.path.join(here, "results", "logs"), exist_ok=True)
-    log = open(os.path.join(here, "results", "logs", slug + ".jsonl"), "w")
+    os.makedirs(os.path.join(ROOT, "results", "logs"), exist_ok=True)
+    log = open(os.path.join(ROOT, "results", "logs", slug + ".jsonl"), "w")
 
     res, ts = {}, []
     for task, state, questions, truth, logged in items(data):
@@ -551,9 +550,13 @@ def main(model=DEFAULT_MODEL, n=60):
     )
     log.close()
     print(f"\n{total} items, {(time.time() - t0) / total * 1000:.0f} ms each on {jev.device}, {model}")
-    print(f"every answer, probability and latency: {os.path.relpath(log.name, here)}")
+    print(f"every answer, probability and latency: {os.path.relpath(log.name, ROOT)}")
+
+
+def cli():
+    a = sys.argv[1:]
+    main(*a[:1], **({"n": int(a[1])} if len(a) > 1 else {}))
 
 
 if __name__ == "__main__":
-    a = sys.argv[1:]
-    main(*a[:1], **({"n": int(a[1])} if len(a) > 1 else {}))
+    cli()

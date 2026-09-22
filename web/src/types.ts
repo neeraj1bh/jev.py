@@ -80,6 +80,8 @@ export interface SavedRun {
   dataset: string;
   backends: string[];
   items: number;
+  /** The dataset row of a one-item run, e.g. "truthfulqa/truthful_qa · validation row 16". */
+  item?: string;
   score?: Record<string, [number, number]>;
 }
 

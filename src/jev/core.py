@@ -9,9 +9,9 @@ parsed, and every answer is one of the options given.
 The state is prefilled once and its KV cache is shared by every option of every
 question, so twenty questions cost one prompt plus short tails.
 
-    python jev.py                      # self-check (CPU is fine, ~3 GB RAM)
-    python jev.py serve                # TypeSafe-compatible server on :8080
-    python jev.py request.json         # answer one request file
+    uv run jev                         # self-check (CPU is fine, ~3 GB RAM)
+    uv run jev serve                   # TypeSafe-compatible server on :8080
+    uv run jev request.json            # answer one request file
 
 Point any TypeSafe client at http://localhost:8080/v1/systemone.
 Request and response shapes follow https://docs.typesafe.ai/api.
@@ -20,12 +20,16 @@ Request and response shapes follow https://docs.typesafe.ai/api.
 import copy
 import json
 import math
+import os
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# The repo: results/, models/, data/, web/ and .env live there.
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 DEFAULT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
 CACHE_BUDGET = 16_384  # prefix tokens × option tails held at once; keeps long states under ~1 GB
@@ -261,7 +265,7 @@ def demo(model_id=DEFAULT_MODEL, jev=None):
     )
 
 
-if __name__ == "__main__":
+def cli():
     args = sys.argv[1:]
     if args and args[0] == "serve":
         serve(*(a for a in args[1:2]), **({"port": int(args[2])} if len(args) > 2 else {}))
@@ -277,3 +281,7 @@ if __name__ == "__main__":
         )
     else:
         demo(*args[:1])
+
+
+if __name__ == "__main__":
+    cli()

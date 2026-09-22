@@ -1,7 +1,8 @@
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { useState } from "react";
 
 import { usePersistentState } from "../hooks/usePersistentState";
-import { cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
+import { chipButton, cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
 import type { RunKind, SavedRun } from "../types";
 import { Icon } from "./Icon";
 import { Dropdown, MenuItem } from "./Menu";
@@ -43,7 +44,7 @@ function compare(a: SavedRun, b: SavedRun, column: SortColumn) {
   return a.name.localeCompare(b.name);
 }
 
-const runTime = (name: string) => name.slice(5, 16).replace(/-(\d\d)-(\d\d)$/, " $1:$2");
+export const runTime = (name: string) => name.slice(5, 16).replace(/-(\d\d)-(\d\d)$/, " $1:$2");
 
 interface PastRunsProps {
   runs: SavedRun[];
@@ -55,6 +56,7 @@ interface PastRunsProps {
   onKindChange: (kind: KindFilter) => void;
   onPageChange: (page: number) => void;
   onOpenRun: (name: string) => void;
+  onCompareRuns: (names: string[]) => void;
   backendLabel: (id: string, kind: RunKind) => string;
 }
 
@@ -65,8 +67,26 @@ export function PastRuns(props: PastRunsProps) {
     { column: "when", descending: true },
     isSort,
   );
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
+  const pickedInput = runs.find((run) => run.name === picked[0])?.dataset;
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const searchText = (run: SavedRun) =>
+    [
+      run.dataset,
+      run.item ?? "",
+      runTime(run.name),
+      ...run.backends.flatMap((backend) => [backend, props.backendLabel(backend, run.mode)]),
+    ]
+      .join(" ")
+      .toLowerCase();
+  const togglePicked = (name: string) =>
+    setPicked((names) =>
+      names.includes(name) ? names.filter((other) => other !== name) : [...names, name],
+    );
   const matching = runs
     .filter((run) => !kind || run.mode === kind)
+    .filter((run) => words.every((word) => searchText(run).includes(word)))
     .sort((a, b) => (sort.descending ? -1 : 1) * compare(a, b, sort.column));
   const header = (column: SortColumn, label: string) => {
     const active = sort.column === column;
@@ -109,27 +129,61 @@ export function PastRuns(props: PastRunsProps) {
             saved in results/logs/demo · opening one sends no requests
           </span>
         </h2>
-        <Dropdown
-          open={props.menuOpen}
-          onOpenChange={props.onMenuOpenChange}
-          button={KIND_LABELS[kind]}
-          menuClassName="right-0 left-auto w-60"
-        >
-          {(Object.keys(KIND_LABELS) as KindFilter[]).map((option) => (
-            <MenuItem
-              key={option}
-              label={KIND_LABELS[option]}
-              detail={runs.filter((run) => !option || run.mode === option).length}
-              selected={option === kind}
-              onSelect={() => props.onKindChange(option)}
+        <div className="flex flex-wrap items-center gap-2">
+          {picked.length > 0 && (
+            <>
+              <button
+                type="button"
+                className={chipButton(picked.length >= 2)}
+                disabled={picked.length < 2}
+                onClick={() => props.onCompareRuns(picked)}
+              >
+                {picked.length < 2 ? "Pick one more to compare" : `Compare ${picked.length} runs`}
+              </button>
+              <button type="button" className={chipButton()} onClick={() => setPicked([])}>
+                Clear
+              </button>
+            </>
+          )}
+          <label className="flex items-center gap-2 rounded-md border border-rule bg-paper px-2.5 py-1.5 text-dim focus-within:border-dim">
+            <Icon icon={Search} size={14} />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                props.onPageChange(1);
+              }}
+              placeholder="Search input, model or date"
+              aria-label="Search past runs"
+              className="w-52 border-0 bg-transparent p-0 text-sm text-ink outline-none placeholder:text-dim max-[600px]:w-full"
             />
-          ))}
-        </Dropdown>
+          </label>
+          <Dropdown
+            open={props.menuOpen}
+            onOpenChange={props.onMenuOpenChange}
+            button={KIND_LABELS[kind]}
+            menuClassName="right-0 left-auto w-60"
+          >
+            {(Object.keys(KIND_LABELS) as KindFilter[]).map((option) => (
+              <MenuItem
+                key={option}
+                label={KIND_LABELS[option]}
+                detail={runs.filter((run) => !option || run.mode === option).length}
+                selected={option === kind}
+                onSelect={() => props.onKindChange(option)}
+              />
+            ))}
+          </Dropdown>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr>
+              <th className={tableHead}>
+                <span className="sr-only">Pick to compare</span>
+              </th>
               {header("when", "When")}
               {header("input", "Input")}
               {header("models", "Models")}
@@ -140,7 +194,7 @@ export function PastRuns(props: PastRunsProps) {
             {props.loading &&
               ["a", "b", "c", "d", "e", "f"].map((key) => (
                 <tr key={key}>
-                  {["w-20", "w-32", "w-56", "w-8"].map((width) => (
+                  {["w-4", "w-20", "w-32", "w-56", "w-8"].map((width) => (
                     <td key={width} className={tableCell}>
                       <Skeleton className={width} />
                     </td>
@@ -149,8 +203,11 @@ export function PastRuns(props: PastRunsProps) {
               ))}
             {!props.loading && shown.length === 0 && (
               <tr>
-                <td colSpan={4} className={tableCell}>
-                  Nothing saved yet{kind && " of this kind"}.
+                <td colSpan={5} className={tableCell}>
+                  {words.length
+                    ? "No run matches the search"
+                    : `Nothing saved yet${kind && " of this kind"}`}
+                  .
                 </td>
               </tr>
             )}
@@ -165,9 +222,34 @@ export function PastRuns(props: PastRunsProps) {
                   className="cursor-pointer transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md"
                 >
                   <td className={tableCell}>
+                    <input
+                      type="checkbox"
+                      checked={picked.includes(run.name)}
+                      disabled={
+                        !picked.includes(run.name) && !!pickedInput && run.dataset !== pickedInput
+                      }
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={() => togglePicked(run.name)}
+                      aria-label={`Pick the ${run.dataset} run of ${runTime(run.name)} to compare`}
+                      title="Runs on the same input can be compared"
+                      className="size-4 accent-current disabled:opacity-30"
+                    />
+                  </td>
+                  <td className={tableCell}>
                     <span className={monoDim}>{runTime(run.name)}</span>
                   </td>
-                  <td className={tableCell}>{run.dataset}</td>
+                  <td className={tableCell}>
+                    {run.dataset}
+                    {run.item && (
+                      <span className={cn(monoDim, "ml-1.5")} title={run.item}>
+                        {run.item
+                          .split("·")
+                          .pop()
+                          ?.trim()
+                          .replace(/^\w+ row/, "row")}
+                      </span>
+                    )}
+                  </td>
                   <td className={tableCell}>
                     {run.backends.map((backend) => {
                       const [correct, total] = run.score?.[backend] ?? [0, 0];

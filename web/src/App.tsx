@@ -3,14 +3,14 @@ import { type ReactNode, useCallback, useRef, useState } from "react";
 import { fetchProgress, fetchRun, fetchRuns, loadModel, sampleItem } from "./api";
 import { isHosted, TEXTLESS } from "./backends";
 import { EditDialog } from "./components/EditDialog";
+import { GenerateReplay } from "./components/GenerateReplay";
 import { Header } from "./components/Header";
 import { InputBar, type InputSource } from "./components/InputBar";
 import { ItemDialog } from "./components/ItemDialog";
 import { KeyDialog } from "./components/KeyDialog";
 import { ModelPicker } from "./components/ModelPicker";
 import { ModelsPicker } from "./components/ModelsPicker";
-import { type KindFilter, PastRuns } from "./components/PastRuns";
-import { GenerateReplay } from "./components/GenerateReplay";
+import { type KindFilter, PastRuns, runTime } from "./components/PastRuns";
 import { CompareView, GenerateView } from "./components/ResultPanels";
 import { ResultsView } from "./components/ResultsView";
 import { Toast } from "./components/Toast";
@@ -24,7 +24,7 @@ import { useToast } from "./hooks/useToast";
 import { now, runBatchLoop, runEach, timedGenerate, timedReadout } from "./runner";
 import { readoutFooter, writtenAnswers } from "./scoring";
 import { cn, ghostButton, labelText, solidButton } from "./styles";
-import type { Item, Mode, Recording, Request, Row, RunKind, SavedRun } from "./types";
+import type { Item, Mode, Recording, Request, Row, RunKind, SavedRun, Side } from "./types";
 import { compareVerdict, generateVerdict, rowRecording } from "./verdicts";
 
 const FIRST_EXAMPLE: ExampleName = "Support ticket";
@@ -216,7 +216,7 @@ export default function App() {
     closeSavedRun();
     setTableVisible(false);
     if (next === "past") {
-      setRunsLoading(true);
+      if (!savedRuns.length) setRunsLoading(true); // keep showing the list we have while it refreshes
       fetchRuns()
         .then(setSavedRuns)
         .finally(() => setRunsLoading(false));
@@ -659,11 +659,48 @@ export default function App() {
     }
   }
 
-  /** Rebuilds a saved batch (table, score, summary, replay) without sending any request. */
-  async function openSavedRun(name: string) {
-    const saved = savedRuns.find((run) => run.name === name);
-    if (!saved) return;
-    const stored = await fetchRun(name);
+  /**
+   * Rebuilds saved batches (table, score, summary, replay) without sending any request. Several
+   * runs on one input open as one compare over the items they all have.
+   */
+  async function openSavedRuns(picked: string[]) {
+    const chosen = savedRuns.filter((run) => picked.includes(run.name));
+    const first = chosen[0];
+    if (!first) return;
+    const name = chosen.map((run) => run.name).join(" + ");
+    const kind: RunKind = chosen.length === 1 ? first.mode : "cmp";
+    const everyRun = await Promise.all(chosen.map((run) => fetchRun(run.name)));
+    // A model in more than one of the runs gets a column per run, told apart by its time.
+    const repeated = (backend: string) =>
+      chosen.filter((run) => run.backends.includes(backend)).length > 1;
+    const columnsOf = chosen.flatMap((run) =>
+      run.backends.map((backend) => ({
+        run,
+        backend,
+        id: repeated(backend) ? `${backend}@${run.name}` : backend,
+      })),
+    );
+    const itemKey = (item: Item) =>
+      [item.source, JSON.stringify(item.state), JSON.stringify(item.questions)].join("|");
+    const merged = new Map<string, { item: Item; sides: Record<string, Side> }>();
+    everyRun.forEach((stored, k) => {
+      for (const row of stored) {
+        const entry = merged.get(itemKey(row.item)) ?? { item: row.item, sides: {} };
+        for (const column of columnsOf.filter((c) => c.run === chosen[k])) {
+          const side = row.sides[column.backend];
+          if (side) entry.sides[column.id] = side;
+        }
+        merged.set(itemKey(row.item), entry);
+      }
+    });
+    const stored = [...merged.values()];
+    const complete = (row: (typeof stored)[number]) =>
+      columnsOf.every((column) => row.sides[column.id]);
+    if (chosen.length > 1 && !stored.some(complete)) {
+      toast.show("These runs have no item in common, so there is nothing to compare.");
+      return;
+    }
+    const saved: SavedRun = { ...first, name, mode: kind, backends: columnsOf.map((c) => c.id) };
     const models = saved.backends;
     const target: Mode = saved.mode === "gen" ? "generate" : "compare";
     if (mode !== target) switchMode(target);
@@ -677,12 +714,16 @@ export default function App() {
       setDataset(saved.dataset);
     }
 
-    const baseId = (id: string) => id.replace(/#text$/, "");
+    const baseId = (id: string) => id.replace(/@.*$/, "").replace(/#text$/, "");
     const known = models.map(baseId).filter((id) => backends[id]);
     if (target === "generate" && known[0]) setGenerateModel(known[0]);
     if (target === "compare" && known.length >= 2) setCompareModels(known);
 
-    const names = models.map((id) => columnName(id, saved.mode));
+    const names = columnsOf.map(({ run, backend, id }) =>
+      id === backend
+        ? columnName(backend, chosen.length === 1 ? run.mode : undefined)
+        : `${columnName(backend, run.mode)} · ${runTime(run.name)}`,
+    );
     const loaded: Row[] = stored.flatMap((row) => {
       const sides = models.map((id) => row.sides[id]).filter((side) => side !== undefined);
       return sides.length === models.length ? [{ item: row.item, sides }] : [];
@@ -695,7 +736,10 @@ export default function App() {
     setRemaining(null);
     setTableVisible(true);
     setResultsOpen(true);
-    setLogFile({ text: "loaded from disk", path: `results/logs/demo/${name}.jsonl` });
+    setLogFile({
+      text: "loaded from disk",
+      path: chosen.map((run) => `results/logs/demo/${run.name}.jsonl`).join(" + "),
+    });
     setOpenItem(null);
     const lastRow = loaded.at(-1);
     if (lastRow) {
@@ -804,7 +848,8 @@ export default function App() {
             setOpenMenu("");
           }}
           onPageChange={setRunsPage}
-          onOpenRun={openSavedRun}
+          onOpenRun={(name) => openSavedRuns([name])}
+          onCompareRuns={openSavedRuns}
           backendLabel={columnName}
         />
       ) : resultsOpen && tableVisible ? (

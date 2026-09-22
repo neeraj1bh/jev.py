@@ -7,7 +7,7 @@ request to any two backends side by side, local, a llama.cpp server or hosted.
 Nothing is loaded at start. A local model is downloaded when first picked: into the Hugging
 Face cache if it is already there, else into ./models (git-ignored; JEV_MODELS overrides).
 
-    python demo.py [model_id] [port]      # then open http://localhost:8080
+    uv run jev-demo [model_id] [port]     # then open http://localhost:8080
 """
 
 import gc
@@ -28,12 +28,11 @@ from huggingface_hub import try_to_load_from_cache
 from huggingface_hub.constants import HF_HUB_CACHE
 from transformers import TextIteratorStreamer
 
-from jev import DEFAULT_MODEL, SYSTEM, Jev, _options, _text
-from remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env
+from jev.core import DEFAULT_MODEL, ROOT, SYSTEM, Jev, _options, _text
+from jev.remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-WEB = os.path.join(HERE, "web", "dist")  # the built page; see web/
-MODELS = os.environ.get("JEV_MODELS") or os.path.join(HERE, "models")
+WEB = os.path.join(ROOT, "web", "dist")  # the built page; see web/
+MODELS = os.environ.get("JEV_MODELS") or os.path.join(ROOT, "models")
 LOCAL = {  # tested models: weights on disk, GB
     "Qwen/Qwen2.5-0.5B-Instruct": 1.0,
     "Qwen/Qwen2.5-1.5B-Instruct": 3.1,
@@ -47,8 +46,8 @@ HOSTED = {
     "moonshot": "Kimi",
     "vercel": "Jev (Vercel)",
 }
-DATA = os.path.join(HERE, "data")  # dataset rows fetched for the demo, git-ignored
-LOGS = os.path.join(HERE, "results", "logs", "demo")  # one .jsonl per batch, git-ignored
+DATA = os.path.join(ROOT, "data")  # dataset rows fetched for the demo, git-ignored
+LOGS = os.path.join(ROOT, "results", "logs", "demo")  # one .jsonl per batch, git-ignored
 ROWS = "https://datasets-server.huggingface.co/rows?dataset={}&config={}&split={}&offset={}&length=100"
 # name: (Hub dataset, config, split, state fields, question, label field, the label meaning yes)
 DATASETS = {
@@ -331,39 +330,43 @@ def item_key(x):
     return x["source"], json.dumps((x["state"], x["questions"]), sort_keys=True)
 
 
-def runs():
-    """The saved batches, newest first: set, the two backends, items and each side's score."""
-    out = []
-    if os.path.isdir(LOGS):
-        for f in sorted(os.listdir(LOGS), reverse=True):
-            if not f.endswith(".jsonl"):
-                continue
-            with open(os.path.join(LOGS, f)) as fh:
-                lines = [json.loads(x) for x in fh if x.strip()]
-            sides = sorted(
-                dict.fromkeys(x["backend"] for x in lines), key=lambda b: not b.endswith("#text")
-            )  # written side first
-            order = next((x["sides"] for x in lines if x.get("sides")), None)
-            if order and lines[0].get("mode") != "gen":  # compare: the order the models were picked in
-                sides.sort(key=lambda b: order.index(b) if b in order else len(order))
-            items = len({item_key(x) for x in lines})
-            score = {b: [0, 0] for b in sides}
-            for x in lines:
-                for qid, t in x["truth"].items():
-                    score[x["backend"]][1] += 1
-                    score[x["backend"]][0] += qid in x["answers"] and right(x["answers"][qid], t)
-            ds, kind = (lines[0]["dataset"], lines[0].get("mode") or "cmp") if lines else ("", "cmp")
-            out.append(
-                {
-                    "name": f[:-6],
-                    "dataset": ds,
-                    "backends": sides,
-                    "items": items,
-                    "score": score,
-                    "mode": kind,
-                }
-            )
+SUMMARIES = {}  # file name -> (mtime, size, summary); a saved run is read again only when it changes
+
+
+def summary(f):
+    """One saved batch: set, backends, items and each side's score."""
+    path = os.path.join(LOGS, f)
+    stat = os.stat(path)
+    cached = SUMMARIES.get(f)
+    if cached and cached[:2] == (stat.st_mtime, stat.st_size):
+        return cached[2]
+    with open(path) as fh:
+        lines = [json.loads(x) for x in fh if x.strip()]
+    sides = sorted(
+        dict.fromkeys(x["backend"] for x in lines), key=lambda b: not b.endswith("#text")
+    )  # written side first
+    order = next((x["sides"] for x in lines if x.get("sides")), None)
+    if order and lines[0].get("mode") != "gen":  # compare: the order the models were picked in
+        sides.sort(key=lambda b: order.index(b) if b in order else len(order))
+    items = len({item_key(x) for x in lines})
+    score = {b: [0, 0] for b in sides}
+    for x in lines:
+        for qid, t in x["truth"].items():
+            score[x["backend"]][1] += 1
+            score[x["backend"]][0] += qid in x["answers"] and right(x["answers"][qid], t)
+    ds, kind = (lines[0]["dataset"], lines[0].get("mode") or "cmp") if lines else ("", "cmp")
+    out = {"name": f[:-6], "dataset": ds, "backends": sides, "items": items, "score": score, "mode": kind}
+    if items == 1:  # which item, so runs that can be compared are visible before opening them
+        out["item"] = lines[0].get("source")
+    SUMMARIES[f] = stat.st_mtime, stat.st_size, out
     return out
+
+
+def runs():
+    """The saved batches, newest first."""
+    if not os.path.isdir(LOGS):
+        return []
+    return [summary(f) for f in sorted(os.listdir(LOGS), reverse=True) if f.endswith(".jsonl")]
 
 
 def run_rows(name):
@@ -603,7 +606,7 @@ def set_key(bid, key, save):
         undo()
         raise
     if save:
-        path = os.path.join(HERE, ".env")
+        path = os.path.join(ROOT, ".env")
         lines = open(path).read().splitlines() if os.path.exists(path) else []
         at = next((i for i, x in enumerate(lines) if x.partition("=")[0].strip() == var), None)
         if at is None:
@@ -697,7 +700,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     {"name": n, "options": OPTIONS.get(n, 2), "local": os.path.exists(dataset_path(n))}
                     for n in [*DATASETS, *MC]
                 ]
-                ts = os.path.isdir(os.path.join(HERE, "results", "typesafe"))
+                ts = os.path.isdir(os.path.join(ROOT, "results", "typesafe"))
                 sets.append({"name": "TypeSafe cases", "options": None, "local": ts})
                 for x in sets:
                     x["about"] = ABOUT[x["name"]]
@@ -797,6 +800,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
             sys.stderr.write(f"{self.command} {self.path} {a[1] if len(a) > 1 else ''}\n")
 
     print(f"open http://localhost:{port}  ({DEVICE}; models in {HF_HUB_CACHE} or {MODELS})")
+    Thread(target=runs, daemon=True).start()  # summarise the saved runs before Past runs is opened
     server = ThreadingHTTPServer(("", port), H)
     try:
         server.serve_forever()
@@ -806,6 +810,10 @@ def main(model_id=DEFAULT_MODEL, port=8080):
         server.server_close()
 
 
-if __name__ == "__main__":
+def cli():
     a = sys.argv[1:]
     main(*a[:1], **({"port": int(a[1])} if len(a) > 1 else {}))
+
+
+if __name__ == "__main__":
+    cli()

@@ -6,7 +6,7 @@ Ask a yes/no, pick-one or rate-on-a-scale question about some text and get a pro
 back instead of prose. No GPU needed, no API key, no text generation. About 270 lines.
 
 ```console
-$ uv run jev.py
+$ uv run jev
 {
   "refund_requested": { "type": "noul",   "noul": 1.0 },
   "is_spam":          { "type": "noul",   "noul": 0.0 },
@@ -33,19 +33,20 @@ and costs one pass.
 ## Run
 
 ```sh
-uv run jev.py                                   # self-check; downloads Qwen2.5-1.5B (3 GB) once
-uv run jev.py serve                             # HTTP on http://localhost:8080/v1/systemone
-uv run jev.py serve Qwen/Qwen2.5-7B-Instruct    # any chat model on the Hub
-uv run jev.py request.json                      # one request from a file
-uv run demo.py                                  # side-by-side comparison page, see Demo
+uv run jev                                   # self-check; downloads Qwen2.5-1.5B (3 GB) once
+uv run jev serve                             # HTTP on http://localhost:8080/v1/systemone
+uv run jev serve Qwen/Qwen2.5-7B-Instruct    # any chat model on the Hub
+uv run jev request.json                      # one request from a file
+uv run jev-demo                                  # side-by-side comparison page, see Demo
 ```
 
 Without uv: `pip install torch transformers`, then `python` instead of `uv run`. Uses CUDA,
 Apple MPS or CPU, whichever is there; on CPUs with native bf16 it uses that.
 
 On Linux without an NVIDIA GPU, skip the 2.5 GB of CUDA libraries: `uv venv && uv pip install
-torch --index-url https://download.pytorch.org/whl/cpu && uv pip install transformers`, then
-`uv run --no-sync` instead of `uv run`, e.g. `uv run --no-sync demo.py`.
+torch --index-url https://download.pytorch.org/whl/cpu && uv pip install transformers && uv pip install -e .
+--no-deps`, then
+`uv run --no-sync` instead of `uv run`, e.g. `uv run --no-sync jev-demo`.
 
 The HTTP request and response follow the
 [TypeSafe System One API](https://docs.typesafe.ai/api), so a client written for it only
@@ -109,7 +110,7 @@ Nothing is generated, so nothing needs parsing and no answer can fall outside th
 
 ## Verify
 
-`uv run eval.py` scores the model on public data with public labels. The model only sees the
+`uv run jev-eval` scores the model on public data with public labels. The model only sees the
 text; the truth comes from the item itself:
 
 | task | type | what the model sees | truth |
@@ -129,7 +130,7 @@ text; the truth comes from the item itself:
 | typesafe | noul, choice | a business document: security incident, agent trace, invoice, support ticket | TypeSafe's published eval cases, the consensus of its two reference label sets |
 
 The seven from sentiment to toxicity are 300 items each from the Hugging Face Hub; the 354
-TypeSafe questions come from TypeSafe's public eval page. No items are in this repo: `eval.py`
+TypeSafe questions come from TypeSafe's public eval page. No items are in this repo: `jev-eval`
 downloads the items on first run and saves the set, so every model is scored on the same items.
 It prints accuracy, Brier score and a reliability table (how often a 0.9 was actually a yes), and
 logs every answer to `results/logs/<model>.jsonl`. A yes/no is correct when its probability is
@@ -179,11 +180,11 @@ Build the page once, then serve it with the backends:
 
 ```bash
 cd web && pnpm install && pnpm build && cd ..   # Node 20.19+ and pnpm
-uv run demo.py                                   # http://localhost:8080
+uv run jev-demo                                   # http://localhost:8080
 ```
 
 While changing the page, `pnpm dev` in `web/` serves it on <http://localhost:3000> with live
-reload and passes API calls to `demo.py`. `pnpm check` runs Biome, the type check and the build.
+reload and passes API calls to `jev-demo`. `pnpm check` runs Biome, the type check and the build.
 Two modes:
 
 - **Generate vs readout.** One local model answers the same questions two ways: writing JSON
@@ -244,17 +245,17 @@ echo "LLAMACPP_URL=http://localhost:8081/v1/chat/completions" >> .env
 
 ## Hosted models
 
-`remote.py` answers the same requests from a hosted model through its chat API's
+`src/jev/remote.py` answers the same requests from a hosted model through its chat API's
 log-probabilities — DeepSeek, Kimi, OpenRouter, OpenAI, or a llama.cpp `llama-server` on your own
 GPU — and passes straight through to the TypeSafe API when that key is present. The options are
 labelled A, B, C… and the model's probability for each letter is the answer, so these backends
 take at most 26 options. Keys go in `.env` (copy `.env.example`).
 
 ```sh
-uv run remote.py deepseek            # self-check
-uv run remote.py deepseek serve      # the same server, backed by DeepSeek
-uv run eval.py remote:deepseek       # the same eval on a hosted model
-uv run eval.py remote:llamacpp:qwen2.5-7b-q4   # a model in llama-server (LLAMACPP_URL, default :8080)
+uv run jev-remote deepseek            # self-check
+uv run jev-remote deepseek serve      # the same server, backed by DeepSeek
+uv run jev-eval remote:deepseek       # the same eval on a hosted model
+uv run jev-eval remote:llamacpp:qwen2.5-7b-q4   # a model in llama-server (LLAMACPP_URL, default :8080)
 ```
 
 Thinking is turned off per provider (otherwise the first token is reasoning, not the answer)
@@ -266,11 +267,11 @@ providers return probabilities, and how many, is in [docs/providers.md](docs/pro
 
 | file | what |
 |---|---|
-| `jev.py` | the model wrapper, the HTTP server and the self-check — the whole idea |
-| `eval.py` | public evaluation, results in `results/` |
-| `readout.py` | letter vs option-text readout, and how often answers flip when the options are reversed |
-| `demo.py`, `web/` | the demo server and its React page |
-| `remote.py`, `.env.example` | hosted backends and where their keys go |
+| `src/jev/core.py` | the model wrapper, the HTTP server and the self-check — the whole idea |
+| `src/jev/eval.py` | public evaluation, results in `results/` |
+| `src/jev/readout.py` | letter vs option-text readout, and how often answers flip when the options are reversed |
+| `src/jev/demo.py`, `web/` | the demo server and its React page |
+| `src/jev/remote.py`, `.env.example` | hosted backends and where their keys go |
 | `docs/providers.md` | which hosted providers return probabilities |
 
 `pyproject.toml` carries the two dependencies and the ruff config; `uvx ruff format . && uvx ruff check .` keeps it clean.
