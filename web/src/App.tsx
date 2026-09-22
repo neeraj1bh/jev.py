@@ -146,6 +146,8 @@ export default function App() {
   })();
   const questionIds = Object.keys(asked);
   const isLocal = (id: string) => !isHosted(backends[id]);
+  // Letter-reading backends stop at 26 options; the rest read any number.
+  const readsWide = (models: string[]) => models.every((id) => !backends[id]?.max);
 
   const menuHandler = useCallback(
     (id: string) => (open: boolean) =>
@@ -361,7 +363,11 @@ export default function App() {
     const set = datasets.find((d) => d.name === name);
     const stopWatching = set && !set.local ? watchDownload(name, name) : () => {};
     try {
-      const next = await sampleItem(name);
+      const next = await sampleItem(
+        name,
+        false,
+        readsWide(isCompare ? compareModels : [generateModel]),
+      );
       if (set && !set.local) markDatasetLocal(name);
       showRequest(next);
       resetPanels();
@@ -609,6 +615,7 @@ export default function App() {
 
     const { done, exhausted } = await runBatchLoop({
       dataset,
+      wide: readsWide(models),
       models,
       total,
       workers,

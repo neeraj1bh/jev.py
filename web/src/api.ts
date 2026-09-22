@@ -51,8 +51,9 @@ export async function fetchRun(name: string) {
   }));
 }
 
-export const sampleItem = (dataset: string, fresh = false) =>
-  postOrThrow<Item>("/v1/sample", { dataset, fresh });
+/** `wide` lets a frozen benchmark include its over-26-option items: every picked model reads them. */
+export const sampleItem = (dataset: string, fresh = false, wide = false) =>
+  postOrThrow<Item>("/v1/sample", { dataset, fresh, wide });
 export const loadModel = (backend: string) => postOrThrow<unknown>("/v1/load", { backend });
 /** `backend` is a backend id such as remote:deepseek, or a key name such as HF_TOKEN. */
 export const saveKey = (backend: string, key: string, save: boolean) =>

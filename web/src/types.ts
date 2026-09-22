@@ -33,6 +33,8 @@ export interface Dataset {
   options: number | null;
   /** A yes/no question, rather than a pick between two named options. */
   yes_no?: boolean;
+  /** A frozen benchmark: a fixed mix of items from many sets. */
+  frozen?: boolean;
   local: boolean;
   about?: string;
   /** The menu heading it sits under, e.g. "Knowledge and exams". */

@@ -293,8 +293,15 @@ ABOUT = {  # one line per set, shown when hovering it in the page
     "Arena votes": "Two chatbot answers to one prompt: which did the person prefer, or a tie?",
     "RewardBench": "A prompt and two responses: which is better? Labels from a curated benchmark",
     "GPQA Diamond": "Graduate-level science question written to resist search (needs HF_TOKEN)",
+    "Core v1": (
+        "Frozen 2026-09-22: 50 balanced items from each set and every TypeSafe step. Banking77, "
+        "CLINC150 and LEDGAR join only when every picked model reads over 26 options"
+    ),
 }
+CORE = ("Core v1",)  # frozen benchmarks, see bench.py
+CORE_ITEMS = {}
 GROUPS = {  # menu headings, in order; every set belongs to one
+    "Frozen benchmarks": list(CORE),
     "Sentiment and tone": [
         "SST-2 sentiment", "IMDB", "Tweet sentiment", "Tweet emotion", "Tweet irony",
     ],
@@ -462,9 +469,17 @@ def row_item(name, page, r):
     }
 
 
-def sample(name, fresh=False):
+def sample(name, fresh=False, wide=False):
     """One random labelled item as a request, plus its truth. The first call per dataset
     downloads 300 rows (three random pages) into DATA; later calls deal from them."""
+    if name in CORE:
+        from jev import bench  # bench imports this module
+
+        deck = f"{name} + wide" if wide else name  # wide: every picked model reads over 26 options
+        if deck not in CORE_ITEMS:
+            CORE_ITEMS[deck] = bench.load("main") + (bench.load("wide") if wide else [])
+        items = CORE_ITEMS[deck]
+        return items[deal(deck, len(items), fresh)] | {"pool": len(items), "left": len(DECKS[deck])}
     if name == "TypeSafe cases":
         cases = typesafe_rows()
         item = typesafe_item(*cases[deal(name, len(cases), fresh)])
@@ -1007,6 +1022,10 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     }
                     for n in [*DATASETS, *MC]
                 ]
+                frozen = os.path.exists(os.path.join(ROOT, "benchmarks", "core-v1.json"))
+                sets += [
+                    {"name": n, "options": 26, "yes_no": False, "frozen": True, "local": frozen} for n in CORE
+                ]
                 ts = os.path.isdir(os.path.join(ROOT, "results", "typesafe"))
                 sets.append({"name": "TypeSafe cases", "options": None, "local": ts})
                 group = {n: g for g, names in GROUPS.items() for n in names}
@@ -1044,7 +1063,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 if self.path.endswith("/sample"):
                     with SAMPLE_LOCK:  # batches ask in parallel; one download and one deck per set
                         try:
-                            item = sample(body["dataset"], body.get("fresh", False))
+                            item = sample(body["dataset"], body.get("fresh", False), body.get("wide", False))
                         except Exhausted as e:
                             return self._send(409, json.dumps({"error": {"message": str(e)}}).encode())
                     return self._send(200, json.dumps(item).encode())

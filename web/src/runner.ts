@@ -70,6 +70,7 @@ export async function timedGenerate(
 
 interface BatchOptions {
   dataset: string;
+  wide: boolean;
   models: string[];
   total: number;
   workers: number;
@@ -97,7 +98,7 @@ export async function runBatchLoop(options: BatchOptions) {
       started++;
       let item: Item;
       try {
-        item = await sampleItem(options.dataset, options.takeFreshDeck());
+        item = await sampleItem(options.dataset, options.takeFreshDeck(), options.wide);
       } catch (error) {
         stopped = true;
         if (error instanceof ApiError && error.status === 409) exhausted = error.message;

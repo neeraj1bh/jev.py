@@ -6,11 +6,13 @@ import { Dropdown, MenuHeading, MenuItem } from "./Menu";
 import { Skeleton } from "./Skeleton";
 
 const answerShape = (dataset: Dataset) =>
-  dataset.yes_no
-    ? "yes / no"
-    : dataset.options
-      ? `pick 1 of ${dataset.options}`
-      : "several questions each";
+  dataset.frozen
+    ? "frozen mix of sets"
+    : dataset.yes_no
+      ? "yes / no"
+      : dataset.options
+        ? `pick 1 of ${dataset.options}`
+        : "several questions each";
 
 interface DatasetMenuProps {
   datasets: Dataset[];

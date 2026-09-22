@@ -5,9 +5,9 @@ repo redistributes nothing and anyone can rebuild the same items from the Hub. S
 questions have more than 26 options form a separate "wide" part: letter-reading backends cannot
 answer them, and keeping them apart keeps the main comparison paired across every model.
 
-    uv run --no-sync jev-bench freeze                # write benchmarks/core-v1.json once
-    uv run --no-sync jev-bench run remote:deepseek   # one model over the main part
-    uv run --no-sync jev-bench run Qwen/Qwen2.5-1.5B-Instruct wide
+    uv run --no-sync jev-bench freeze                        # write benchmarks/core-v1.json once
+    uv run --no-sync jev-bench run remote:deepseek           # one model; letter readers skip wide
+    uv run --no-sync jev-bench run Qwen/Qwen2.5-1.5B-Instruct  # local models answer every item
 
 Each run is saved like a demo batch, so Past runs lists it and can compare runs side by side.
 """
@@ -27,7 +27,7 @@ NAME = "core-v1"
 PATH = os.path.join(ROOT, "benchmarks", f"{NAME}.json")
 PER_SET = 50
 LETTER_LIMIT = 26
-PARTS = {"main": "Core v1", "wide": "Core v1 wide"}
+DATASET = "Core v1"
 HOSTED_WORKERS = 8
 
 
@@ -138,12 +138,20 @@ def load(part="main"):
     return items
 
 
-def run(model, part="main"):
-    items = load(part)
+def reads_wide(model):
+    """Letter-reading backends answer 26 options at most; Jev and local models read any number."""
+    if model.startswith("openrouter:"):
+        return False
+    kind, _, name = model.partition(":")
+    return kind != "remote" or name not in demo.LETTER
+
+
+def run(model):
+    items = load("main") + (load("wide") if reads_wide(model) else [])
     backend = demo.get(model)
     stamp = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime())
-    log = f"{stamp}-{NAME}-{part}-{model.split(':')[-1].split('/')[-1]}"
-    dataset = PARTS[part]
+    log = f"{stamp}-{NAME}-{model.split(':')[-1].split('/')[-1]}"
+    dataset = DATASET
 
     def ask(item):
         started = time.time()
@@ -173,8 +181,8 @@ def cli():
     args = sys.argv[1:]
     if args[:1] == ["freeze"]:
         freeze()
-    elif args[:1] == ["run"] and len(args) >= 2:
-        run(args[1], args[2] if len(args) > 2 else "main")
+    elif args[:1] == ["run"] and len(args) == 2:
+        run(args[1])
     else:
         print(__doc__)
 
