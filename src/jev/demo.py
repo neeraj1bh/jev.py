@@ -7,7 +7,7 @@ request to any two backends side by side, local, a llama.cpp server or hosted.
 Nothing is loaded at start. A local model is downloaded when first picked: into the Hugging
 Face cache if it is already there, else into ./models (git-ignored; JEV_MODELS overrides).
 
-    uv run jev-demo [model_id] [port]     # then open http://localhost:8080
+    uv run prod [model_id] [port]     # then open http://localhost:8080
 """
 
 import contextlib

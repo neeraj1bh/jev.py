@@ -44,7 +44,7 @@ BACKENDS = {
         "typesafe-ai/jev",
     ),
     # llama.cpp's llama-server on this machine or the LAN; no key, LLAMACPP_URL overrides the address
-    "llamacpp": ("", "http://localhost:8080/v1/chat/completions", "local"),
+    "llamacpp": ("", "http://localhost:8081/v1/chat/completions", "local"),
 }
 # thinking must be off (else the first token is reasoning); each provider's accepted temperature
 EXTRAS = {
