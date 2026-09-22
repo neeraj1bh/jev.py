@@ -28,11 +28,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock, Thread
 
 import torch
-from huggingface_hub import try_to_load_from_cache
 from huggingface_hub.constants import HF_HUB_CACHE
 from transformers import TextIteratorStreamer
 
-from jev import hub
+from jev import cache, downloads, hub
 from jev.core import DEFAULT_MODEL, ROOT, SYSTEM, Jev, _options, _text
 from jev.eval import typesafe_rows
 from jev.remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env
@@ -592,15 +591,9 @@ BF16 = DEVICE == "cuda" or getattr(torch.cpu, "_is_avx512_bf16_supported", lambd
 
 
 def where(model_id):
-    """(cache folder, downloaded?): the Hugging Face cache if the model is there, else MODELS."""
-    for cache in (HF_HUB_CACHE, MODELS):
-        found = [
-            try_to_load_from_cache(model_id, f, cache_dir=cache)
-            for f in ("config.json", "model.safetensors", "model.safetensors.index.json")
-        ]
-        if isinstance(found[0], str) and any(isinstance(x, str) for x in found[1:]):
-            return cache, True
-    return MODELS, False
+    """(cache folder, complete?): where the whole model is, else MODELS for a new download."""
+    found = on_disk().get(model_id)
+    return (found[0], True) if found else (MODELS, False)
 
 
 def text_answers(text, questions):
@@ -725,18 +718,9 @@ def run_rows(name):
     return list(items.values())
 
 
-def folder_bytes(path):
-    return sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(path) for f in fs)
-
-
 def progress():
-    """Everything downloading now; a model's progress is the size of its folder so far."""
-    out = {}
-    for k, (done, total, unit) in list(PROGRESS.items()):
-        if unit == "bytes":
-            done = folder_bytes(done) if os.path.isdir(done) else 0
-        out[k] = {"done": done, "total": total, "unit": unit}
-    return out
+    """Everything downloading now: datasets by pages, models by bytes."""
+    return {k: {"done": done, "total": total, "unit": unit} for k, (done, total, unit) in PROGRESS.items()}
 
 
 def memory_gb():
@@ -864,21 +848,35 @@ def model_gb(model_id):
     return LOCAL.get(model_id) or added().get(model_id)
 
 
+def on_disk():
+    return cache.on_disk((HF_HUB_CACHE, MODELS))
+
+
+def local_ids(extra):
+    """Chat models already on this machine, the ones added in the page, and the built-in starters
+    until three models are on disk."""
+    disk = on_disk()
+    starters = list(LOCAL) if len(disk) < 3 else []
+    return list(dict.fromkeys([*disk, *added(), *starters, *extra])), disk
+
+
 def backends(extra):
     """Everything the page can pick, with what it needs before it can run."""
     out, mem = [], memory_gb()
-    for m in dict.fromkeys([*LOCAL, *added(), *extra]):
+    ids, disk = local_ids(extra)
+    for m in ids:
         if m.startswith("remote:"):
             continue
-        cache, have = where(m)
-        gb = model_gb(m)
+        found = disk.get(m)
+        folder = found[0] if found else MODELS
+        gb = model_gb(m) or (found and found[1])
         out.append(
             {
                 "id": m,
                 "group": "local",
                 "label": m.split("/")[-1].removesuffix("-Instruct"),
-                "ready": have,
-                "path": os.path.join(cache, "models--" + m.replace("/", "--")),
+                "ready": bool(found),
+                "path": os.path.join(folder, "models--" + m.replace("/", "--")),
                 "gb": gb,
                 "need_gb": gb and round(gb * (1 if BF16 else 2) * 1.3, 1),
                 "have_gb": mem and round(mem, 1),
@@ -928,6 +926,12 @@ LOADED, LOCK = {}, Lock()  # backend id -> Jev or Remote; at most two local mode
 
 
 def get(bid):
+    if not bid.startswith(("remote:", "openrouter:")) and bid not in LOADED:
+        folder, have = where(bid)
+        if not have:  # outside LOCK, so other models keep answering while this one downloads
+            if env("HF_TOKEN"):  # a gated model downloads with the token saved under Keys
+                os.environ["HF_TOKEN"] = env("HF_TOKEN")
+            downloads.fetch(bid, folder, PROGRESS)
     with LOCK:
         if bid not in LOADED:
             if bid.startswith(("remote:", "openrouter:")):
@@ -944,20 +948,7 @@ def get(bid):
                 gc.collect()
                 if DEVICE == "cuda":
                     torch.cuda.empty_cache()
-                cache, have = where(bid)
-                if not have:
-                    gb = model_gb(bid)
-                    PROGRESS[bid] = [
-                        os.path.join(cache, "models--" + bid.replace("/", "--")),
-                        gb and gb * 1e9,
-                        "bytes",
-                    ]
-                if env("HF_TOKEN"):  # a gated model downloads with the token saved under Keys
-                    os.environ["HF_TOKEN"] = env("HF_TOKEN")
-                try:
-                    LOADED[bid] = Jev(bid, cache_dir=cache)
-                finally:
-                    PROGRESS.pop(bid, None)
+                LOADED[bid] = Jev(bid, cache_dir=where(bid)[0])
         return LOADED[bid]
 
 
@@ -1146,11 +1137,27 @@ def generate(jev, state, questions):
     yield from streamer
 
 
+def page_is_stale(index):
+    """True when the page's source changed after the last build, as after a git pull."""
+    source = os.path.join(ROOT, "web")
+    built = os.path.getmtime(index)
+    paths = [os.path.join(source, f) for f in ("index.html", "package.json", "vite.config.ts")]
+    paths += [os.path.join(d, f) for d, _, fs in os.walk(os.path.join(source, "src")) for f in fs]
+    return any(os.path.getmtime(p) > built for p in paths if os.path.exists(p))
+
+
 def main(model_id=DEFAULT_MODEL, port=8080):
+    started_with = [] if model_id == DEFAULT_MODEL else [model_id]  # a model named at start is listed
+
     class H(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"  # chunked streaming needs 1.1; 1.0 clients would see the size markers
 
         def _send(self, code, data, ctype="application/json"):
+            # The page may reload or close before the answer arrives.
+            with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+                self._write(code, data, ctype)
+
+        def _write(self, code, data, ctype):
             # A 9-model run is 11 MB of JSON; compressed it is a tenth of that.
             if len(data) > 64_000 and "gzip" in self.headers.get("accept-encoding", ""):
                 data = gzip.compress(data, compresslevel=1)
@@ -1165,7 +1172,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
 
         def do_GET(self):
             if self.path.endswith("/backends"):
-                return self._send(200, json.dumps(backends([model_id])).encode())
+                return self._send(200, json.dumps(backends(started_with)).encode())
             if self.path.endswith("/gateway"):
                 return self._send(200, json.dumps(gateway()).encode())
             if self.path.endswith("/runs"):
@@ -1211,8 +1218,13 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 with open(file, "rb") as f:
                     return self._send(200, f.read(), kind)
             index = os.path.join(WEB, "index.html")
-            if not os.path.exists(index):
-                hint = "The page is not built yet. Run: cd web && pnpm install && pnpm build\n"
+            if not os.path.exists(index) or page_is_stale(index):
+                state = (
+                    "is older than its source (after a pull?)"
+                    if os.path.exists(index)
+                    else "is not built yet"
+                )
+                hint = f"The page {state}. Run: cd web && pnpm install && pnpm build, then reload.\n"
                 return self._send(503, hint.encode(), "text/plain; charset=utf-8")
             with open(index, encoding="utf-8") as f:
                 html = f.read().replace("{{model}}", model_id)
@@ -1248,8 +1260,16 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     add_model(body["id"].strip())
                     return self._send(200, b"{}")
                 bid = body.get("backend") or model_id
-                if not bid.startswith(("remote:", "openrouter:")) and bid not in {*LOCAL, *added(), model_id}:
+                if not bid.startswith(("remote:", "openrouter:")) and bid not in local_ids([model_id])[0]:
                     raise ValueError(f"{bid} is not in the model menu; add it there first")
+                if self.path.endswith("/stop"):
+                    downloads.stop(bid)
+                    return self._send(200, b"{}")
+                if self.path.endswith("/delete"):
+                    LOADED.pop(bid, None)
+                    gc.collect()
+                    freed = cache.delete(bid, (HF_HUB_CACHE, MODELS))
+                    return self._send(200, json.dumps({"freed": freed}).encode())
                 jev = get(bid)
                 if self.path.endswith("/load"):  # downloads a local model the first time
                     return self._send(200, json.dumps({"device": jev.device}).encode())
@@ -1316,6 +1336,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 self._send(400, json.dumps({"error": {"message": msg}}).encode())
 
         def log_message(self, fmt, *a):
+            if self.path.endswith("/progress"):
+                return  # polled every second while the page is open
             sys.stderr.write(f"{self.command} {self.path} {a[1] if len(a) > 1 else ''}\n")
 
     print(f"open http://localhost:{port}  ({DEVICE}; models in {HF_HUB_CACHE} or {MODELS})")

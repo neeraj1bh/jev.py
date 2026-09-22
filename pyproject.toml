@@ -5,7 +5,7 @@ description = "Typed decisions from any local language model, in one file."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-dependencies = ["torch>=2.4", "transformers>=4.45"]
+dependencies = ["torch>=2.4", "transformers>=4.45", "httpx>=0.27"]
 
 [project.scripts]
 jev = "jev.core:cli"
