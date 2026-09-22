@@ -4,6 +4,7 @@ import { type ReactNode, useCallback, useRef, useState } from "react";
 import {
   addModel,
   deleteModel,
+  downloadModel,
   fetchRun,
   fetchRuns,
   loadModel,
@@ -306,6 +307,21 @@ export default function App() {
     if (forCompare && mode === "generate") switchMode("compare");
   }
 
+  /** A local model picked before it is on disk starts downloading right away, not at the first run. */
+  async function downloadIfMissing(backend: Backend) {
+    if (backend.group !== "local" || backend.ready || downloads[backend.id]) return;
+    const ok = await askConfirm(
+      `Download ${backend.label}?`,
+      `About ${backend.gb?.toFixed(1) ?? "?"} GB, saved to ${backend.path?.replace(/models--.*$/, "") ?? "models/"} and used from there next time.`,
+      "Download",
+    );
+    if (!ok) return;
+    downloadModel(backend.id)
+      .then(() => toast.show(`${backend.label} is downloaded.`))
+      .catch((error) => toast.show(errorMessage(error)))
+      .finally(reload);
+  }
+
   function pickGenerateModel(id: string) {
     setOpenMenu("");
     const backend = backends[id];
@@ -316,6 +332,7 @@ export default function App() {
       else askForKey(id, false);
       return;
     }
+    downloadIfMissing(backend);
     setGenerateModel(id);
     clearBatch();
     exampleResults.current = {};
@@ -385,6 +402,7 @@ export default function App() {
       askForKey("remote:openrouter", true, id);
       return;
     }
+    if (adding) downloadIfMissing(backend);
     const next = adding ? [...compareModels, id] : compareModels.filter((model) => model !== id);
     setCompareModels(next);
     clearBatch();

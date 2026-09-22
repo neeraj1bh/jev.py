@@ -62,6 +62,8 @@ export const saveKey = (backend: string, key: string, save: boolean) =>
   postOrThrow<unknown>("/v1/key", { backend, key, save });
 /** Checks a Hugging Face model id on the Hub and adds it to the model menu. */
 export const addModel = (id: string) => postOrThrow<unknown>("/v1/models", { id });
+/** Downloads a local model's files without loading it; resolves when they are on disk. */
+export const downloadModel = (backend: string) => postOrThrow<unknown>("/v1/download", { backend });
 /** Stops a model download; its partial files stay, so the next load continues from there. */
 export const stopDownload = (backend: string) => postOrThrow<unknown>("/v1/stop", { backend });
 /** Stops the llama-server running a GGUF model, which frees its memory. */

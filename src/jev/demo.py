@@ -985,6 +985,17 @@ SAMPLE_LOCK = Lock()
 LOADED, LOCK = {}, Lock()  # backend id -> Jev or Remote; at most two local models stay in memory
 
 
+def download_model(bid):
+    """Fetch a Hugging Face model's files when they are not on disk yet; loads nothing."""
+    if bid.startswith(("remote:", "openrouter:", "gguf:")) or os.path.isdir(bid):
+        return
+    folder, have = where(bid)
+    if not have:
+        if env("HF_TOKEN"):  # a gated model downloads with the token saved under Keys
+            os.environ["HF_TOKEN"] = env("HF_TOKEN")
+        downloads.fetch(bid, folder, PROGRESS)
+
+
 def get(bid):
     if bid.startswith("gguf:"):
         if not folders.llama_server():
@@ -996,12 +1007,8 @@ def get(bid):
         remote.url = url + "/v1/chat/completions"
         LOADED[bid] = remote
         return remote
-    if not bid.startswith(("remote:", "openrouter:")) and bid not in LOADED and not os.path.isdir(bid):
-        folder, have = where(bid)
-        if not have:  # outside LOCK, so other models keep answering while this one downloads
-            if env("HF_TOKEN"):  # a gated model downloads with the token saved under Keys
-                os.environ["HF_TOKEN"] = env("HF_TOKEN")
-            downloads.fetch(bid, folder, PROGRESS)
+    if bid not in LOADED:
+        download_model(bid)  # outside LOCK, so other models keep answering while this one downloads
     with LOCK:
         if bid not in LOADED:
             if bid.startswith(("remote:", "openrouter:")):
@@ -1374,6 +1381,9 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     gc.collect()
                     freed = cache.delete(bid, caches())
                     return self._send(200, json.dumps({"freed": freed}).encode())
+                if self.path.endswith("/download"):  # picked in the menu: fetch now, load at run time
+                    download_model(bid)
+                    return self._send(200, b"{}")
                 was_running = set(llamaserver.running())
                 jev = get(bid)
                 by_path = {m["path"]: m for m in backends([]) if m["group"] == "gguf"}
