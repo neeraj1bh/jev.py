@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useEffect, useMemo, useRef } from "react";
 
 import { answerLabel, inputSnippet, matchesLabel, scoreResponse } from "../scoring";
 import { cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
@@ -66,6 +67,8 @@ interface BatchTableProps {
   onOpen: (index: number) => void;
 }
 
+const ROW_PX = 43; // a first guess per row; each drawn row is then measured
+
 export function BatchTable({
   rows,
   columns,
@@ -75,25 +78,44 @@ export function BatchTable({
   follow,
   onOpen,
 }: BatchTableProps) {
-  const bodyRef = useRef<HTMLTableSectionElement>(null);
-  const tally = columns.map((_, k) =>
-    rows.reduce<[number, number]>(
-      ([correct, total], row) => {
-        const side = row.sides[k];
-        if (!side) return [correct, total];
-        const [c, n] = scoreResponse(side.response, row.item.truth);
-        return [correct + c, total + n];
-      },
-      [0, 0],
-    ),
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Only the rows in view are drawn, so a 3,000-item run opens and replays as fast as a short one.
+  const virtual = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_PX,
+    overscan: 12,
+  });
+  const drawn = virtual.getVirtualItems();
+  const padTop = drawn[0]?.start ?? 0;
+  const padBottom = virtual.getTotalSize() - (drawn.at(-1)?.end ?? 0);
+  const tally = useMemo(
+    () =>
+      columns.map((_, k) =>
+        rows.reduce<[number, number]>(
+          ([correct, total], row) => {
+            const side = row.sides[k];
+            if (!side) return [correct, total];
+            const [c, n] = scoreResponse(side.response, row.item.truth);
+            return [correct + c, total + n];
+          },
+          [0, 0],
+        ),
+      ),
+    [rows, columns],
   );
   const countsQuestions = (tally[0]?.[1] ?? 0) > rows.length;
   const labelled = (tally[0]?.[1] ?? 0) > 0;
+  const span = 2 + (labelled ? 1 : 0) + columns.length;
 
-  // The table follows the item open in the item dialog.
+  // The table follows the item open in the item dialog, and the newest row during a replay.
+  // The virtualizer is a new object every render, so it is read through a ref: depending on it
+  // would scroll, render and scroll again without end.
+  const virtualRef = useRef(virtual);
+  virtualRef.current = virtual;
   useEffect(() => {
-    if (selected === null || !follow) return;
-    bodyRef.current?.children[selected]?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (selected !== null && follow)
+      virtualRef.current.scrollToIndex(selected, { align: "center" });
   }, [selected, follow]);
 
   return (
@@ -120,7 +142,7 @@ export function BatchTable({
           <span className={labelText}>{file.text}</span>
         </Tip>
       </div>
-      <div className="max-h-[460px] overflow-auto">
+      <div ref={scrollRef} className="max-h-[460px] overflow-auto">
         <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px]">
           <colgroup>
             <col className="w-11" />
@@ -142,22 +164,31 @@ export function BatchTable({
               ))}
             </tr>
           </thead>
-          <tbody ref={bodyRef}>
-            {rows.map((row, i) => {
+          <tbody>
+            {padTop > 0 && (
+              <tr>
+                <td colSpan={span} style={{ height: padTop, padding: 0 }} />
+              </tr>
+            )}
+            {drawn.map(({ index }) => {
+              const row = rows[index];
+              if (!row) return null;
               const questionCount = Object.keys(row.item.truth).length;
               const input = inputSnippet(row.item.state);
               return (
                 <tr
-                  key={row.item.source}
-                  onClick={() => onOpen(i)}
+                  key={index}
+                  ref={virtual.measureElement}
+                  data-index={index}
+                  onClick={() => onOpen(index)}
                   className={cn(
                     "cursor-pointer transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md",
-                    selected === i && "bg-lift",
+                    selected === index && "bg-lift",
                     row.isNew && "animate-rise motion-reduce:animate-none",
                   )}
                 >
                   <td className={tableCell}>
-                    <span className={monoDim}>{i + 1}</span>
+                    <span className={monoDim}>{index + 1}</span>
                   </td>
                   <Tip content={input}>
                     <td className={cn(tableCell, "max-w-none text-ink")}>{input}</td>
@@ -187,6 +218,11 @@ export function BatchTable({
                 </tr>
               );
             })}
+            {padBottom > 0 && (
+              <tr>
+                <td colSpan={span} style={{ height: padBottom, padding: 0 }} />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

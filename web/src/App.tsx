@@ -878,8 +878,8 @@ export default function App() {
               ? {
                   startedAt: batchReplay.startedAt,
                   total: rows.length,
-                  pace: batchReplay.speed,
-                  label: `Replaying ${inputName} at ${batchReplay.speed}×`,
+                  pace: batchReplay.pace,
+                  label: `Replaying ${inputName} at ${Math.round(batchReplay.pace)}×`,
                 }
               : liveBatch && batchRunning
                 ? { ...liveBatch, pace: 1, label: `Running ${inputName}` }
@@ -890,7 +890,7 @@ export default function App() {
               <GenerateReplay
                 rows={rows}
                 startedAt={batchReplay.startedAt}
-                pace={batchReplay.speed}
+                pace={batchReplay.pace}
                 onePass={onePass}
               />
             ) : batchRunning ? (

@@ -1,15 +1,17 @@
 import { ArrowLeft, Play, Square } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
 
-import type { ReplaySpeed } from "../hooks/useBatchReplay";
+import { FIT, FIT_MS, type ReplaySpeed } from "../hooks/useBatchReplay";
+import { rankColumns } from "../scoring";
 import { chipButton, cn, labelText } from "../styles";
 import type { Row } from "../types";
 import { BatchTable } from "./BatchTable";
 import { Icon } from "./Icon";
 import { Scoreboard } from "./Scoreboard";
 import { Summary } from "./Summary";
+import { Tip } from "./Tip";
 
-const SPEEDS: ReplaySpeed[] = [1, 2, 4];
+const SPEEDS: ReplaySpeed[] = [1, 4, 10, 50, 100, FIT];
 
 export interface ScoreboardState {
   startedAt: number;
@@ -43,6 +45,19 @@ interface ResultsViewProps {
 
 /** A batch on its own screen: the summary and the items, with a replay that plays it back as it ran. */
 export function ResultsView(props: ResultsViewProps) {
+  // A finished batch reads best first; while rows still arrive the columns keep their place.
+  const settled = !props.scoreboard && !props.stage;
+  const ranked = useMemo(() => {
+    if (!settled) return { rows: props.rows, columns: props.columns };
+    const order = rankColumns(props.rows, props.columns.length);
+    return {
+      columns: order.map((k) => props.columns[k] ?? ""),
+      rows: props.rows.map((row) => ({
+        ...row,
+        sides: order.flatMap((k) => (row.sides[k] ? [row.sides[k]] : [])),
+      })),
+    };
+  }, [settled, props.rows, props.columns]);
   const top = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -70,21 +85,29 @@ export function ResultsView(props: ResultsViewProps) {
             <span className={cn(labelText, "hidden sm:inline")}>Speed</span>
             <div className="inline-flex rounded-full border border-rule p-0.5">
               {SPEEDS.map((speed) => (
-                <button
+                <Tip
                   key={speed}
-                  type="button"
-                  aria-pressed={props.speed === speed}
-                  disabled={props.replaying}
-                  onClick={() => props.onSpeedChange(speed)}
-                  className={cn(
-                    "rounded-full border-0 px-2.5 py-[3px] font-mono text-xs transition-colors",
-                    props.speed === speed
-                      ? "bg-lift text-ink"
-                      : "bg-transparent text-dim hover:text-ink",
-                  )}
+                  content={
+                    speed === FIT
+                      ? `Picks the speed that fits the whole replay into ${FIT_MS / 1000} seconds`
+                      : undefined
+                  }
                 >
-                  {speed}×
-                </button>
+                  <button
+                    type="button"
+                    aria-pressed={props.speed === speed}
+                    disabled={props.replaying}
+                    onClick={() => props.onSpeedChange(speed)}
+                    className={cn(
+                      "rounded-full border-0 px-2.5 py-[3px] font-mono text-xs transition-colors",
+                      props.speed === speed
+                        ? "bg-lift text-ink"
+                        : "bg-transparent text-dim hover:text-ink",
+                    )}
+                  >
+                    {speed === FIT ? `${FIT_MS / 1000} s` : `${speed}×`}
+                  </button>
+                </Tip>
               ))}
             </div>
             <button
@@ -102,11 +125,11 @@ export function ResultsView(props: ResultsViewProps) {
         (props.scoreboard ? (
           <Scoreboard rows={props.rows} columns={props.columns} {...props.scoreboard} />
         ) : (
-          <Summary rows={props.rows} columns={props.columns} dataset={props.dataset} />
+          <Summary rows={ranked.rows} columns={ranked.columns} dataset={props.dataset} />
         ))}
       <BatchTable
-        rows={props.rows}
-        columns={props.columns}
+        rows={ranked.rows}
+        columns={ranked.columns}
         note={props.note}
         file={props.file}
         selected={props.selected}

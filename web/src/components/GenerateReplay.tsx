@@ -65,7 +65,7 @@ export function GenerateReplay({ rows, startedAt, pace, onePass }: GenerateRepla
   return (
     <div className="mb-3.5">
       <p className={`${labelText} mb-2 font-mono tabular-nums`}>
-        Replaying item {index + 1} of {rows.length} at {pace}×
+        Replaying item {index + 1} of {rows.length} at {Math.round(pace)}×
       </p>
       <GenerateView
         panels={[sidePanel(row, 0, elapsed, now), sidePanel(row, 1, elapsed, now)]}

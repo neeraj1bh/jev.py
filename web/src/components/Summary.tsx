@@ -1,5 +1,5 @@
 import { answerLabel, percent, scoreResponse } from "../scoring";
-import { cn, labelText } from "../styles";
+import { cn, labelText, tableCell, tableHead } from "../styles";
 import type { Answer, Row } from "../types";
 import { InfoTip } from "./InfoTip";
 import { Tip } from "./Tip";
@@ -87,6 +87,110 @@ function StatLine({
   );
 }
 
+const CARDS = 3; // more models than this read better as one ranked table than as a wall of cards
+
+interface Best {
+  share: number;
+  whole: number;
+  average: number;
+  median: number;
+}
+
+interface RankTableProps {
+  rows: Row[];
+  columns: string[];
+  stats: ColumnStats[];
+  best: Best;
+  labelled: boolean;
+  byQuestion: boolean;
+}
+
+/** Many models as one table, best first: the same numbers as the cards, one row each. */
+function RankTable({ rows, columns, stats, best, labelled, byQuestion }: RankTableProps) {
+  const head = (label: string, info: string, right = true) => (
+    <th className={cn(tableHead, right && "text-right")}>
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <InfoTip>{info}</InfoTip>
+      </span>
+    </th>
+  );
+  const number = (value: string, isBest: boolean) => (
+    <td
+      className={cn(
+        tableCell,
+        "text-right font-mono tabular-nums",
+        isBest ? "text-good" : "text-ink",
+      )}
+    >
+      {value}
+    </td>
+  );
+  return (
+    <div className="overflow-x-auto rounded-lg border border-rule bg-panel px-4 py-2">
+      <table className="w-full min-w-[640px] border-collapse text-[13px]">
+        <thead>
+          <tr>
+            <th className={cn(tableHead, "w-8")}>#</th>
+            <th className={tableHead}>Model</th>
+            {labelled && head("Right", INFO.right)}
+            {labelled && byQuestion && head("Items fully right", INFO.whole)}
+            {head("Average", INFO.average)}
+            {head("Median", INFO.median)}
+          </tr>
+        </thead>
+        <tbody>
+          {columns.map((column, k) => {
+            const s = stats[k];
+            if (!s) return null;
+            const share = s.total ? s.correct / s.total : 0;
+            return (
+              <tr key={column}>
+                <td className={cn(tableCell, "font-mono text-xs text-dim")}>{k + 1}</td>
+                <td className={cn(tableCell, "max-w-none font-semibold text-ink")}>{column}</td>
+                {labelled && (
+                  <td className={cn(tableCell, "w-[34%] max-w-none")}>
+                    <span className="flex items-center justify-end gap-3">
+                      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-bar">
+                        <span
+                          className={cn(
+                            "block h-full rounded-full",
+                            best.share === k ? "bg-good" : "bg-dim",
+                          )}
+                          style={{ width: `${share * 100}%` }}
+                        />
+                      </span>
+                      <span
+                        className={cn(
+                          "w-14 text-right font-mono font-semibold tabular-nums",
+                          best.share === k ? "text-good" : "text-ink",
+                        )}
+                      >
+                        {percent(s.correct, s.total)}
+                      </span>
+                      <span className="w-24 text-right font-mono text-xs text-dim tabular-nums">
+                        {s.correct.toLocaleString()}/{s.total.toLocaleString()}
+                      </span>
+                    </span>
+                  </td>
+                )}
+                {labelled &&
+                  byQuestion &&
+                  number(
+                    `${s.fullyRight.toLocaleString()}/${rows.length.toLocaleString()}`,
+                    best.whole === k,
+                  )}
+                {number(`${s.averageMs.toLocaleString()} ms`, best.average === k)}
+                {number(`${s.medianMs.toLocaleString()} ms`, best.median === k)}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 interface SummaryProps {
   rows: Row[];
   columns: string[];
@@ -131,71 +235,82 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
           {agreementRate(rows)} of {byQuestion ? "questions" : "items"}
         </p>
       </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
-        {columns.map((column, k) => {
-          const s = stats[k];
-          if (!s) return null;
-          return (
-            <article
-              key={column}
-              className="rounded-lg border border-rule bg-panel px-4 pt-3.5 pb-1.5"
-            >
-              <Tip content={column}>
-                <h3 className="m-0 truncate text-sm font-semibold text-ink">{column}</h3>
-              </Tip>
-              {labelled ? (
-                <>
-                  <p className="mt-2.5 mb-0 flex items-baseline gap-2">
-                    <span
-                      className={cn(
-                        "text-[26px] leading-none font-semibold tabular-nums",
-                        best.share === k ? "text-good" : "text-ink",
-                      )}
-                    >
-                      {percent(s.correct, s.total)}
+      {columns.length > CARDS ? (
+        <RankTable
+          rows={rows}
+          columns={columns}
+          stats={stats}
+          best={best}
+          labelled={labelled}
+          byQuestion={byQuestion}
+        />
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+          {columns.map((column, k) => {
+            const s = stats[k];
+            if (!s) return null;
+            return (
+              <article
+                key={column}
+                className="rounded-lg border border-rule bg-panel px-4 pt-3.5 pb-1.5"
+              >
+                <Tip content={column}>
+                  <h3 className="m-0 truncate text-sm font-semibold text-ink">{column}</h3>
+                </Tip>
+                {labelled ? (
+                  <>
+                    <p className="mt-2.5 mb-0 flex items-baseline gap-2">
+                      <span
+                        className={cn(
+                          "text-[26px] leading-none font-semibold tabular-nums",
+                          best.share === k ? "text-good" : "text-ink",
+                        )}
+                      >
+                        {percent(s.correct, s.total)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[13px] whitespace-nowrap text-dim">
+                        {s.correct}/{s.total} right
+                        <InfoTip>{INFO.right}</InfoTip>
+                      </span>
+                    </p>
+                    <span className="mt-2.5 mb-3 block h-1 overflow-hidden rounded-full bg-bar">
+                      <span
+                        className={cn(
+                          "block h-full rounded-full transition-[width] duration-500",
+                          best.share === k ? "bg-good" : "bg-dim",
+                        )}
+                        style={{ width: `${(shares[k] ?? 0) * 100}%` }}
+                      />
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[13px] text-dim">
-                      {s.correct}/{s.total} right
-                      <InfoTip>{INFO.right}</InfoTip>
-                    </span>
-                  </p>
-                  <span className="mt-2.5 mb-3 block h-1 overflow-hidden rounded-full bg-bar">
-                    <span
-                      className={cn(
-                        "block h-full rounded-full transition-[width] duration-500",
-                        best.share === k ? "bg-good" : "bg-dim",
-                      )}
-                      style={{ width: `${(shares[k] ?? 0) * 100}%` }}
-                    />
-                  </span>
-                  {byQuestion && (
-                    <StatLine
-                      label="Items fully right"
-                      info={INFO.whole}
-                      value={`${s.fullyRight}/${rows.length}`}
-                      best={best.whole === k}
-                    />
-                  )}
-                </>
-              ) : (
-                <p className={cn(labelText, "mt-2 mb-3")}>No labels to score against</p>
-              )}
-              <StatLine
-                label="Average time"
-                info={INFO.average}
-                value={`${s.averageMs.toLocaleString()} ms`}
-                best={best.average === k}
-              />
-              <StatLine
-                label="Median time"
-                info={INFO.median}
-                value={`${s.medianMs.toLocaleString()} ms`}
-                best={best.median === k}
-              />
-            </article>
-          );
-        })}
-      </div>
+                    {byQuestion && (
+                      <StatLine
+                        label="Items fully right"
+                        info={INFO.whole}
+                        value={`${s.fullyRight}/${rows.length}`}
+                        best={best.whole === k}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <p className={cn(labelText, "mt-2 mb-3")}>No labels to score against</p>
+                )}
+                <StatLine
+                  label="Average time"
+                  info={INFO.average}
+                  value={`${s.averageMs.toLocaleString()} ms`}
+                  best={best.average === k}
+                />
+                <StatLine
+                  label="Median time"
+                  info={INFO.median}
+                  value={`${s.medianMs.toLocaleString()} ms`}
+                  best={best.median === k}
+                />
+              </article>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }

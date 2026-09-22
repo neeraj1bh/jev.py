@@ -46,35 +46,36 @@ function Clock({ startedAt, pace }: { startedAt: number; pace: number }) {
   }, []);
   const seconds = Math.max(0, ((now - startedAt) * pace) / 1000);
   return (
-    <span className="font-mono text-[44px] leading-none font-semibold text-ink tabular-nums">
+    <span className="font-mono text-[34px] leading-none font-semibold text-ink tabular-nums">
       {seconds.toFixed(1)}
-      <small className="ml-1 text-base font-normal text-dim">s</small>
+      <small className="ml-1 text-sm font-normal text-dim">s</small>
     </span>
   );
 }
 
-function LaneRow({ lane, leading, labelled }: { lane: Lane; leading: boolean; labelled: boolean }) {
+interface LaneRowProps {
+  lane: Lane;
+  rank: number;
+  leading: boolean;
+  labelled: boolean;
+}
+
+/** One model in one line: rank, name, a bar as wide as the page allows, then its numbers. */
+function LaneRow({ lane, rank, leading, labelled }: LaneRowProps) {
   const share = lane.total ? lane.correct / lane.total : 0;
   const shown = useCountUp(share * 100);
   const ms = useCountUp(lane.averageMs);
   return (
-    <motion.div
+    <motion.li
       layout
       transition={{ type: "spring", stiffness: 380, damping: 32 }}
-      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 border-t border-rule py-3 first:border-t-0"
+      className="grid grid-cols-[1.75rem_minmax(7rem,15rem)_minmax(0,1fr)_5rem_minmax(0,11rem)] items-center gap-x-4 border-t border-rule py-2.5 first:border-t-0 max-[700px]:grid-cols-[1.75rem_minmax(0,1fr)_5rem] max-[700px]:gap-y-1.5"
     >
+      <span className="font-mono text-xs text-dim tabular-nums">{rank}</span>
       <Tip content={lane.name}>
         <span className="truncate text-sm font-semibold text-ink">{lane.name}</span>
       </Tip>
-      <span
-        className={cn(
-          "text-right font-mono text-[26px] leading-none font-semibold tabular-nums transition-colors",
-          leading ? "text-good" : "text-ink",
-        )}
-      >
-        {labelled ? `${shown.toFixed(1)}%` : `${Math.round(ms)} ms`}
-      </span>
-      <span className="h-1.5 overflow-hidden rounded-full bg-bar">
+      <span className="h-2 overflow-hidden rounded-full bg-bar max-[700px]:order-last max-[700px]:col-span-3">
         <span
           className={cn(
             "block h-full rounded-full transition-[width] duration-500 ease-out",
@@ -83,11 +84,21 @@ function LaneRow({ lane, leading, labelled }: { lane: Lane; leading: boolean; la
           style={{ width: `${labelled ? share * 100 : 100}%` }}
         />
       </span>
-      <span className={cn(labelText, "text-right font-mono tabular-nums")}>
+      <span
+        className={cn(
+          "text-right font-mono text-xl leading-none font-semibold tabular-nums transition-colors",
+          leading ? "text-good" : "text-ink",
+        )}
+      >
+        {labelled ? `${shown.toFixed(1)}%` : `${Math.round(ms)} ms`}
+      </span>
+      <span
+        className={cn(labelText, "truncate text-right font-mono tabular-nums max-[700px]:hidden")}
+      >
         {labelled && `${lane.correct}/${lane.total} · `}
         {Math.round(ms).toLocaleString()} ms avg
       </span>
-    </motion.div>
+    </motion.li>
   );
 }
 
@@ -111,28 +122,37 @@ export function Scoreboard({ rows, columns, total, startedAt, pace, label }: Sco
     rows.length > 0 && ranked.length > 1 && score(ranked[0]!) > score(ranked[1]!)
       ? ranked[0]?.name
       : undefined;
-  const done = useCountUp(rows.length, 250);
+  const done = useCountUp(rows.length, 120);
 
   return (
-    <section className="mb-3.5 grid gap-6 rounded-lg border border-rule bg-panel px-5 py-5 md:grid-cols-[220px_minmax(0,1fr)]">
-      <div className="flex flex-col gap-3">
+    <section className="mb-3.5 rounded-lg border border-rule bg-panel px-5 py-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <span className={labelText}>{label}</span>
-        <Clock startedAt={startedAt} pace={pace} />
-        <span className="font-mono text-sm text-dim tabular-nums">
-          <span className="text-ink">{Math.round(done)}</span> / {total} items
-        </span>
-        <span className="h-1 overflow-hidden rounded-full bg-bar">
-          <span
-            className="block h-full rounded-full bg-ink/70 transition-[width] duration-300"
-            style={{ width: `${total ? (rows.length / total) * 100 : 0}%` }}
+        <div className="flex items-baseline gap-5">
+          <span className="font-mono text-sm text-dim tabular-nums">
+            <span className="text-ink">{Math.round(done).toLocaleString()}</span> /{" "}
+            {total.toLocaleString()} items
+          </span>
+          <Clock startedAt={startedAt} pace={pace} />
+        </div>
+      </div>
+      <span className="mt-3 mb-2 block h-1 overflow-hidden rounded-full bg-bar">
+        <span
+          className="block h-full rounded-full bg-ink/70 transition-[width] duration-300"
+          style={{ width: `${total ? (rows.length / total) * 100 : 0}%` }}
+        />
+      </span>
+      <ol className="m-0 list-none p-0">
+        {ranked.map((lane, k) => (
+          <LaneRow
+            key={lane.name}
+            lane={lane}
+            rank={k + 1}
+            leading={lane.name === leader}
+            labelled={labelled}
           />
-        </span>
-      </div>
-      <div>
-        {ranked.map((lane) => (
-          <LaneRow key={lane.name} lane={lane} leading={lane.name === leader} labelled={labelled} />
         ))}
-      </div>
+      </ol>
     </section>
   );
 }

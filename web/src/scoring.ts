@@ -1,4 +1,4 @@
-import type { Answer, Question, Response } from "./types";
+import type { Answer, Question, Response, Row } from "./types";
 
 export const answerLabel = (answer: Answer) =>
   answer.type === "noul"
@@ -99,3 +99,22 @@ export const fastestIndexes = (ms: number[]) => {
   const min = Math.min(...ms);
   return ms.filter((x) => x === min).length === 1 ? [ms.indexOf(min)] : [];
 };
+
+/** Column indexes best first: share of questions right, then the faster average on a tie. */
+export function rankColumns(rows: Row[], count: number) {
+  const score = Array.from({ length: count }, (_, k) => {
+    let correct = 0;
+    let total = 0;
+    let ms = 0;
+    for (const row of rows) {
+      const side = row.sides[k];
+      if (!side) continue;
+      const [c, n] = scoreResponse(side.response, row.item.truth);
+      correct += c;
+      total += n;
+      ms += side.ms;
+    }
+    return { k, share: total ? correct / total : 0, ms };
+  });
+  return score.sort((a, b) => b.share - a.share || a.ms - b.ms).map(({ k }) => k);
+}
