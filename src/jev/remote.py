@@ -61,10 +61,11 @@ def env(name):
         return os.environ[name]
     path = os.path.join(ROOT, ".env")
     if os.path.exists(path):
-        for line in open(path):
-            k, _, v = line.partition("=")
-            if k.strip() == name and v.split("#")[0].strip():  # skip empty template lines
-                return v.split("#")[0].strip()
+        with open(path) as f:
+            for line in f:
+                k, _, v = line.partition("=")
+                if k.strip() == name and v.split("#")[0].strip():  # skip empty template lines
+                    return v.split("#")[0].strip()
     return ""
 
 

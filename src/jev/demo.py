@@ -10,6 +10,7 @@ Face cache if it is already there, else into ./models (git-ignored; JEV_MODELS o
     uv run jev-demo [model_id] [port]     # then open http://localhost:8080
 """
 
+import contextlib
 import gc
 import hashlib
 import json
@@ -504,10 +505,8 @@ def text_answers(text, questions):
             if hit is not None:
                 out[qid] = {"type": "choice", "choice": hit, "probabilities": {hit: 1.0}}
         else:
-            try:
+            with contextlib.suppress(ValueError):
                 out[qid] = {"type": "score", "score": float(first)}
-            except ValueError:
-                pass
     return out
 
 
@@ -877,7 +876,10 @@ def set_key(name, key, save):
         raise
     if save:
         path = os.path.join(ROOT, ".env")
-        lines = open(path).read().splitlines() if os.path.exists(path) else []
+        lines = []
+        if os.path.exists(path):
+            with open(path) as f:
+                lines = f.read().splitlines()
         at = next((i for i, x in enumerate(lines) if x.partition("=")[0].strip() == var), None)
         if at is None:
             label, unlocks, url = KEYS.get(var, (var, "", ""))

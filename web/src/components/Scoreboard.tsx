@@ -118,10 +118,9 @@ export function Scoreboard({ rows, columns, total, startedAt, pace, label }: Sco
   const score = (lane: Lane) =>
     labelled ? (lane.total ? lane.correct / lane.total : 0) : -lane.averageMs;
   const ranked = [...all].sort((a, b) => score(b) - score(a));
+  const [first, second] = ranked;
   const leader =
-    rows.length > 0 && ranked.length > 1 && score(ranked[0]!) > score(ranked[1]!)
-      ? ranked[0]?.name
-      : undefined;
+    rows.length > 0 && first && second && score(first) > score(second) ? first.name : undefined;
   const done = useCountUp(rows.length, 120);
 
   return (

@@ -505,50 +505,50 @@ def main(model=DEFAULT_MODEL, n=60):
         -1
     ].lower()
     os.makedirs(os.path.join(ROOT, "results", "logs"), exist_ok=True)
-    log = open(os.path.join(ROOT, "results", "logs", slug + ".jsonl"), "w")
-
-    res, ts = {}, []
-    for task, state, questions, truth, logged in items(data):
-        a = record(log, jev, task, state, questions, truth, logged)
-        if task == "typesafe":
-            for qid, ans in a.items():
-                ours = dist(ans)
-                ts.append(max(ours, key=ours.get) == truth[qid])
+    with open(os.path.join(ROOT, "results", "logs", slug + ".jsonl"), "w") as log:
+        res, ts = {}, []
+        for task, state, questions, truth, logged in items(data):
+            a = record(log, jev, task, state, questions, truth, logged)
+            if task == "typesafe":
+                for qid, ans in a.items():
+                    ours = dist(ans)
+                    ts.append(max(ours, key=ours.get) == truth[qid])
+                total += 1
+                continue
+            for qid, y in truth.items():
+                ans = a[qid]
+                if ans["type"] == "noul":
+                    res.setdefault(qid, []).append((ans["noul"], int(y)))
+                else:
+                    res.setdefault(qid, []).append(
+                        (ans.get("choice", ans.get("score")), y, ans["confidence"])
+                    )
+            if task == "fields":
+                res.setdefault(state["subject"].replace(" ", "_"), []).append(
+                    a["answer"]["choice"] == truth["answer"]
+                )
             total += 1
-            continue
-        for qid, y in truth.items():
-            ans = a[qid]
-            if ans["type"] == "noul":
-                res.setdefault(qid, []).append((ans["noul"], int(y)))
-            else:
-                res.setdefault(qid, []).append((ans.get("choice", ans.get("score")), y, ans["confidence"]))
-        if task == "fields":
-            res.setdefault(state["subject"].replace(" ", "_"), []).append(
-                a["answer"]["choice"] == truth["answer"]
-            )
-        total += 1
-    for name, kind in (
-        ("show", "noul"),
-        ("ask", "noul"),
-        ("kind", len(KIND_DESC)),
-        ("type", len(COMMIT_TYPES)),
-        ("writes", "noul"),
-        ("answer", 4),
-        ("sentiment", "noul"),
-        ("phishing", "noul"),
-        ("entails", "noul"),
-        ("snli", 3),
-        ("topic", 4),
-        ("intent", len(data["public"]["intent"][1])),
-        ("toxicity", "score"),
-    ):
-        report(name, res[name], kind)
-    print(f"typesafe  {len(ts)} questions  accuracy vs consensus={sum(ts) / len(ts):.3f}")
-    print(
-        "  by subject: "
-        + "  ".join(f"{s.replace('college_', '')} {sum(res[s]) / len(res[s]):.2f}" for s in SUBJECTS)
-    )
-    log.close()
+        for name, kind in (
+            ("show", "noul"),
+            ("ask", "noul"),
+            ("kind", len(KIND_DESC)),
+            ("type", len(COMMIT_TYPES)),
+            ("writes", "noul"),
+            ("answer", 4),
+            ("sentiment", "noul"),
+            ("phishing", "noul"),
+            ("entails", "noul"),
+            ("snli", 3),
+            ("topic", 4),
+            ("intent", len(data["public"]["intent"][1])),
+            ("toxicity", "score"),
+        ):
+            report(name, res[name], kind)
+        print(f"typesafe  {len(ts)} questions  accuracy vs consensus={sum(ts) / len(ts):.3f}")
+        print(
+            "  by subject: "
+            + "  ".join(f"{s.replace('college_', '')} {sum(res[s]) / len(res[s]):.2f}" for s in SUBJECTS)
+        )
     print(f"\n{total} items, {(time.time() - t0) / total * 1000:.0f} ms each on {jev.device}, {model}")
     print(f"every answer, probability and latency: {os.path.relpath(log.name, ROOT)}")
 

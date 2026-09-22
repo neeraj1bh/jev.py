@@ -1,5 +1,5 @@
 import { panelSubtitle } from "../backends";
-import type { PanelState } from "../types";
+import type { PanelState, Question } from "../types";
 import { Answers } from "./Answers";
 import { CompareTable } from "./CompareTable";
 import { Panel } from "./Panel";
@@ -34,12 +34,21 @@ interface CompareViewProps {
   names: string[];
   panels: PanelState[];
   questionIds: string[];
+  asked?: Record<string, Question>;
   truth?: Record<string, string>;
 }
 
 /** Every compare, two models or six, uses one table: a column per model, a row per question. */
-export function CompareView({ names, panels, questionIds, truth }: CompareViewProps) {
-  return <CompareTable names={names} panels={panels} questionIds={questionIds} truth={truth} />;
+export function CompareView({ names, panels, questionIds, asked, truth }: CompareViewProps) {
+  return (
+    <CompareTable
+      names={names}
+      panels={panels}
+      questionIds={questionIds}
+      asked={asked}
+      truth={truth}
+    />
+  );
 }
 
 interface GenerateViewProps {

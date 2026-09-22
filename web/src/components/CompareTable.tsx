@@ -4,7 +4,7 @@ import { Fragment, useState } from "react";
 import { useElapsed } from "../hooks/useElapsed";
 import { answerLabel, matchesLabel } from "../scoring";
 import { cn, labelText, panelBox, tableHead } from "../styles";
-import type { Answer, PanelState } from "../types";
+import type { Answer, PanelState, Question } from "../types";
 import { CheckMark } from "./CheckMark";
 import { Icon } from "./Icon";
 import { Skeleton } from "./Skeleton";
@@ -155,19 +155,48 @@ interface CompareTableProps {
   names: string[];
   panels: PanelState[];
   questionIds: string[];
+  /** The questions themselves, so the table shows what will be asked before anything runs. */
+  asked?: Record<string, Question>;
   truth?: Record<string, string>;
   /** Inside another box, such as the item dialog: no frame or legend of its own. */
   bare?: boolean;
 }
 
 const idle: PanelState = { status: "idle", footer: "" };
+
+function optionsText(question: Question) {
+  if (question.type === "noul") return "yes / no";
+  const options = Array.isArray(question.criteria)
+    ? question.criteria
+    : Object.keys(question.criteria ?? {});
+  if (question.type === "score") return `${options.length} levels`;
+  const shown = options.slice(0, 4).join(" · ");
+  return options.length > 4 ? `${shown} · +${options.length - 4}` : shown;
+}
+
+/** What a question asks and what it can answer, under its name. */
+function QuestionHint({ question }: { question: Question }) {
+  return (
+    <span className="mt-0.5 block text-xs text-dim">
+      {question.instructions && <span className="block">{question.instructions}</span>}
+      <span className="block font-mono">{optionsText(question)}</span>
+    </span>
+  );
+}
 /** snake_case names wrap after an underscore instead of spilling into the next column. */
 const breakable = (name: string) => name.replaceAll("_", "_\u200b");
 
 const rowCell = "border-b border-rule px-2 py-2 align-top";
 
 /** One column per model and one row per question; a row opens to show every option's probability. */
-export function CompareTable({ names, panels, questionIds, truth, bare }: CompareTableProps) {
+export function CompareTable({
+  names,
+  panels,
+  questionIds,
+  asked,
+  truth,
+  bare,
+}: CompareTableProps) {
   const [open, setOpen] = useState<string[]>([]);
   const hasResults = panels.some((panel) => panel.status !== "idle");
   const hasAnswers = panels.some((panel) => panel.response);
@@ -199,10 +228,10 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
         <table
           className="w-full table-fixed border-collapse text-[13px]"
           // On narrow screens the table keeps readable columns and scrolls inside its card.
-          style={{ minWidth: 176 + (truth ? 120 : 0) + 150 * names.length }}
+          style={{ minWidth: (asked ? 288 : 176) + (truth ? 120 : 0) + 150 * names.length }}
         >
           <colgroup>
-            <col className="w-44" />
+            <col className={asked ? "w-72" : "w-44"} />
             {truth && <col className="w-[20%]" />}
             {names.map((name) => (
               <col key={name} />
@@ -244,6 +273,7 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
                       ) : (
                         <span className="break-words">{breakable(id)}</span>
                       )}
+                      {asked?.[id] && <QuestionHint question={asked[id]} />}
                     </td>
                     {truth && (
                       <Tip content={truth[id]}>

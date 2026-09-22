@@ -1,9 +1,11 @@
+import { Columns3 } from "lucide-react";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 
 import { fetchProgress, fetchRun, fetchRuns, loadModel, sampleItem } from "./api";
 import { isHosted } from "./backends";
 import { Benchmark } from "./components/Benchmark";
 import { EditDialog } from "./components/EditDialog";
+import { EmptyState } from "./components/EmptyState";
 import { GenerateReplay } from "./components/GenerateReplay";
 import { Header } from "./components/Header";
 import { InputBar, type InputSource } from "./components/InputBar";
@@ -27,8 +29,18 @@ import { useTheme } from "./hooks/useTheme";
 import { useToast } from "./hooks/useToast";
 import { now, runBatchLoop, runEach, timedGenerate, timedReadout } from "./runner";
 import { readoutFooter, writtenAnswers } from "./scoring";
-import { cn, ghostButton, labelText, solidButton } from "./styles";
-import type { Item, Mode, Recording, Request, Row, RunKind, SavedRun, Side } from "./types";
+import { cn, ghostButton, labelText, panelBox, solidButton } from "./styles";
+import type {
+  Item,
+  Mode,
+  Question,
+  Recording,
+  Request,
+  Row,
+  RunKind,
+  SavedRun,
+  Side,
+} from "./types";
 import { compareVerdict, generateVerdict, rowRecording } from "./verdicts";
 
 const FIRST_EXAMPLE: ExampleName = "Support ticket";
@@ -121,15 +133,18 @@ export default function App() {
   const inputName = dataset || example || "edited input";
   const labels = item && Object.keys(item.truth).length > 0 ? item.truth : undefined;
   // The item on screen decides the questions; the editor only matters for hand-edited input.
-  const questionIds = (() => {
-    if (item) return Object.keys(item.questions);
+  const asked: Record<string, Question> = (() => {
+    if (item) return item.questions;
     try {
       const questions: unknown = JSON.parse(questionsText);
-      return questions && typeof questions === "object" ? Object.keys(questions) : [];
+      return questions && typeof questions === "object"
+        ? (questions as Record<string, Question>)
+        : {};
     } catch {
-      return [];
+      return {};
     }
   })();
+  const questionIds = Object.keys(asked);
   const isLocal = (id: string) => !isHosted(backends[id]);
 
   const menuHandler = useCallback(
@@ -1053,11 +1068,23 @@ export default function App() {
               {isCompare && panels.some((panel) => panel.status !== "idle") && (
                 <RaceClocks names={compareNames} panels={panels} />
               )}
-              {isCompare ? (
+              {isCompare && compareModels.length < 2 ? (
+                <div className={panelBox}>
+                  <EmptyState
+                    icon={Columns3}
+                    title="Pick at least two models"
+                    action={{ label: "Choose models", onClick: () => setOpenMenu("models") }}
+                  >
+                    Compare sends the same questions to every model you pick and lines up their
+                    answers, probabilities and times.
+                  </EmptyState>
+                </div>
+              ) : isCompare ? (
                 <CompareView
                   names={compareNames}
                   panels={panels}
                   questionIds={questionIds}
+                  asked={asked}
                   truth={labels}
                 />
               ) : (

@@ -22,4 +22,5 @@ build-backend = "hatchling.build"
 line-length = 110
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PIE", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # ×, — and ≥ in text and comments are meant

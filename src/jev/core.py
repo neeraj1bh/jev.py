@@ -270,7 +270,8 @@ def cli():
     if args and args[0] == "serve":
         serve(*(a for a in args[1:2]), **({"port": int(args[2])} if len(args) > 2 else {}))
     elif args and args[0].endswith(".json"):
-        req = json.load(open(args[0]))
+        with open(args[0]) as f:
+            req = json.load(f)
         print(
             json.dumps(
                 Jev(req.get("model") if req.get("model", "").count("/") else DEFAULT_MODEL).ask(

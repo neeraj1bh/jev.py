@@ -87,7 +87,10 @@ def main(model=DEFAULT_MODEL):
                 row |= {k: a[k]["probabilities"] for k in qs}
                 rows.append(row)
                 log.write(json.dumps(row, ensure_ascii=False) + "\n")
-    top = lambda p: max(p, key=p.get)  # noqa: E731
+
+    def top(p):
+        return max(p, key=p.get)
+
     print(
         f"# python readout.py {model}   {len(rows) // 2} items, "
         f"{(time.time() - t0) / len(rows) * 2000:.0f} ms each (both readouts, both orders)\n"

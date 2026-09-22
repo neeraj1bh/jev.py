@@ -77,8 +77,8 @@ export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
                   label={key.label}
                   hint={
                     key.var === "LLAMACPP_URL"
-                      ? "http://localhost:8081/v1/chat/completions"
-                      : key.var
+                      ? "The llama-server address, e.g. http://localhost:8081/v1/chat/completions"
+                      : `Paste your ${key.label} key`
                   }
                   secret={key.var !== "LLAMACPP_URL"}
                   onCancel={() => setEditing("")}
