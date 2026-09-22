@@ -61,7 +61,10 @@ export function ModelFolders({ onChanged }: { onChanged: () => void }) {
           type="button"
           disabled={busy}
           className={cn(ghostButton, "px-3 py-1.5 text-sm")}
-          onClick={() => setPicking("folder")}
+          onClick={() => {
+            setError("");
+            setPicking("folder");
+          }}
         >
           Choose a folder…
         </button>
@@ -70,7 +73,10 @@ export function ModelFolders({ onChanged }: { onChanged: () => void }) {
             type="button"
             disabled={busy}
             className={cn(ghostButton, "px-3 py-1.5 text-sm")}
-            onClick={() => setPicking("program")}
+            onClick={() => {
+              setError("");
+              setPicking("program");
+            }}
           >
             Choose llama-server…
           </button>
@@ -89,9 +95,9 @@ export function ModelFolders({ onChanged }: { onChanged: () => void }) {
             pick={picking}
             onPick={(path) => change(picking === "folder" ? { add: path } : { llama_server: path })}
             onCancel={() => setPicking(null)}
+            problem={error}
           />
         )}
-        {error && <p className="mt-2 mb-0 text-xs text-warn">{error}</p>}
       </Modal>
       {state?.has_gguf && (
         <p className="mt-2 mb-0 text-xs text-dim">
@@ -104,7 +110,7 @@ export function ModelFolders({ onChanged }: { onChanged: () => void }) {
           )}
         </p>
       )}
-      {error && <p className="mt-2 mb-0 text-xs text-warn">{error}</p>}
+      {error && !picking && <p className="mt-2 mb-0 text-xs text-warn">{error}</p>}
     </section>
   );
 }

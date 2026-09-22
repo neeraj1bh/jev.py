@@ -10,13 +10,15 @@ interface FolderPickerProps {
   pick: "folder" | "program";
   onPick: (path: string) => void;
   onCancel: () => void;
+  /** Why the last pick was refused, shown beside the buttons. */
+  problem?: string;
 }
 
 const row =
   "flex w-full items-center gap-2 rounded-md border-0 bg-transparent px-2 py-1.5 text-left text-sm text-ink transition-colors hover:bg-lift";
 
 /** Browses the machine jev.py runs on; a page cannot read a folder's path from the browser. */
-export function FolderPicker({ pick, onPick, onCancel }: FolderPickerProps) {
+export function FolderPicker({ pick, onPick, onCancel, problem }: FolderPickerProps) {
   const [listing, setListing] = useState<Listing | null>(null);
   const [error, setError] = useState("");
   const [hidden, setHidden] = useState(false);
@@ -96,15 +98,19 @@ export function FolderPicker({ pick, onPick, onCancel }: FolderPickerProps) {
           <li className="px-2 py-1.5 text-xs text-dim">Nothing here.</li>
         )}
       </ul>
-      {error && <p className="m-0 border-t border-rule px-3 py-2 text-xs text-warn">{error}</p>}
-      <div className="flex justify-end gap-2 border-t border-rule p-2">
+      <div className="flex items-center justify-end gap-2 border-t border-rule p-2">
+        <p className={cn("m-0 mr-auto px-1 text-xs", error || problem ? "text-warn" : "text-dim")}>
+          {error ||
+            problem ||
+            (pick === "folder" && listing?.listed ? "These models are already in the menu." : "")}
+        </p>
         <button type="button" className={cn(ghostButton, "px-3 py-1 text-sm")} onClick={onCancel}>
           Cancel
         </button>
         {pick === "folder" && (
           <button
             type="button"
-            disabled={!listing}
+            disabled={!listing || listing.listed}
             className={cn(solidButton, "px-3 py-1 text-sm")}
             onClick={() => listing && onPick(listing.path)}
           >

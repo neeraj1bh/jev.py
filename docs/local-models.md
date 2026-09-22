@@ -55,7 +55,9 @@ uv run jev-eval Qwen/Qwen2.5-7B-Instruct    # public eval
 Models already somewhere else on the machine can be listed without copying them: in **Add a
 model**, under *From a folder on this machine*, choose **Choose a folder…** and click through to it.
 The browser starts at the home folder and lists the drives (`/mnt/c`, `/mnt/d` in WSL, `/Volumes`
-on a Mac, `C:\` on Windows); folders that hold models are marked. The folders are remembered in `data/model-folders.json`, and
+on a Mac, `/media` on Linux, `C:\` on Windows). A folder is marked when it holds a model within
+two levels, or leads to one the page already knows about, however deep (such as `.cache` on the way
+to the Hugging Face cache); hidden folders show on request, or when they lead to models. The folders are remembered in `data/model-folders.json`, and
 the menu lists what they hold:
 
 - **Hugging Face model folders** (a `config.json` and `.safetensors` weights) under *On this

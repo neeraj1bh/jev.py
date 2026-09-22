@@ -849,8 +849,21 @@ def model_gb(model_id):
     return LOCAL.get(model_id) or added().get(model_id)
 
 
+def caches():
+    """The Hugging Face cache, models/, and any other cache folder added in the page."""
+    return list(dict.fromkeys([HF_HUB_CACHE, MODELS, *filter(folders.is_hf_cache, model_dirs())]))
+
+
 def on_disk():
-    return cache.on_disk((HF_HUB_CACHE, MODELS))
+    return cache.on_disk(caches())
+
+
+def model_places():
+    """Folders known to hold models: each usable model's folder in the caches, and the folders
+    added in the page."""
+    return [
+        os.path.join(c, "models--" + m.replace("/", "--")) for m, (c, _) in on_disk().items()
+    ] + model_dirs()
 
 
 def model_dirs():
@@ -859,7 +872,11 @@ def model_dirs():
 
 def folder_state():
     """The folders added in the page, how many models each holds, and the llama-server in use."""
-    listed = [{"path": d, "models": len(folders.scan([d]))} for d in model_dirs()]
+
+    def count(d):
+        return len(folders.scan([d])) + (len(cache.on_disk([d])) if folders.is_hf_cache(d) else 0)
+
+    listed = [{"path": d, "models": count(d)} for d in model_dirs()]
     gguf = any(k.startswith("gguf:") for k in folders.scan(model_dirs()))
     return {"folders": listed, "llama_server": folders.llama_server(), "has_gguf": gguf}
 
@@ -1222,7 +1239,10 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 try:
                     path = query.get("path", [""])[0]
-                    listing = folders.browse(path, files="files" in query, hidden="hidden" in query)
+                    listing = folders.browse(
+                        path, files="files" in query, hidden="hidden" in query, places=model_places()
+                    )
+                    listing["listed"] = listing["path"] in (HF_HUB_CACHE, MODELS, *model_dirs())
                 except ValueError as e:
                     return self._send(400, json.dumps({"error": {"message": str(e)}}).encode())
                 return self._send(200, json.dumps(listing).encode())
@@ -1307,7 +1327,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     if self.client_address[0] not in ("127.0.0.1", "::1"):
                         raise ValueError("folders can only be changed from this machine")
                     if "add" in body:
-                        folders.add(body["add"])
+                        folders.add(body["add"], listed=(HF_HUB_CACHE, MODELS))
                     elif "remove" in body:
                         folders.remove(body["remove"])
                     else:
@@ -1322,7 +1342,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 if self.path.endswith("/delete"):
                     LOADED.pop(bid, None)
                     gc.collect()
-                    freed = cache.delete(bid, (HF_HUB_CACHE, MODELS))
+                    freed = cache.delete(bid, caches())
                     return self._send(200, json.dumps({"freed": freed}).encode())
                 jev = get(bid)
                 if self.path.endswith("/load"):  # downloads a local model the first time

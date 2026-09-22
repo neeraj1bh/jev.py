@@ -82,6 +82,8 @@ export interface Listing {
   folders: { name: string; path: string; models: boolean }[];
   files: { name: string; path: string }[];
   models: boolean;
+  /** Already read by the menu, such as the Hugging Face cache. */
+  listed?: boolean;
 }
 /** One folder on the machine running jev.py, for the page's folder picker. */
 export async function browse(path: string, files = false, hidden = false) {

@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 
-from jev.cache import runnable
+from jev.cache import on_disk, runnable
 from jev.core import ROOT
 
 PATH = os.path.join(ROOT, "data", "model-folders.json")
@@ -29,7 +29,8 @@ def scan(dirs):
     # Walks the whole tree: quick for a models folder, slow if pointed at a home folder.
     for top in dirs:
         for folder, subfolders, files in os.walk(top):
-            subfolders[:] = [s for s in subfolders if not s.startswith(".")]
+            # A Hugging Face cache's own folders are read through the cache, by model name (cache.py).
+            subfolders[:] = [s for s in subfolders if not s.startswith((".", "models--")) and s != "blobs"]
             if runnable({f: os.path.join(folder, f) for f in files}):
                 found[folder] = {
                     "label": os.path.basename(folder),
@@ -95,18 +96,28 @@ def _local(path):
     return os.path.abspath(path.strip())
 
 
-def add(folder):
-    """Remember a folder that holds models; returns how many it holds."""
+def is_hf_cache(folder):
+    try:
+        return any(e.is_dir() and e.name.startswith("models--") for e in os.scandir(folder))
+    except OSError:
+        return False
+
+
+def add(folder, listed=()):
+    """Remember a folder that holds models; returns how many it holds. `listed` are the cache
+    folders the menu already reads, which need no adding."""
     folder = _local(folder)
     if not os.path.isdir(folder):
         raise ValueError(f"No folder at {folder}")
-    found = scan([folder])
+    if folder in listed:
+        raise ValueError("These models are already in the menu.")
+    found = len(scan([folder])) + (len(on_disk([folder])) if is_hf_cache(folder) else 0)
     if not found:
         raise ValueError(f"No GGUF files or model folders in {folder}")
     values = settings()
     values["folders"] = list(dict.fromkeys([*values["folders"], folder]))
     _save(values)
-    return len(found)
+    return found
 
 
 def remove(folder):
@@ -134,19 +145,26 @@ def set_llama_server(path):
     _save(values)
 
 
+SYSTEM = {"/proc", "/sys", "/dev"}  # virtual folders of the running system, never models
+
+
 def _holds_models(folder, depth=2):
-    """A quick look, two levels down, used to mark folders worth opening."""
+    """A quick look, two levels down, used to mark folders worth opening. Unreadable counts as no."""
+    if folder in SYSTEM:
+        return False
     try:
         entries = list(os.scandir(folder))
+        if any(e.name.lower().endswith(".gguf") for e in entries):
+            return True
+        files = {e.name: e.path for e in entries if e.is_file()}
+        if "config.json" in files and runnable(
+            files
+        ):  # many tools keep a config.json; a model has weights too
+            return True
+        subfolders = [e.path for e in entries if e.is_dir(follow_symlinks=False) and e.name[0] != "."]
     except OSError:
         return False
-    if any(e.name == "config.json" or e.name.lower().endswith(".gguf") for e in entries):
-        return True
-    return depth > 1 and any(
-        _holds_models(e.path, depth - 1)
-        for e in entries
-        if e.is_dir(follow_symlinks=False) and e.name[0] != "."
-    )
+    return depth > 1 and any(_holds_models(f, depth - 1) for f in subfolders)
 
 
 def roots():
@@ -158,6 +176,9 @@ def roots():
         places += sorted(os.path.join("/mnt", d) for d in os.listdir("/mnt") if len(d) == 1)
     if os.path.isdir("/Volumes"):  # macOS disks
         places += sorted(os.path.join("/Volumes", d) for d in os.listdir("/Volumes"))
+    for mounts in ("/media", "/run/media"):  # Linux: USB and other mounted drives, one folder per user
+        if os.path.isdir(mounts):
+            places += sorted(os.path.join(mounts, d) for d in os.listdir(mounts))
     return [p for p in dict.fromkeys(places) if _has_entries(p)]
 
 
@@ -169,9 +190,15 @@ def _has_entries(folder):
         return False
 
 
-def browse(path, files=False, hidden=False):
+def _leads_to(folder, places):
+    """True when a folder known to hold models is this folder or somewhere below it."""
+    return any(p == folder or p.startswith(folder.rstrip(os.sep) + os.sep) for p in places)
+
+
+def browse(path, files=False, hidden=False, places=()):
     """One folder's subfolders, and with files=True its llama-server programs, for the page's picker;
-    folders starting with a dot are left out unless hidden=True."""
+    folders starting with a dot are left out unless hidden=True. `places` are folders known to hold
+    models, so every folder on the way to one is marked, however deep."""
     path = _local(path) if path else os.path.expanduser("~")
     if not os.path.isdir(path):
         raise ValueError(f"No folder at {path}")
@@ -179,13 +206,18 @@ def browse(path, files=False, hidden=False):
         entries = sorted(os.scandir(path), key=lambda e: e.name.lower())
     except PermissionError:
         raise ValueError(f"No permission to open {path}") from None
-    visible = [e for e in entries if not e.name.startswith("$") and (hidden or not e.name.startswith("."))]
+    # A hidden folder that leads to models (like ~/.cache) is shown anyway.
+    visible = [
+        e
+        for e in entries
+        if not e.name.startswith("$") and (hidden or not e.name.startswith(".") or _leads_to(e.path, places))
+    ]
     return {
         "path": path,
         "parent": os.path.dirname(path) if os.path.dirname(path) != path else None,
         "roots": roots(),
         "folders": [
-            {"name": e.name, "path": e.path, "models": _holds_models(e.path)}
+            {"name": e.name, "path": e.path, "models": _leads_to(e.path, places) or _holds_models(e.path)}
             for e in visible
             if e.is_dir(follow_symlinks=False)
         ],
@@ -196,7 +228,7 @@ def browse(path, files=False, hidden=False):
         ]
         if files
         else [],
-        "models": _holds_models(path),
+        "models": _leads_to(path, places) or _holds_models(path),
     }
 
 
