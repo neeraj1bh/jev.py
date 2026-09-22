@@ -57,20 +57,21 @@ model**, under *From a folder on this machine*, choose **Choose a folder…** an
 The browser starts at the home folder and lists the drives (`/mnt/c`, `/mnt/d` in WSL, `/Volumes`
 on a Mac, `/media` on Linux, `C:\` on Windows). A folder is marked when it holds a model within
 two levels, or leads to one the page already knows about, however deep (such as `.cache` on the way
-to the Hugging Face cache); hidden folders show on request, or when they lead to models. The folders are remembered in `data/model-folders.json`, and
-the menu lists what they hold:
+to the Hugging Face cache); hidden folders show on request, or when they lead to models. The
+folders are remembered in `data/model-folders.json`, and the menu lists what they hold:
 
 - **Hugging Face model folders** (a `config.json` and `.safetensors` weights) under *On this
   machine*; they run through PyTorch like any other.
 - **GGUF files** under *GGUF files · llama.cpp*. Split files (`-00001-of-00003.gguf`) count as one
   model. They need llama.cpp's `llama-server`: one on the PATH is found by itself, otherwise
   **Choose llama-server…** picks the program the same way. Picking a GGUF model starts llama-server
-  with it, sized to fit the GPU's memory, and stops the one it ran before. The ■ beside a running
-  model stops it and frees its memory; it also stops after 15 minutes unused, and when jev.py exits.
+  with it, sized to fit the GPU's memory. The ■ beside a running model, in the header or the menu,
+  stops it and frees its memory; it also stops after 15 minutes unused, and when jev.py exits.
 
-One GGUF model runs at a time, so comparing two of them restarts llama-server between them; the
-restart is not counted in the times. From WSL, the Windows `llama-server.exe` works: jev.py passes
-it Windows paths and reaches it at the Windows address, as below.
+Each GGUF model gets its own llama-server, so two of them answer without taking turns; the second
+is sized to the memory the first leaves free. Models running together may take about 70% of the
+machine's memory, after which the one used longest ago is stopped to make room. From WSL, the Windows `llama-server.exe` works:
+jev.py passes it Windows paths and reaches it at the Windows address, as below.
 
 ## llama.cpp
 

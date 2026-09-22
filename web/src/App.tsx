@@ -31,6 +31,7 @@ import { type KindFilter, PastRuns, runTime } from "./components/PastRuns";
 import { RaceClocks } from "./components/RaceClocks";
 import { CompareView, GenerateView } from "./components/ResultPanels";
 import { ResultsView } from "./components/ResultsView";
+import { RunningDialog } from "./components/RunningDialog";
 import { Tip } from "./components/Tip";
 import { Toast } from "./components/Toast";
 import { EXAMPLES, type ExampleName, isExampleName } from "./examples";
@@ -92,6 +93,7 @@ export default function App() {
   const [keysOpen, setKeysOpen] = useState(false);
   const downloads = useDownloads();
   const [addingFor, setAddingFor] = useState<"generate" | "compare" | "benchmark" | null>(null);
+  const [runningOpen, setRunningOpen] = useState(false);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [source, setSource] = useState<InputSource>("examples");
   const [example, setExample] = useState<ExampleName | "">(FIRST_EXAMPLE);
@@ -469,6 +471,16 @@ export default function App() {
       setVerdict("Pick a model first.");
       return false;
     }
+    // Models that do not fit together would take turns, each stopping the last, so refuse instead.
+    const gguf = picked.filter((backend) => backend.group === "gguf");
+    const budget = gguf[0]?.budget_gb;
+    const needed = gguf.reduce((sum, backend) => sum + (backend.gb ?? 0), 0);
+    if (budget && needed > budget) {
+      const message = `${gguf.length} llama.cpp models need ${needed.toFixed(1)} GB together; this machine allows ${budget} GB. Pick fewer.`;
+      setVerdict(message);
+      toast.show(message);
+      return false;
+    }
     const missing = picked.filter((backend) => backend.group === "local" && !backend.ready);
     if (missing.length) {
       const gb = missing.reduce((sum, backend) => sum + (backend.gb ?? 0), 0);
@@ -488,7 +500,8 @@ export default function App() {
       for (const backend of picked) {
         if (backend.group === "local") setVerdict(`Loading ${backend.label}…`);
         if (backend.group === "gguf") setVerdict(`Starting llama-server with ${backend.label}…`);
-        await loadModel(backend.id);
+        const { stopped } = await loadModel(backend.id);
+        if (stopped?.length) toast.show(`Stopped ${stopped.join(", ")} to make room.`);
       }
     } catch (error) {
       setVerdict(errorMessage(error));
@@ -949,11 +962,10 @@ export default function App() {
   return (
     <div className="mx-auto max-w-[1280px] px-6 pt-7 pb-14 max-[600px]:px-4">
       <Header
-        running={runningModels.map((backend) => ({
-          id: backend.id,
-          label: backend.label,
-          onStop: () => localActions("compare").onStop(backend),
-        }))}
+        running={{
+          labels: runningModels.map((backend) => backend.label),
+          onOpen: () => setRunningOpen(true),
+        }}
         mode={mode}
         onModeChange={switchMode}
         preference={theme.preference}
@@ -966,6 +978,15 @@ export default function App() {
         progress={downloads}
         label={(key) => backends[key]?.label ?? key}
         onStop={(key) => stopDownload(key).catch((error) => toast.show(errorMessage(error)))}
+      />
+      <RunningDialog
+        open={runningOpen}
+        models={runningModels}
+        onClose={() => setRunningOpen(false)}
+        onStop={(backend) => {
+          if (runningModels.length <= 1) setRunningOpen(false);
+          localActions("compare").onStop(backend);
+        }}
       />
       <AddModelDialog
         open={addingFor !== null}

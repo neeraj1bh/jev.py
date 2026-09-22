@@ -54,7 +54,9 @@ export async function fetchRun(name: string) {
 /** `wide` lets a frozen benchmark include its over-26-option items: every picked model reads them. */
 export const sampleItem = (dataset: string, fresh = false, wide = false) =>
   postOrThrow<Item>("/v1/sample", { dataset, fresh, wide });
-export const loadModel = (backend: string) => postOrThrow<unknown>("/v1/load", { backend });
+/** Downloads and loads a model; says which models it stopped to make room. */
+export const loadModel = (backend: string) =>
+  postOrThrow<{ device: string; stopped?: string[] }>("/v1/load", { backend });
 /** `backend` is a backend id such as remote:deepseek, or a key name such as HF_TOKEN. */
 export const saveKey = (backend: string, key: string, save: boolean) =>
   postOrThrow<unknown>("/v1/key", { backend, key, save });

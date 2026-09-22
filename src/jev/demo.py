@@ -877,6 +877,10 @@ def in_cache(folder):
     return any(folder.startswith(c.rstrip(os.sep) + os.sep) for c in (HF_HUB_CACHE, MODELS))
 
 
+def folder_models():
+    return folders.scan(model_dirs())
+
+
 def folder_state():
     """The folders added in the page, how many models each holds, and the llama-server in use."""
 
@@ -929,7 +933,13 @@ def backends(extra):
             running = llamaserver.running(entry["path"])
             out.append(
                 entry
-                | {"group": "gguf", "ready": bool(folders.llama_server()), "max": 26, "running": running}
+                | {
+                    "group": "gguf",
+                    "ready": bool(folders.llama_server()),
+                    "max": 26,
+                    "running": running,
+                    "budget_gb": llamaserver.budget_gb(folders.llama_server()),
+                }
             )
         else:
             need = round(found["gb"] * (1 if BF16 else 2) * 1.3, 1)
@@ -979,7 +989,9 @@ def get(bid):
     if bid.startswith("gguf:"):
         if not folders.llama_server():
             raise ValueError("Set the llama-server program in Add a model to run GGUF models")
-        url = llamaserver.serve(bid.removeprefix("gguf:"), folders.llama_server())
+        path = bid.removeprefix("gguf:")
+        size = folder_models().get(bid, {}).get("gb")
+        url = llamaserver.serve(path, folders.llama_server(), size)
         remote = LOADED.get(bid) or Remote("llamacpp", model=os.path.basename(bid))
         remote.url = url + "/v1/chat/completions"
         LOADED[bid] = remote
@@ -1362,9 +1374,14 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     gc.collect()
                     freed = cache.delete(bid, caches())
                     return self._send(200, json.dumps({"freed": freed}).encode())
+                was_running = set(llamaserver.running())
                 jev = get(bid)
+                by_path = {m["path"]: m for m in backends([]) if m["group"] == "gguf"}
+                gone = was_running - set(llamaserver.running())
+                stopped_for_room = [by_path[p]["label"] for p in gone if p in by_path]
                 if self.path.endswith("/load"):  # downloads a local model the first time
-                    return self._send(200, json.dumps({"device": jev.device}).encode())
+                    answer = {"device": jev.device, "stopped": stopped_for_room}
+                    return self._send(200, json.dumps(answer).encode())
                 if self.path.endswith("/generate"):
                     if (body.get("backend") or model_id) in TEXTLESS:
                         raise ValueError("Jev returns probabilities only; it does not write text")

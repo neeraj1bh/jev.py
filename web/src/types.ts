@@ -28,6 +28,8 @@ export interface Backend {
   price_out?: number;
   /** A GGUF model whose llama-server is running now. */
   running?: boolean;
+  /** GB that GGUF models may take together on this machine. */
+  budget_gb?: number;
 }
 
 export interface Dataset {
