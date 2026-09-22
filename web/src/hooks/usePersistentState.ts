@@ -33,5 +33,3 @@ export function usePersistentState<T>(
 }
 
 export const isString = (value: unknown): value is string => typeof value === "string";
-export const isStringList = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every(isString);
