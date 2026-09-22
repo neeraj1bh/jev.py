@@ -1,9 +1,10 @@
 # jev.py
 
-Typed decisions from any local language model, in one file.
+Typed decisions from any local language model.
 
 Ask a yes/no, pick-one or rate-on-a-scale question about some text and get a probability
-back instead of prose. No GPU needed, no API key, no text generation. About 270 lines.
+back instead of prose. No GPU needed, no API key, no text generation. The whole idea is one
+file, [`src/jev/core.py`](src/jev/core.py), under 300 lines.
 
 ```console
 $ uv run jev
@@ -19,14 +20,14 @@ OK  4 questions, 567 input tokens, 1813 ms on cpu with Qwen/Qwen2.5-1.5B-Instruc
 ```
 
 One support ticket, four questions, one pass over the state, a laptop CPU. The 1.0s are a
-small model's overconfidence; see Verify.
+small model's overconfidence; see [Results](#results).
 
 ## Why
 
 Most decisions software asks a model for are small: is this spam, which queue, how urgent.
 Asking a chat model to *write* the answer means waiting for tokens, parsing text, and handling
 the day it replies with a paragraph. A model shown the options has already decided before it
-writes. `jev.py` asks it how likely each option's own words are as the answer and reads those
+writes. jev.py asks how likely each option's own words are as the answer and reads those
 probabilities directly, so the answer is always one of your options, comes with a probability,
 and costs one pass.
 
@@ -37,20 +38,24 @@ uv run jev                                   # self-check; downloads Qwen2.5-1.5
 uv run jev serve                             # HTTP on http://localhost:8080/v1/systemone
 uv run jev serve Qwen/Qwen2.5-7B-Instruct    # any chat model on the Hub
 uv run jev request.json                      # one request from a file
-uv run jev-demo                                  # side-by-side comparison page, see Demo
+uv run jev-demo                              # the comparison page, see Demo
 ```
 
-Without uv: `pip install torch transformers`, then `python` instead of `uv run`. Uses CUDA,
-Apple MPS or CPU, whichever is there; on CPUs with native bf16 it uses that.
+It uses CUDA, Apple MPS or the CPU, whichever is there, in bf16 where the hardware has it.
 
-On Linux without an NVIDIA GPU, skip the 2.5 GB of CUDA libraries: `uv venv && uv pip install
-torch --index-url https://download.pytorch.org/whl/cpu && uv pip install transformers && uv pip install -e .
---no-deps`, then
-`uv run --no-sync` instead of `uv run`, e.g. `uv run --no-sync jev-demo`.
+On Linux without an NVIDIA GPU, skip the 2.5 GB of CUDA libraries and install once:
 
-The HTTP request and response follow the
-[TypeSafe System One API](https://docs.typesafe.ai/api), so a client written for it only
-needs a base URL change.
+```sh
+uv venv
+uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+uv pip install transformers && uv pip install -e . --no-deps
+uv run --no-sync jev          # --no-sync goes before the command, or uv installs CUDA again
+```
+
+Without uv: `pip install -e .`, then `jev`, `jev-demo` and the rest are on your path.
+
+Requests and responses follow the [TypeSafe System One API](https://docs.typesafe.ai/api), so a
+client written for it only needs a base URL change.
 
 ## Ask
 
@@ -68,17 +73,16 @@ needs a base URL change.
 
 | type | you give | you get |
 |---|---|---|
-| `noul` | a yes/no question | `noul`, probability of yes |
-| `choice` | up to 255 named options (26 on hosted backends), descriptions optional | `choice`, `probabilities`, `confidence` |
+| `noul` | a yes/no question | `noul`, the probability of yes |
+| `choice` | up to 255 named options (26 on letter backends), descriptions optional | `choice`, `probabilities`, `confidence` |
 | `score` | 2–10 ordered level descriptions | `score` on the level line, `probabilities`, `legend`, `confidence` |
 
 State is any text or JSON. All questions in a request see the same state and are answered in
 the same pass, so ask everything at once. `confidence` is 1 − normalized entropy.
 
-**Put the content in `state`, the judgment in the question.** Small models read the state
-block carefully and under-weight text tucked inside the question: the same titles scored at
-chance when placed after "QUESTION:" and 7 of 8 when placed in the state. One piece of content
-per call, as many questions about it as you like.
+**Put the content in `state`, the judgment in the question.** Small models read the state block
+carefully and under-weight text tucked inside the question: the same titles scored at chance
+when placed after "QUESTION:" and 7 of 8 when placed in the state.
 
 ```python
 from jev import Jev
@@ -86,7 +90,7 @@ from jev import Jev
 Jev().ask(state, questions)["answers"]["refund"]["noul"]  # 1.0
 ```
 
-## How
+## How it works
 
 ```
                        ┌─ "Is the customer asking for a refund?"  yes ─┐
@@ -102,23 +106,23 @@ Jev().ask(state, questions)["answers"]["refund"]["noul"]  # 1.0
 ```
 
 1. The state goes through the model once; its key/value cache is kept.
-2. For every option of every question, the question and the option's own words are appended
-   and scored: the model's log-probability for those words, given everything before them.
+2. For every option of every question, the question and the option's own words are appended and
+   scored: the model's log-probability for those words, given everything before them.
 3. The scores of one question are softmaxed against each other. That is the answer.
 
 Nothing is generated, so nothing needs parsing and no answer can fall outside the options.
 
-## Verify
+## Results
 
-`uv run jev-eval` scores the model on public data with public labels. The model only sees the
-text; the truth comes from the item itself:
+`uv run jev-eval` scores a model on public data with public labels. The model only sees the
+text; the truth comes from the item itself.
 
 | task | type | what the model sees | truth |
 |---|---|---|---|
 | show, ask | noul | a Hacker News title, prefix removed | the "Show HN:" / "Ask HN:" prefix |
 | kind | choice, 5 | a Hacker News title | the link's domain: code / paper / video / reference / news |
 | type | choice, 6 | a commit message, prefix removed | its conventional-commit prefix: fix / feat / docs / … |
-| writes | noul | a shell command | 40 commands labelled by hand — too few to separate the local models |
+| writes | noul | a shell command | 40 commands labelled by hand, too few to separate the local models |
 | fields | choice, 4 | an exam question with four answers | the exam key, 40 questions from each of ten MMLU subjects |
 | sentiment | noul | a movie review sentence | SST-2 label |
 | phishing | noul | an email | a public phishing-email set |
@@ -128,13 +132,6 @@ text; the truth comes from the item itself:
 | intent | choice, 26 | a customer message | Bitext customer-support intent |
 | toxicity | score, 4 levels | a comment | Civil Comments human toxicity score, binned |
 | typesafe | noul, choice | a business document: security incident, agent trace, invoice, support ticket | TypeSafe's published eval cases, the consensus of its two reference label sets |
-
-The seven from sentiment to toxicity are 300 items each from the Hugging Face Hub; the 354
-TypeSafe questions come from TypeSafe's public eval page. No items are in this repo: `jev-eval`
-downloads the items on first run and saves the set, so every model is scored on the same items.
-It prints accuracy, Brier score and a reliability table (how often a 0.9 was actually a yes), and
-logs every answer to `results/logs/<model>.jsonl`. A yes/no is correct when its probability is
-above 0.5. Per-model summaries are in [`results/`](results/).
 
 | task | chance | 1.5B CPU | 3B CPU | 7B Q4 | 14B Q4 | 30B-A3B Q4 | DeepSeek |
 |---|---|---|---|---|---|---|---|
@@ -156,16 +153,14 @@ above 0.5. Per-model summaries are in [`results/`](results/).
 | ms / item | | 1,804 | 3,405 | 1,916 | 4,715 | — | 725 |
 
 Qwen2.5 1.5B–14B and Qwen3-30B-A3B. CPU: Ryzen 7 7700X, PyTorch bf16. The rest: AMD RX 6700 XT
-through llama.cpp's Vulkan server (`remote:llamacpp`), which also ran 3B f16 and 7B Q8 (in
-`results/`; 7B Q8 is within a few points of Q4). The 30B run was resumed after driver crashes, so it has no
+through llama.cpp's Vulkan server, which also ran 3B f16 and 7B Q8 (in [`results/`](results/);
+7B Q8 is within a few points of Q4). The 30B run was resumed after driver crashes, so it has no
 latency figure. DeepSeek is V4.1-Flash, hosted.
 
 - Quality grows with the model: on the TypeSafe questions .51 (1.5B) → .75 (14B) → .77 (30B) →
   .88 (DeepSeek).
-- Small models are overconfident and none of the local ones grades toxicity well. Use them for
+- Small models are overconfident, and none of the local ones grades toxicity well. Use them for
   triage, not for gating destructive actions.
-- The probabilities are softmaxed log-probs, not measured frequencies. Check the reliability
-  table for your model before picking a threshold.
 
 | hardware | how | measured |
 |---|---|---|
@@ -174,66 +169,92 @@ latency figure. DeepSeek is V4.1-Flash, hosted.
 | NVIDIA GPU | PyTorch CUDA | not yet |
 | Apple Silicon | PyTorch MPS | not yet |
 
+### Reproducing them
+
+- **The same items for every model.** The first run downloads the items (300 per Hub task, plus
+  the 354 TypeSafe questions from TypeSafe's public eval page) and freezes them in
+  `results/eval-set.json`. Every later run, on any model, reads that file.
+- **No items in this repo.** The frozen set and the TypeSafe cases are git-ignored; only the
+  summaries in `results/` are committed.
+- **Every answer is kept.** Each answer, with its probabilities and latency, goes to
+  `results/logs/<model>.jsonl`.
+- **What is printed.** Accuracy, Brier score and a reliability table: how often a 0.9 was
+  actually a yes. A yes/no counts as correct when its probability is above 0.5.
+- **The same text for every backend.** Each question's wording lives in one place,
+  `items()` in `src/jev/eval.py`, and local and hosted models get identical text.
+
 ## Demo
 
-Build the page once, then serve it with the backends:
-
-```bash
-cd web && pnpm install && pnpm build && cd ..   # Node 20.19+ and pnpm
-uv run jev-demo                                   # http://localhost:8080
+```sh
+cd web && pnpm install && pnpm build && cd ..   # Node 20.19+ and pnpm, once
+uv run jev-demo                                  # http://localhost:8080
 ```
 
-While changing the page, `pnpm dev` in `web/` serves it on <http://localhost:3000> with live
-reload and passes API calls to `jev-demo`. `pnpm check` runs Biome, the type check and the build.
-Two modes:
+- **Compare.** The same request to several models at once (2–6 picked by hand, any number from
+  Benchmark): local, a llama.cpp server, a direct API or any OpenRouter model that returns
+  probabilities.
+- **Generate vs readout.** One model answers the same questions two ways: writing JSON token by
+  token, and reading the probabilities in one pass. On the example ticket the 1.5B, writing,
+  routes the double charge to `returns`; reading, it says `billing` at 1.00. Same weights.
+- **Benchmark.** Pick many models (every model of one maker in a click), a set and an item count.
+  It shows the estimated cost before anything is sent, then sets the run up in Compare. Its
+  leaderboard ranks every model from the saved runs.
+- **Past runs.** Every batch is saved to `results/logs/demo/` (git-ignored) and reopens without a
+  request. You can search, filter by kind and set, and compare runs that share items side by side.
+  Replay plays a run back at its recorded times, at 1×–100× or fitted into 30 seconds.
 
-- **Generate vs readout.** One local model answers the same questions two ways: writing JSON
-  token by token on the left, reading the logits in one pass on the right.
-- **Compare two.** The same request to any two backends: a local model, a llama.cpp server or a
-  hosted API. Each runs alone so its time is honest; **Replay together** plays both back at the
-  recorded speed.
+The input is a built-in example, your own JSON, or an item from a labelled public set. With a
+set, each answer is marked against the label. Sets are downloaded into `data/` on first use:
+[SST-2](https://huggingface.co/datasets/stanfordnlp/sst2),
+[RTE](https://huggingface.co/datasets/nyu-mll/glue),
+[BoolQ](https://huggingface.co/datasets/google/boolq),
+[SNLI](https://huggingface.co/datasets/stanfordnlp/snli),
+[AG News](https://huggingface.co/datasets/fancyzhx/ag_news),
+[tweet emotion](https://huggingface.co/datasets/cardiffnlp/tweet_eval),
+[Banking77](https://huggingface.co/datasets/legacy-datasets/banking77),
+[CLINC150](https://huggingface.co/datasets/clinc/clinc_oos),
+[MMLU](https://huggingface.co/datasets/cais/mmlu),
+[MMLU-Pro](https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro),
+[ARC-Challenge](https://huggingface.co/datasets/allenai/ai2_arc),
+[HellaSwag](https://huggingface.co/datasets/Rowan/hellaswag),
+[TruthfulQA](https://huggingface.co/datasets/truthfulqa/truthful_qa)
+and TypeSafe's published cases.
 
-Four examples are built in (a support ticket, a shell command, an email, a pull request) and
-both boxes are editable. Under **Dataset** the input is a labelled item from a public set (SST-2,
-RTE, BoolQ, SNLI, AG News, tweet emotion, Banking77, CLINC150, MMLU, MMLU-Pro, ARC-Challenge,
-HellaSwag, TruthfulQA, or TypeSafe's cases): each answer
-is marked against the label and a running score is kept. A batch runs any number of items, or all
-of them; two hosted backends run eight items at a time. Items are downloaded on first use into
-`data/`, and every batch answer is logged to `results/logs/demo/`; both are git-ignored.
+Nothing downloads until you pick it. A model already in the Hugging Face cache is used from there;
+anything else goes to `models/` (git-ignored; `JEV_MODELS` moves it). A backend without a key asks
+for one in the page, checks it with one tiny request, and saves it to `.env` only if you tick the
+box.
 
-| dataset | asks | answers |
+## Backends
+
+| backend | how it answers | keys |
 |---|---|---|
-| [SST-2](https://huggingface.co/datasets/stanfordnlp/sst2) | is this movie-review sentence positive? | yes / no |
-| [RTE](https://huggingface.co/datasets/nyu-mll/glue) | does sentence A entail sentence B? | yes / no |
-| [BoolQ](https://huggingface.co/datasets/google/boolq) | given a passage, is the answer yes? | yes / no |
-| [SNLI](https://huggingface.co/datasets/stanfordnlp/snli) | premise vs hypothesis | 3 labels |
-| [AG News](https://huggingface.co/datasets/fancyzhx/ag_news) | news section | 4 labels |
-| [Tweet emotion](https://huggingface.co/datasets/cardiffnlp/tweet_eval) | emotion of a tweet | 4 labels |
-| [Banking77](https://huggingface.co/datasets/legacy-datasets/banking77) | intent of a banking message | 77 labels |
-| [CLINC150](https://huggingface.co/datasets/clinc/clinc_oos) | intent of an assistant request | 151 labels |
-| TypeSafe's published cases | several questions about one business document | mixed |
-| [MMLU](https://huggingface.co/datasets/cais/mmlu) | exam question, 57 subjects | 4 choices |
-| [MMLU-Pro](https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro) | harder exam question | 10 choices |
-| [ARC-Challenge](https://huggingface.co/datasets/allenai/ai2_arc) | grade-school science | 4 choices |
-| [HellaSwag](https://huggingface.co/datasets/Rowan/hellaswag) | most plausible ending | 4 choices |
-| [TruthfulQA](https://huggingface.co/datasets/truthfulqa/truthful_qa) | the true answer among misconceptions | 4 to 13 choices |
+| a Hugging Face model | the option readout above, full probabilities | none |
+| llama.cpp `llama-server` | the letter readout below | none; `LLAMACPP_URL` |
+| DeepSeek, Kimi, OpenAI | the letter readout, one pinned model each (`src/jev/remote.py`) | in `.env` |
+| OpenRouter | the letter readout, on the models that return probabilities | `OPENROUTER_API_KEY` |
+| TypeSafe (Jev) | passed straight through, any number of options | `TYPESAFE_API_KEY` |
 
-Backends that read the answer as a letter (DeepSeek, Kimi, OpenAI, OpenRouter, llama.cpp) take at
-most 26 labels, so the menu greys out Banking77 and CLINC150 for them.
+Letter backends label the options A, B, C… and read each letter's probability from the API's
+`top_logprobs`, so they take at most 26 options. The demo greys out Banking77 and CLINC150 for
+them. Thinking is turned off per provider, since otherwise the first token is reasoning, not the
+answer.
 
-On the example ticket the 1.5B, generating text, routes the double charge to `returns`;
-reading the logits it says `billing` at 1.00. Same weights. That gap is the point.
+OpenRouter's model list overstates which models return probabilities: 44 of the 139 checked
+actually did. The demo sends each model one small request and lists only those that answered with
+probabilities. Which providers work, and why Anthropic, Groq and Kimi K3 do not, is in
+[docs/providers.md](docs/providers.md). Keys go in `.env`; copy `.env.example`.
 
-The menu lists Qwen2.5 0.5B, 1.5B and 3B, the hosted backends whose key is in `.env`, and a
-llama.cpp server if one is running. Nothing downloads until you pick it. A model already in the
-Hugging Face cache is used from there; anything else goes to `models/` (git-ignored, or set
-`JEV_MODELS`). A hosted backend without a key takes one in the page: it is checked with one tiny
-request, then used for the session and, if you tick the box, saved to `.env`. A rejected key shows
-up as a message and changes nothing.
+```sh
+uv run jev-remote deepseek                     # self-check
+uv run jev-remote deepseek serve               # the same server, backed by DeepSeek
+uv run jev-eval remote:deepseek                # the eval on a hosted model
+uv run jev-eval remote:llamacpp:qwen2.5-7b-q4  # a model in llama-server
+```
 
-llama.cpp is optional. On NVIDIA, a Mac or a CPU the demo runs models through PyTorch as it is.
-Use llama.cpp for an AMD GPU, which PyTorch cannot use on Windows or WSL, or to run a 4-bit model
-too large to load otherwise. The GGUFs measured above (Q4_K_M):
+llama.cpp is optional. On NVIDIA, a Mac or a CPU, PyTorch runs the models as it is. Use llama.cpp
+for an AMD GPU, which PyTorch cannot use on Windows or WSL, or for a 4-bit model too large to load
+otherwise. The GGUFs measured above are Q4_K_M:
 [Qwen2.5-7B](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF),
 [Qwen2.5-14B](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF),
 [Qwen3-30B-A3B](https://huggingface.co/unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF).
@@ -243,37 +264,36 @@ llama-server -m qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf --port 8081
 echo "LLAMACPP_URL=http://localhost:8081/v1/chat/completions" >> .env
 ```
 
-## Hosted models
+## Limitations
 
-`src/jev/remote.py` answers the same requests from a hosted model through its chat API's
-log-probabilities — DeepSeek, Kimi, OpenRouter, OpenAI, or a llama.cpp `llama-server` on your own
-GPU — and passes straight through to the TypeSafe API when that key is present. The options are
-labelled A, B, C… and the model's probability for each letter is the answer, so these backends
-take at most 26 options. Keys go in `.env` (copy `.env.example`).
+- **The probabilities are softmaxed log-probabilities, not measured frequencies.** Check the
+  reliability table for your model before you pick a threshold.
+- **Letter backends see only the top 20 tokens.** An option outside them reads as 0, so hosted
+  answers have 26 options at most and are less smooth than a local model's.
+- **Hosted latency is not a model's speed.** A letter readout sends one request per question, in
+  parallel; provider load moves the times from day to day. Past runs keep the date they were
+  recorded.
+- **A few tasks are small.** `writes` has 40 items, and the TypeSafe set has 354 questions from
+  20 cases.
+- **NVIDIA and Apple Silicon** are supported through PyTorch but not measured yet.
+
+## Development
 
 ```sh
-uv run jev-remote deepseek            # self-check
-uv run jev-remote deepseek serve      # the same server, backed by DeepSeek
-uv run jev-eval remote:deepseek       # the same eval on a hosted model
-uv run jev-eval remote:llamacpp:qwen2.5-7b-q4   # a model in llama-server (LLAMACPP_URL, default :8080)
+uv run jev                         # self-check against the example ticket
+uvx ruff format . && uvx ruff check .
+cd web && pnpm check               # Biome, the type check and the build
+cd web && pnpm dev                 # the page on :3000 with live reload, API calls to jev-demo
 ```
 
-Thinking is turned off per provider (otherwise the first token is reasoning, not the answer)
-and the temperature set to what each accepts. A provider must return log-probabilities to be
-usable this way; Anthropic's API does not, and Kimi K3 cannot stop reasoning first. Which
-providers return probabilities, and how many, is in [docs/providers.md](docs/providers.md).
-
-## Files
-
-| file | what |
+| path | what |
 |---|---|
-| `src/jev/core.py` | the model wrapper, the HTTP server and the self-check — the whole idea |
-| `src/jev/eval.py` | public evaluation, results in `results/` |
+| `src/jev/core.py` | the model wrapper, the HTTP server and the self-check: the whole idea |
+| `src/jev/eval.py` | the frozen evaluation set and the eval |
 | `src/jev/readout.py` | letter vs option-text readout, and how often answers flip when the options are reversed |
+| `src/jev/remote.py` | hosted and llama.cpp backends |
 | `src/jev/demo.py`, `web/` | the demo server and its React page |
-| `src/jev/remote.py`, `.env.example` | hosted backends and where their keys go |
+| `results/` | one summary per model run |
 | `docs/providers.md` | which hosted providers return probabilities |
-
-`pyproject.toml` carries the two dependencies and the ruff config; `uvx ruff format . && uvx ruff check .` keeps it clean.
 
 MIT.
