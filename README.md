@@ -216,10 +216,12 @@ cd web && pnpm install && pnpm build && cd ..   # Node 20.19+ and pnpm; again af
 uv run prod                                      # http://localhost:8080
 ```
 
-Other Hugging Face models can be added from the model menu; they and llama.cpp are covered in
-[docs/local-models.md](docs/local-models.md).
+If the page's source changed since the last build, as after a pull, the server says so and shows
+the build command instead of an old page. Models already on this machine are listed on their own;
+others can be added from the model menu. Downloads can be stopped and resume where they stopped.
+Details, and llama.cpp: [docs/local-models.md](docs/local-models.md).
 
-- **Compare.** The same request to several models at once (2–6 picked by hand, any number from
+- **Compare.** The same request to several models at once (up to 6 picked by hand, any number from
   Benchmark): local, a llama.cpp server, a direct API or any OpenRouter model that returns
   probabilities.
 - **Generate vs readout.** One model answers the same questions two ways: writing JSON token by

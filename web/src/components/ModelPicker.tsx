@@ -1,7 +1,7 @@
 import { isOffline, location, pickerSubtitle, statusText, TEXTLESS } from "../backends";
 import type { Backend } from "../types";
 import { Dropdown } from "./Menu";
-import { ModelMenu } from "./ModelMenu";
+import { type LocalModelActions, ModelMenu } from "./ModelMenu";
 import { Skeleton } from "./Skeleton";
 
 export interface MenuState {
@@ -13,12 +13,12 @@ interface ModelPickerProps extends MenuState {
   backends: Backend[];
   value: string;
   onPick: (id: string) => void;
-  onAdd: (id: string) => Promise<void>;
+  local: LocalModelActions;
 }
 
 /** One model for generate vs readout: only models that both write text and return probabilities. */
 export function ModelPicker(props: ModelPickerProps) {
-  const { backends, value, onPick, onAdd, open, onOpenChange } = props;
+  const { backends, value, onPick, local, open, onOpenChange } = props;
   const current = backends.find((backend) => backend.id === value);
   const bothWays = backends.filter((backend) => !TEXTLESS.has(backend.id));
   return (
@@ -47,7 +47,7 @@ export function ModelPicker(props: ModelPickerProps) {
         isDisabled={isOffline}
         detail={statusText}
         onSelect={onPick}
-        onAdd={onAdd}
+        {...local}
       />
     </Dropdown>
   );

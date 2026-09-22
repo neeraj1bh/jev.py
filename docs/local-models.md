@@ -12,29 +12,43 @@ jev.py runs local models in two ways. Both appear in the page's model menu.
 
 ## Hugging Face models
 
-The page lists three Qwen2.5 models (0.5B, 1.5B, 3B). Each downloads the first time it is picked.
+### What the menu lists
 
-To add any other chat model, choose **Add a model from Hugging Face** in the model menu and enter
-its id, such as `Qwen/Qwen2.5-7B-Instruct`. The id is checked on the Hub first. These are refused,
-with the reason:
+- **Models already on this machine.** Every complete chat model in the Hugging Face cache
+  (`~/.cache/huggingface/hub`, or `HF_HUB_CACHE`) and in `models/` (or `JEV_MODELS`), whichever
+  tool downloaded it. Partial downloads, embedding, speech and vision-only models are skipped.
+- **Models added in the page,** remembered in `data/added-models.json`.
+- **Three starters** (Qwen2.5 0.5B, 1.5B and 3B), until three models are on disk.
+
+### Adding one
+
+**Add a model from Hugging Face** in the model menu opens a dialog with a few small starter models
+and a field for any model id, such as `Qwen/Qwen2.5-7B-Instruct`. Each starter shows the memory it
+needs on this machine: about 1.3× its download size at 16 bits (NVIDIA, most recent CPUs), 2.6× at
+32 bits (Apple Silicon, older CPUs). The id is checked on the Hub first. These are refused, with the
+reason:
 
 - repositories with GGUF files only (use llama.cpp, below);
 - models transformers cannot load as text generators (speech, vision-only, embeddings);
 - base models without a chat template;
 - gated models while no Hugging Face token is set.
 
-Added models are remembered in `data/added-models.json`. The same id works from the terminal:
+Gated models (Llama, Gemma) require accepting the licence on the model's Hub page, then a token:
+`HF_TOKEN` under Keys in the page, or `hf auth login` for the terminal.
+
+### Downloading, stopping, deleting
+
+A model downloads the first time it runs, into `models/`. The bar at the bottom right shows the
+progress, also after a reload. **Stop** keeps the partial file, and the next try continues from
+there. The bin beside a downloaded model deletes its files; one in the shared Hugging Face cache is
+gone for other tools too.
+
+The same ids work from the terminal:
 
 ```sh
 uv run jev serve Qwen/Qwen2.5-7B-Instruct   # API on :8080
 uv run jev-eval Qwen/Qwen2.5-7B-Instruct    # public eval
 ```
-
-Weights already in the Hugging Face cache are used in place. Everything else downloads to
-`models/`; set `JEV_MODELS` to use another directory.
-
-Gated models (Llama, Gemma) require accepting the licence on the model's Hub page, then a token:
-`HF_TOKEN` under Keys in the page, or `hf auth login` for the terminal.
 
 ## llama.cpp
 

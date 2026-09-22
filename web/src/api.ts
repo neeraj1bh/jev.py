@@ -60,6 +60,11 @@ export const saveKey = (backend: string, key: string, save: boolean) =>
   postOrThrow<unknown>("/v1/key", { backend, key, save });
 /** Checks a Hugging Face model id on the Hub and adds it to the model menu. */
 export const addModel = (id: string) => postOrThrow<unknown>("/v1/models", { id });
+/** Stops a model download; its partial files stay, so the next load continues from there. */
+export const stopDownload = (backend: string) => postOrThrow<unknown>("/v1/stop", { backend });
+/** Deletes a downloaded model's files; returns the bytes freed. */
+export const deleteModel = (backend: string) =>
+  postOrThrow<{ freed: number }>("/v1/delete", { backend });
 export const fetchKeys = () => getJson<KeyInfo[]>("/v1/keys");
 /** Forgets a key for this session and removes it from .env. */
 export const clearKey = (backend: string) =>

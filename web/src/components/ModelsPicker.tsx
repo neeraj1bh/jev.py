@@ -1,25 +1,25 @@
 import { isOffline, statusText } from "../backends";
 import type { Backend } from "../types";
 import { Dropdown } from "./Menu";
-import { ModelMenu } from "./ModelMenu";
+import { type LocalModelActions, ModelMenu } from "./ModelMenu";
 import type { MenuState } from "./ModelPicker";
 import { Skeleton } from "./Skeleton";
 
-const MAX_MODELS = 6;
+export const MAX_COMPARE = 6;
 
 interface ModelsPickerProps extends MenuState {
   backends: Backend[];
   selected: string[];
   onToggle: (id: string) => void;
-  onAdd: (id: string) => Promise<void>;
+  local: LocalModelActions;
 }
 
-/** Two to six models for Compare; the menu stays open between picks. */
+/** Up to six models for Compare; the menu stays open between picks. */
 export function ModelsPicker({
   backends,
   selected,
   onToggle,
-  onAdd,
+  local,
   open,
   onOpenChange,
 }: ModelsPickerProps) {
@@ -51,14 +51,14 @@ export function ModelsPicker({
       <ModelMenu
         backends={backends}
         showChecks
-        hint={`Compare 2 to ${MAX_MODELS} · click to add or remove`}
+        hint={`Up to ${MAX_COMPARE} models · click to add or remove`}
         isSelected={chosen}
         isDisabled={(backend) =>
-          (!chosen(backend) && selected.length >= MAX_MODELS) || isOffline(backend)
+          (!chosen(backend) && selected.length >= MAX_COMPARE) || isOffline(backend)
         }
         detail={statusText}
         onSelect={onToggle}
-        onAdd={onAdd}
+        {...local}
       />
     </Dropdown>
   );

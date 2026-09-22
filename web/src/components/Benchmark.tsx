@@ -25,7 +25,7 @@ import { DatasetMenu } from "./DatasetMenu";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
 import { Dropdown } from "./Menu";
-import { ModelMenu } from "./ModelMenu";
+import { type LocalModelActions, ModelMenu } from "./ModelMenu";
 import { type KindFilter, RunFilter } from "./RunFilter";
 
 const FREE = "free";
@@ -99,11 +99,11 @@ interface BenchmarkProps {
   runs: SavedRun[];
   backendLabel: (id: string, kind: RunKind) => string;
   onSetUp: (models: string[], dataset: string, items: number) => void;
-  onAddModel: (id: string) => Promise<void>;
+  local: LocalModelActions;
 }
 
 export function Benchmark(props: BenchmarkProps) {
-  const { backends, datasets, runs, backendLabel, onSetUp, onAddModel } = props;
+  const { backends, datasets, runs, backendLabel, onSetUp, local } = props;
   const gateway = backends.filter((backend) => backend.group === "gateway");
   const makers = Object.entries(
     gateway.reduce<Record<string, number>>((counts, backend) => {
@@ -227,10 +227,7 @@ export function Benchmark(props: BenchmarkProps) {
                   setDataset(preset.dataset);
                 },
               }))}
-              onAdd={async (id) => {
-                await onAddModel(id);
-                toggleModel(id);
-              }}
+              {...local}
             />
           </Dropdown>
           <DatasetMenu

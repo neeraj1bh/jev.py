@@ -38,7 +38,7 @@ interface CompareViewProps {
   truth?: Record<string, string>;
 }
 
-/** Every compare, two models or six, uses one table: a column per model, a row per question. */
+/** Every compare, one model or six, uses one table: a column per model, a row per question. */
 export function CompareView({ names, panels, questionIds, asked, truth }: CompareViewProps) {
   return (
     <CompareTable

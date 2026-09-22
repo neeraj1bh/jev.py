@@ -1,10 +1,9 @@
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronRight, Plus, Search, Trash2 } from "lucide-react";
 import { Fragment, type ReactNode, useMemo, useState } from "react";
 
 import { dollarText, groupBackends, providerName, runDollars } from "../backends";
 import { cn } from "../styles";
 import type { Backend } from "../types";
-import { AddModelForm } from "./AddModelForm";
 import { CheckMark } from "./CheckMark";
 import { Icon } from "./Icon";
 import { MenuHeading, MenuHint, MenuItem } from "./Menu";
@@ -34,6 +33,12 @@ export interface ModelList {
   onToggle: () => void;
 }
 
+/** What the menu offers for models on this machine: add one from the Hub, delete a download. */
+export interface LocalModelActions {
+  onAddModel: () => void;
+  onDelete: (backend: Backend) => void;
+}
+
 interface ModelMenuProps {
   backends: Backend[];
   isSelected: (backend: Backend) => boolean;
@@ -43,15 +48,18 @@ interface ModelMenuProps {
   /** Multi-select shows a check beside each chosen model. */
   showChecks?: boolean;
   hint?: ReactNode;
-  /** Adds a Hugging Face model by id; rejects with the reason it cannot run. */
-  onAdd?: (id: string) => Promise<void>;
+  /** Opens the dialog that adds a Hugging Face model. */
+  onAddModel?: () => void;
+  /** Deletes a downloaded local model's files. */
+  onDelete?: (backend: Backend) => void;
   /** Frozen model lists, each picked or dropped as a whole. */
   lists?: ModelList[];
 }
 
 /** Search over every model, the direct groups, and OpenRouter's models under their makers. */
 export function ModelMenu(props: ModelMenuProps) {
-  const { backends, isSelected, isDisabled, detail, onSelect, showChecks, onAdd, lists } = props;
+  const { backends, isSelected, isDisabled, detail, onSelect, showChecks, lists } = props;
+  const { onAddModel, onDelete } = props;
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
   const [allProviders, setAllProviders] = useState(false);
@@ -86,6 +94,25 @@ export function ModelMenu(props: ModelMenuProps) {
   const gatewayMatches = matches.filter((backend) => backend.group === "gateway");
 
   const item = (backend: Backend, inTree = false) => {
+    const row = menuItem(backend, inTree);
+    if (!(onDelete && backend.group === "local" && backend.ready)) return row;
+    return (
+      <div key={backend.id} className="grid grid-cols-[1fr_auto] items-center gap-1">
+        {row}
+        <button
+          type="button"
+          aria-label={`Delete ${backend.label} from this machine`}
+          title={`Delete ${backend.label} from this machine`}
+          onClick={() => onDelete(backend)}
+          className="rounded-md border-0 bg-transparent p-1.5 text-dim transition-colors hover:bg-lift hover:text-warn"
+        >
+          <Icon icon={Trash2} size={14} />
+        </button>
+      </div>
+    );
+  };
+
+  const menuItem = (backend: Backend, inTree: boolean) => {
     const chosen = isSelected(backend);
     const inGateway = backend.group === "gateway" && backend.ready;
     return (
@@ -177,7 +204,16 @@ export function ModelMenu(props: ModelMenuProps) {
             <Fragment key={group}>
               <MenuHeading>{heading}</MenuHeading>
               {members.map((member) => item(member))}
-              {group === "local" && onAdd && <AddModelForm onAdd={onAdd} />}
+              {group === "local" && onAddModel && (
+                <button
+                  type="button"
+                  onClick={onAddModel}
+                  className="flex w-full items-center gap-1.5 rounded-md border-0 bg-transparent px-2.5 py-1.5 text-left text-sm text-dim transition-colors hover:bg-lift hover:text-ink"
+                >
+                  <Icon icon={Plus} size={14} />
+                  Add a model from Hugging Face
+                </button>
+              )}
             </Fragment>
           ))}
           {gateway.length > 0 && (

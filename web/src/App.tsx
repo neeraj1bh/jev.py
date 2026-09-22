@@ -1,11 +1,20 @@
 import { Columns3 } from "lucide-react";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 
-import { addModel, fetchProgress, fetchRun, fetchRuns, loadModel, sampleItem } from "./api";
+import {
+  addModel,
+  deleteModel,
+  fetchRun,
+  fetchRuns,
+  loadModel,
+  sampleItem,
+  stopDownload,
+} from "./api";
 import { isHosted } from "./backends";
+import { AddModelDialog } from "./components/AddModelDialog";
 import { Benchmark } from "./components/Benchmark";
 import { ConfirmDialog, type ConfirmRequest } from "./components/ConfirmDialog";
-import { type Download, DownloadBar } from "./components/DownloadBar";
+import { DownloadBar } from "./components/DownloadBar";
 import { EditDialog } from "./components/EditDialog";
 import { EmptyState } from "./components/EmptyState";
 import { GenerateReplay } from "./components/GenerateReplay";
@@ -14,8 +23,9 @@ import { InputBar, type InputSource } from "./components/InputBar";
 import { ItemDialog } from "./components/ItemDialog";
 import { KeyDialog } from "./components/KeyDialog";
 import { KeysDialog } from "./components/KeysDialog";
+import type { LocalModelActions } from "./components/ModelMenu";
 import { ModelPicker } from "./components/ModelPicker";
-import { ModelsPicker } from "./components/ModelsPicker";
+import { MAX_COMPARE, ModelsPicker } from "./components/ModelsPicker";
 import { type KindFilter, PastRuns, runTime } from "./components/PastRuns";
 import { RaceClocks } from "./components/RaceClocks";
 import { CompareView, GenerateView } from "./components/ResultPanels";
@@ -25,6 +35,7 @@ import { Toast } from "./components/Toast";
 import { EXAMPLES, type ExampleName, isExampleName } from "./examples";
 import { useBackends } from "./hooks/useBackends";
 import { useBatchReplay } from "./hooks/useBatchReplay";
+import { useDownloads } from "./hooks/useDownloads";
 import { idlePanel, runningPanel, usePanels } from "./hooks/usePanels";
 import { isString, usePersistentState } from "./hooks/usePersistentState";
 import { useTheme } from "./hooks/useTheme";
@@ -33,6 +44,7 @@ import { now, runBatchLoop, runEach, timedGenerate, timedReadout } from "./runne
 import { readoutFooter, writtenAnswers } from "./scoring";
 import { cn, ghostButton, labelText, panelBox, solidButton } from "./styles";
 import type {
+  Backend,
   Item,
   Mode,
   Question,
@@ -77,7 +89,8 @@ export default function App() {
 
   const [mode, setMode] = useState<Mode>("compare");
   const [keysOpen, setKeysOpen] = useState(false);
-  const [download, setDownload] = useState<Download | null>(null);
+  const downloads = useDownloads();
+  const [addingFor, setAddingFor] = useState<"generate" | "compare" | "benchmark" | null>(null);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [source, setSource] = useState<InputSource>("examples");
   const [example, setExample] = useState<ExampleName | "">(FIRST_EXAMPLE);
@@ -308,10 +321,50 @@ export default function App() {
   }
 
   /** Adds a Hugging Face model to the menu; the new entry is not in `backends` until the reload. */
+  /** Adds a Hugging Face model and picks it where the dialog was opened from. */
   async function addLocalModel(id: string) {
     await addModel(id);
     await reload();
+    if (addingFor === "generate") {
+      setGenerateModel(id);
+      clearBatch();
+      exampleResults.current = {};
+      resetPanels();
+    } else if (addingFor === "compare" && compareModels.length < MAX_COMPARE) {
+      const next = [...compareModels, id];
+      setCompareModels(next);
+      clearBatch();
+      resetPanels(next.length);
+    }
   }
+
+  async function deleteLocalModel(backend: Backend) {
+    setOpenMenu("");
+    const shared = backend.path?.includes(`${"/"}.cache${"/"}huggingface`)
+      ? " It is in the shared Hugging Face cache, so other tools lose it too."
+      : "";
+    const ok = await askConfirm(
+      `Delete ${backend.label}?`,
+      `This removes about ${backend.gb ?? "?"} GB from ${backend.path}.${shared} It downloads again if you pick it later.`,
+      "Delete",
+    );
+    if (!ok) return;
+    try {
+      const { freed } = await deleteModel(backend.id);
+      toast.show(`Deleted ${backend.label}, ${(freed / 1e9).toFixed(1)} GB freed.`);
+    } catch (error) {
+      toast.show(errorMessage(error));
+    }
+    await reload();
+  }
+
+  const localActions = (target: "generate" | "compare" | "benchmark"): LocalModelActions => ({
+    onAddModel: () => {
+      setOpenMenu("");
+      setAddingFor(target);
+    },
+    onDelete: deleteLocalModel,
+  });
 
   function toggleCompareModel(id: string) {
     const backend = backends[id];
@@ -351,19 +404,6 @@ export default function App() {
     else if (!dataset) setOpenMenu("dataset");
   }
 
-  /** Polls download progress so a long first download shows how far it is. */
-  function watchDownload(key: string, what: string) {
-    setDownload({ what, done: 0, total: 0, unit: "bytes" });
-    const timer = setInterval(async () => {
-      const progress = (await fetchProgress().catch(() => null))?.[key];
-      if (progress) setDownload({ what, ...progress });
-    }, 500);
-    return () => {
-      clearInterval(timer);
-      setDownload(null);
-    };
-  }
-
   /** The page's own confirm box; resolves true on the confirm button. */
   const askConfirm = (title: string, body: string, confirmLabel: string) =>
     new Promise<boolean>((resolve) =>
@@ -380,7 +420,6 @@ export default function App() {
 
   async function nextItem(name = dataset): Promise<Item | null> {
     const set = datasets.find((d) => d.name === name);
-    const stopWatching = set && !set.local ? watchDownload(name, name) : () => {};
     try {
       const next = await sampleItem(
         name,
@@ -395,8 +434,6 @@ export default function App() {
     } catch (error) {
       toast.show(errorMessage(error));
       return null;
-    } finally {
-      stopWatching();
     }
   }
 
@@ -437,15 +474,12 @@ export default function App() {
     } else if (backend.group === "local") {
       setVerdict(`Loading ${backend.label}…`);
     }
-    const stopWatching = downloading ? watchDownload(id, backend.label) : () => {};
     try {
       await loadModel(id);
     } catch (error) {
       setVerdict(errorMessage(error));
       toast.show(errorMessage(error));
       return false;
-    } finally {
-      stopWatching();
     }
     if (!backend.ready) await reload();
     return true;
@@ -702,8 +736,8 @@ export default function App() {
   }
 
   async function runBatch(all: boolean) {
-    if (isCompare && compareModels.length < 2) {
-      toast.show("Pick at least two models to compare.");
+    if (noModel) {
+      toast.show("Pick a model first.");
       return;
     }
     const total = all ? (remaining ?? 0) : Math.max(1, Math.floor(Number(batchSize) || 1));
@@ -783,7 +817,7 @@ export default function App() {
     const baseId = (id: string) => id.replace(/@.*$/, "").replace(/#text$/, "");
     const known = models.map(baseId).filter((id) => backends[id]);
     if (target === "generate" && known[0]) setGenerateModel(known[0]);
-    if (target === "compare" && known.length >= 2) setCompareModels(known);
+    if (target === "compare" && known.length) setCompareModels(known);
 
     const names = columnsOf.map(({ run, backend, id }) =>
       id === backend
@@ -887,6 +921,11 @@ export default function App() {
   }
 
   const backendList = Object.values(backends);
+  const noModel = isCompare ? compareModels.length === 0 : !generateModel;
+  // Memory a local model needs per GB of weights here, as the server works it out.
+  const localModel = backendList.find((backend) => backend.group === "local" && backend.gb);
+  const memoryPerGb =
+    localModel?.need_gb && localModel.gb ? localModel.need_gb / localModel.gb : undefined;
   const keyBackend = keyRequest ? backends[keyRequest.backend] : undefined;
   const questionCount = item ? Object.keys(item.truth).length : 0;
   const tableNote = `· ${batchReplay.visibleRows.length} done${remaining !== null && batchRunning ? ` · ${remaining} left in the set` : ""}`;
@@ -902,7 +941,19 @@ export default function App() {
       />
       <KeysDialog open={keysOpen} onClose={() => setKeysOpen(false)} onChanged={reload} />
       <ConfirmDialog request={confirmRequest} />
-      <DownloadBar download={download} />
+      <DownloadBar
+        progress={downloads}
+        label={(key) => backends[key]?.label ?? key}
+        onStop={(key) => stopDownload(key).catch((error) => toast.show(errorMessage(error)))}
+      />
+      <AddModelDialog
+        open={addingFor !== null}
+        listed={new Set(Object.keys(backends))}
+        memoryPerGb={memoryPerGb}
+        memoryGb={localModel?.have_gb}
+        onClose={() => setAddingFor(null)}
+        onAdd={addLocalModel}
+      />
 
       <div key={mode} className="animate-fade motion-reduce:animate-none">
         {mode === "benchmark" ? (
@@ -912,7 +963,7 @@ export default function App() {
             runs={savedRuns}
             backendLabel={columnName}
             onSetUp={setUpBenchmark}
-            onAddModel={addLocalModel}
+            local={localActions("benchmark")}
           />
         ) : mode === "past" ? (
           <PastRuns
@@ -1009,13 +1060,7 @@ export default function App() {
                         backends={backendList}
                         selected={compareModels}
                         onToggle={toggleCompareModel}
-                        onAdd={async (id) => {
-                          await addLocalModel(id);
-                          const next = [...compareModels, id];
-                          setCompareModels(next);
-                          clearBatch();
-                          resetPanels(next.length);
-                        }}
+                        local={localActions("compare")}
                         open={openMenu === "models"}
                         onOpenChange={menuHandler("models")}
                       />
@@ -1038,13 +1083,7 @@ export default function App() {
                       backends={backendList}
                       value={generateModel}
                       onPick={pickGenerateModel}
-                      onAdd={async (id) => {
-                        await addLocalModel(id);
-                        setGenerateModel(id);
-                        clearBatch();
-                        exampleResults.current = {};
-                        resetPanels();
-                      }}
+                      local={localActions("generate")}
                       open={openMenu === "model"}
                       onOpenChange={menuHandler("model")}
                     />
@@ -1059,15 +1098,11 @@ export default function App() {
                   >
                     Replay together
                   </button>
-                  <Tip
-                    content={
-                      isCompare && compareModels.length < 2 ? "Pick at least two models" : undefined
-                    }
-                  >
+                  <Tip content={noModel ? "Pick a model first" : undefined}>
                     <button
                       type="button"
                       className={solidButton}
-                      disabled={busy || replaying || (isCompare && compareModels.length < 2)}
+                      disabled={busy || replaying || noModel}
                       onClick={onRun}
                     >
                       Run
@@ -1123,11 +1158,11 @@ export default function App() {
               {isCompare && panels.some((panel) => panel.status !== "idle") && (
                 <RaceClocks names={compareNames} panels={panels} />
               )}
-              {isCompare && compareModels.length < 2 ? (
+              {isCompare && compareModels.length === 0 ? (
                 <div className={panelBox}>
                   <EmptyState
                     icon={Columns3}
-                    title="Pick at least two models"
+                    title="Pick models to compare"
                     action={{ label: "Choose models", onClick: () => setOpenMenu("models") }}
                   >
                     Compare sends the same questions to every model you pick and lines up their
