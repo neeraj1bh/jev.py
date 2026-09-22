@@ -854,7 +854,7 @@ def on_disk():
 
 
 def model_dirs():
-    return folders.settings()["folders"]
+    return list(dict.fromkeys([*folders.settings()["folders"], *folders.KNOWN]))
 
 
 def folder_state():
@@ -1221,7 +1221,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     )
                 query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 try:
-                    listing = folders.browse(query.get("path", [""])[0], files="files" in query)
+                    path = query.get("path", [""])[0]
+                    listing = folders.browse(path, files="files" in query, hidden="hidden" in query)
                 except ValueError as e:
                     return self._send(400, json.dumps({"error": {"message": str(e)}}).encode())
                 return self._send(200, json.dumps(listing).encode())
@@ -1397,7 +1398,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
     Thread(target=runs, daemon=True).start()  # summarise the saved runs before Past runs is opened
     # `kill` ends the server like Ctrl+C does, so exit handlers run and stop llama-server.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-    server = ThreadingHTTPServer(("", port), H)
+    # This machine only; JEV_HOST=0.0.0.0 opens the page and its models to the local network.
+    server = ThreadingHTTPServer((os.environ.get("JEV_HOST", "127.0.0.1"), port), H)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

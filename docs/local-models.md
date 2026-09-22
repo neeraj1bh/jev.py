@@ -99,10 +99,11 @@ Download the Vulkan or CUDA build from the releases, then in PowerShell:
 Use this setup for an AMD GPU: PyTorch in WSL cannot reach it, but the Vulkan build on Windows can.
 
 Under WSL's default (NAT) networking, `localhost` inside WSL is not Windows. Start the server on
-all interfaces:
+the Windows side of the WSL link, at the address found below (`--host 0.0.0.0` works too, but also
+opens it to the local network):
 
 ```powershell
-.\llama-server.exe -hf Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M --port 8081 --host 0.0.0.0
+.\llama-server.exe -hf Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M --port 8081 --host <windows-address>
 ```
 
 Find the Windows address from WSL:

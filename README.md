@@ -216,6 +216,8 @@ cd web && pnpm install && pnpm build && cd ..   # Node 20.19+ and pnpm; again af
 uv run prod                                      # http://localhost:8080
 ```
 
+The server answers this machine only; `JEV_HOST=0.0.0.0 uv run prod` shares it on the local network.
+
 If the page's source changed since the last build, as after a pull, the server says so and shows
 the build command instead of an old page. Models already on this machine are listed on their own;
 others can be added from the model menu. Downloads can be stopped and resume where they stopped.

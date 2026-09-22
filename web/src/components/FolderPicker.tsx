@@ -19,9 +19,10 @@ const row =
 export function FolderPicker({ pick, onPick, onCancel }: FolderPickerProps) {
   const [listing, setListing] = useState<Listing | null>(null);
   const [error, setError] = useState("");
+  const [hidden, setHidden] = useState(false);
 
-  const open = (path: string) =>
-    browse(path, pick === "program")
+  const open = (path: string, showHidden = hidden) =>
+    browse(path, pick === "program", showHidden)
       .then((next) => {
         setListing(next);
         setError("");
@@ -60,8 +61,19 @@ export function FolderPicker({ pick, onPick, onCancel }: FolderPickerProps) {
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-ink" title={listing?.path}>
           {listing?.path ?? "…"}
         </span>
+        <label className="flex shrink-0 items-center gap-1.5 text-xs text-dim">
+          <input
+            type="checkbox"
+            checked={hidden}
+            onChange={(event) => {
+              setHidden(event.target.checked);
+              if (listing) open(listing.path, event.target.checked);
+            }}
+          />
+          Show hidden
+        </label>
       </div>
-      <ul className="m-0 h-56 list-none overflow-y-auto p-1">
+      <ul className="m-0 h-80 list-none overflow-y-auto p-1">
         {listing?.folders.map((folder) => (
           <li key={folder.path}>
             <button type="button" className={row} onClick={() => open(folder.path)}>

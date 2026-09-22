@@ -2,6 +2,7 @@
 Hugging Face model folders, which run through PyTorch. The folders, and the llama-server program
 when it is not on the PATH, are kept in data/model-folders.json (git-ignored)."""
 
+import contextlib
 import json
 import os
 import platform
@@ -46,11 +47,30 @@ def scan(dirs):
                 stem = SHARD.sub("", name) if shard else name[: -len(".gguf")]
                 parts = [f for f in files if SHARD.sub("", f) == stem] if shard else [name]
                 found["gguf:" + os.path.join(folder, name)] = {
-                    "label": re.sub("-instruct", "", stem, flags=re.IGNORECASE),
+                    # llama.cpp's cache names files owner_repo-GGUF_file
+                    "label": re.sub(r"^.*-GGUF_|-instruct", "", stem, flags=re.IGNORECASE),
                     "gb": _gb(folder, parts),
                     "kind": "gguf",
                 }
     return found
+
+
+def known_folders():
+    """Where llama.cpp (llama-server -hf) and LM Studio keep models, when they exist; from WSL,
+    also under the Windows user's folder."""
+    homes = [os.path.expanduser("~")]
+    if "microsoft" in platform.release().lower():
+        with contextlib.suppress(OSError, subprocess.CalledProcessError):
+            windows = subprocess.run(
+                ["cmd.exe", "/c", "echo %USERPROFILE%"],
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd="/mnt/c",
+            ).stdout
+            homes.append(_local(windows))
+    places = [".cache/llama.cpp", "AppData/Local/llama.cpp", ".lmstudio/models", ".cache/lm-studio/models"]
+    return [os.path.join(h, p) for h in homes for p in places if os.path.isdir(os.path.join(h, p))]
 
 
 def settings():
@@ -149,8 +169,9 @@ def _has_entries(folder):
         return False
 
 
-def browse(path, files=False):
-    """One folder's subfolders, and with files=True its llama-server programs, for the page's picker."""
+def browse(path, files=False, hidden=False):
+    """One folder's subfolders, and with files=True its llama-server programs, for the page's picker;
+    folders starting with a dot are left out unless hidden=True."""
     path = _local(path) if path else os.path.expanduser("~")
     if not os.path.isdir(path):
         raise ValueError(f"No folder at {path}")
@@ -158,7 +179,7 @@ def browse(path, files=False):
         entries = sorted(os.scandir(path), key=lambda e: e.name.lower())
     except PermissionError:
         raise ValueError(f"No permission to open {path}") from None
-    visible = [e for e in entries if not e.name.startswith((".", "$"))]
+    visible = [e for e in entries if not e.name.startswith("$") and (hidden or not e.name.startswith("."))]
     return {
         "path": path,
         "parent": os.path.dirname(path) if os.path.dirname(path) != path else None,
@@ -177,3 +198,6 @@ def browse(path, files=False):
         else [],
         "models": _holds_models(path),
     }
+
+
+KNOWN = known_folders()  # looked up once: cmd.exe takes a moment

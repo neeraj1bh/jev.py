@@ -53,7 +53,8 @@ export function Modal({
       ref={dialog}
       className={className}
       tabIndex={holdFocus ? -1 : undefined}
-      onClose={onClose}
+      // React passes a nested dialog's close event up to this one; only its own counts.
+      onClose={(event) => event.target === dialog.current && onClose()}
       onKeyDown={onKeyDown}
       onClick={(event) => {
         if (event.target === dialog.current) onClose();

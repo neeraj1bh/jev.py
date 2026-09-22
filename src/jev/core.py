@@ -212,7 +212,7 @@ def serve(model_id=DEFAULT_MODEL, port=8080, jev=None):
             sys.stderr.write(f"{self.command} {self.path} {a[1] if len(a) > 1 else ''}\n")
 
     print(f"jev.py serving {jev.model_id} on http://localhost:{port}/v1/systemone ({jev.device})")
-    server = ThreadingHTTPServer(("", port), H)
+    server = ThreadingHTTPServer((os.environ.get("JEV_HOST", "127.0.0.1"), port), H)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

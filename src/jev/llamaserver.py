@@ -2,8 +2,8 @@
 is picked or jev.py exits. One GGUF model runs at a time.
 
 From WSL it can start the Windows build (llama-server.exe), which is how an AMD GPU is used: the
-model path is given in Windows form, the server listens on every interface, and jev.py reaches
-it at the Windows address."""
+model path is given in Windows form, and the server listens on the Windows side of the WSL link
+only, where jev.py reaches it, not on the local network."""
 
 import atexit
 import json
@@ -51,7 +51,7 @@ def serve(gguf, binary):
         model = gguf
         if windows:
             model = subprocess.run(["wslpath", "-w", gguf], capture_output=True, text=True, check=True).stdout
-        host = "0.0.0.0" if windows else "127.0.0.1"
+        host = _windows_address() if windows else "127.0.0.1"
         with open(LOG, "w") as log:
             process = subprocess.Popen(
                 [
@@ -70,7 +70,7 @@ def serve(gguf, binary):
                 stdout=log,
                 stderr=subprocess.STDOUT,
             )
-        url = f"http://{_windows_address() if windows else '127.0.0.1'}:{PORT}"
+        url = f"http://{host}:{PORT}"
         STATE.update(gguf=gguf, process=process, url=url)
         deadline = time.time() + READY_SECONDS
         while time.time() < deadline:

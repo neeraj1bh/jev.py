@@ -5,6 +5,7 @@ import { changeFolders, type FolderState, fetchFolders } from "../api";
 import { cn, ghostButton } from "../styles";
 import { FolderPicker } from "./FolderPicker";
 import { Icon } from "./Icon";
+import { Modal } from "./Modal";
 
 /** Folders on this machine that already hold models, and the llama-server that runs GGUF files. */
 export function ModelFolders({ onChanged }: { onChanged: () => void }) {
@@ -55,34 +56,43 @@ export function ModelFolders({ onChanged }: { onChanged: () => void }) {
           ))}
         </ul>
       )}
-      {picking ? (
-        <FolderPicker
-          pick={picking}
-          onPick={(path) => change(picking === "folder" ? { add: path } : { llama_server: path })}
-          onCancel={() => setPicking(null)}
-        />
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          className={cn(ghostButton, "px-3 py-1.5 text-sm")}
+          onClick={() => setPicking("folder")}
+        >
+          Choose a folder…
+        </button>
+        {state?.has_gguf && !state.llama_server && (
           <button
             type="button"
             disabled={busy}
             className={cn(ghostButton, "px-3 py-1.5 text-sm")}
-            onClick={() => setPicking("folder")}
+            onClick={() => setPicking("program")}
           >
-            Choose a folder…
+            Choose llama-server…
           </button>
-          {state?.has_gguf && !state.llama_server && (
-            <button
-              type="button"
-              disabled={busy}
-              className={cn(ghostButton, "px-3 py-1.5 text-sm")}
-              onClick={() => setPicking("program")}
-            >
-              Choose llama-server…
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
+      <Modal
+        open={picking !== null}
+        onClose={() => setPicking(null)}
+        className="w-[min(600px,calc(100vw-32px))] px-6 py-5"
+      >
+        <h2 className="mt-0 mb-3 text-[15px] font-semibold">
+          {picking === "program" ? "Choose llama-server" : "Choose a folder with models"}
+        </h2>
+        {picking && (
+          <FolderPicker
+            pick={picking}
+            onPick={(path) => change(picking === "folder" ? { add: path } : { llama_server: path })}
+            onCancel={() => setPicking(null)}
+          />
+        )}
+        {error && <p className="mt-2 mb-0 text-xs text-warn">{error}</p>}
+      </Modal>
       {state?.has_gguf && (
         <p className="mt-2 mb-0 text-xs text-dim">
           {state.llama_server ? (

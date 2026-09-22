@@ -84,8 +84,12 @@ export interface Listing {
   models: boolean;
 }
 /** One folder on the machine running jev.py, for the page's folder picker. */
-export async function browse(path: string, files = false) {
-  const query = new URLSearchParams({ path, ...(files ? { files: "1" } : {}) });
+export async function browse(path: string, files = false, hidden = false) {
+  const query = new URLSearchParams({
+    path,
+    ...(files ? { files: "1" } : {}),
+    ...(hidden ? { hidden: "1" } : {}),
+  });
   const response = await fetch(`/v1/browse?${query}`);
   const data = (await response.json()) as Listing & { error?: { message?: string } };
   if (!response.ok) throw new ApiError(data.error?.message ?? response.statusText, response.status);
