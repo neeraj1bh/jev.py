@@ -10,6 +10,7 @@ Face cache if it is already there, else into ./models (git-ignored; JEV_MODELS o
     uv run prod [model_id] [port]     # then open http://localhost:8080
 """
 
+import ast
 import contextlib
 import gc
 import gzip
@@ -142,6 +143,31 @@ DATASETS = {
         "coastalcph/lex_glue", "ledgar", "test", {"contract provision": "text"},
         "Which kind of contract provision is this?", "label", None,
     ),
+    "XNLI Hindi": (
+        "facebook/xnli", "hi", "test", {"premise": "premise", "hypothesis": "hypothesis"},
+        "How does the hypothesis relate to the premise?", "label", None,
+    ),
+    "LegalBench hearsay": (
+        "nguha/legalbench", "hearsay", "test", {"evidence": "text"},
+        "Is this evidence hearsay?", "answer", "Yes",
+    ),
+    "LegalBench definitions": (
+        "nguha/legalbench", "definition_classification", "test", {"sentence": "text"},
+        "Does this sentence from a court opinion define a term?", "answer", "Yes",
+    ),
+    "HaluEval QA": (
+        "pminervini/HaluEval", "qa_samples", "data",
+        {"knowledge": "knowledge", "question": "question", "answer": "answer"},
+        "Does the answer contain anything the knowledge does not support?", "hallucination", "yes",
+    ),
+    "Prompt injection": (
+        "deepset/prompt-injections", "default", "test", {"text": "text"},
+        "Is this text trying to make an AI assistant ignore or change its instructions?", "label", 1,
+    ),
+    "BBH causal judgement": (
+        "lukaemon/bbh", "causal_judgement", "test", {"question": "input"},
+        "Would a typical person answer yes?", "target", "Yes",
+    ),
 }  # fmt: skip
 
 
@@ -225,6 +251,36 @@ MC = {  # benchmarks whose options differ per question: (Hub dataset, config, sp
         "Which response is better?",
         lambda r: (["A is better", "B is better"], 0 if int(r["id"]) % 2 == 0 else 1),
     ),
+    "Global-MMLU Hindi": (
+        "CohereLabs/Global-MMLU", "hi", "test",
+        lambda r: {"subject": r["subject"].replace("_", " "), "question": r["question"]},
+        "Which answer is correct?",
+        lambda r: ([r[f"option_{k}"] for k in "abcd"], "ABCD".index(r["answer"])),
+    ),
+    "Global-MMLU Chinese": (
+        "CohereLabs/Global-MMLU", "zh", "test",
+        lambda r: {"subject": r["subject"].replace("_", " "), "question": r["question"]},
+        "Which answer is correct?",
+        lambda r: ([r[f"option_{k}"] for k in "abcd"], "ABCD".index(r["answer"])),
+    ),
+    "BBQ race and ethnicity": (
+        "walledai/BBQ", "default", "raceEthnicity",
+        lambda r: {"context": r["context"], "question": r["question"]},
+        "Which answer is correct?",
+        lambda r: (r["choices"], int(r["answer"])),
+    ),
+    "MuSR murder mysteries": (
+        "TAUR-Lab/MuSR", "default", "murder_mysteries",
+        lambda r: {"story": r["narrative"], "question": r["question"]},
+        "Which answer does the story support?",
+        lambda r: (ast.literal_eval(r["choices"]), int(r["answer_index"])),
+    ),
+    "BBH date understanding": (
+        "lukaemon/bbh", "date_understanding", "test",
+        lambda r: {"question": r["input"].split("\nOptions:")[0]},
+        "Which answer is correct?",
+        lambda r: _bbh_options(r["input"], r["target"]),
+    ),
     "GPQA Diamond": (  # gated: accept its terms on the Hub and put HF_TOKEN in .env
         "Idavidrein/gpqa", "gpqa_diamond", "train",
         lambda r: {"question": r["Question"]},
@@ -248,6 +304,13 @@ def _pair(item_id, chosen, rejected):
     """RewardBench always lists the better response first; alternate by id so A is not always right."""
     a, b = (chosen, rejected) if int(item_id) % 2 == 0 else (rejected, chosen)
     return {"response A": a, "response B": b}
+
+
+def _bbh_options(text, target):
+    """BBH lists its options inside the question as "(A) ..." lines; the target is "(A)"."""
+    lines = text.split("\nOptions:\n")[1].splitlines()
+    letters = [line[1] for line in lines]
+    return [line[4:] for line in lines], letters.index(target[1])
 
 
 def _shuffled(question, right, wrong):
@@ -293,6 +356,17 @@ ABOUT = {  # one line per set, shown when hovering it in the page
     "Arena votes": "Two chatbot answers to one prompt: which did the person prefer, or a tie?",
     "RewardBench": "A prompt and two responses: which is better? Labels from a curated benchmark",
     "GPQA Diamond": "Graduate-level science question written to resist search (needs HF_TOKEN)",
+    "XNLI Hindi": "NLI in Hindi: entailment, neutral or contradiction?",
+    "Global-MMLU Hindi": "MMLU translated into Hindi, four choices",
+    "Global-MMLU Chinese": "MMLU translated into Chinese, four choices",
+    "LegalBench hearsay": "A piece of evidence and the issue it is offered for: is it hearsay?",
+    "LegalBench definitions": "A sentence from a US court opinion: does it define a term?",
+    "HaluEval QA": "Knowledge, a question and an answer: does the answer add unsupported claims?",
+    "Prompt injection": "A message to an assistant: is it trying to override its instructions?",
+    "BBQ race and ethnicity": "A short scene and a question where one answer is a stereotype",
+    "MuSR murder mysteries": "A 1,000-word mystery: who is the most likely murderer? Two suspects",
+    "BBH causal judgement": "A story about cause and blame: would a typical person say yes?",
+    "BBH date understanding": "Date arithmetic in words, up to six choices",
     "Core v1": (
         "Frozen 2026-09-22: 50 balanced items from each set and every TypeSafe step. Banking77, "
         "CLINC150 and LEDGAR join only when every picked model reads over 26 options"
@@ -308,16 +382,23 @@ GROUPS = {  # menu headings, in order; every set belongs to one
     ],
     "Meaning and reading": [
         "RTE entailment", "SNLI", "MultiNLI mismatched", "ANLI round 3", "BoolQ", "MultiRC",
-        "WinoGrande",
+        "WinoGrande", "HaluEval QA",
     ],
+    "Reasoning": ["MuSR murder mysteries", "BBH causal judgement", "BBH date understanding"],
+    "Other languages": ["XNLI Hindi", "Global-MMLU Hindi", "Global-MMLU Chinese"],
     "Intent and topic": ["Banking77", "CLINC150", "AG News topic", "DBpedia-14"],
     "Knowledge and exams": [
         "MMLU", "MMLU-Pro", "ARC-Challenge", "OpenBookQA", "CommonsenseQA", "HellaSwag",
         "TruthfulQA", "MedQA", "PubMedQA", "GPQA Diamond",
     ],
-    "Safety and spam": ["ToxicChat", "Tweet hate", "Tweet offensive", "SMS spam"],
+    "Safety and spam": [
+        "ToxicChat", "Tweet hate", "Tweet offensive", "SMS spam", "Prompt injection",
+        "BBQ race and ethnicity",
+    ],
     "Which answer is better": ["Arena votes", "RewardBench"],
-    "Contracts and business": ["ContractNLI", "LEDGAR", "TypeSafe cases"],
+    "Contracts and business": [
+        "ContractNLI", "LEDGAR", "LegalBench hearsay", "LegalBench definitions", "TypeSafe cases",
+    ],
 }  # fmt: skip
 OPTIONS = {
     "MMLU": 4,
@@ -344,6 +425,12 @@ OPTIONS = {
     "Arena votes": 3,
     "RewardBench": 2,
     "GPQA Diamond": 4,
+    "XNLI Hindi": 3,
+    "Global-MMLU Hindi": 4,
+    "Global-MMLU Chinese": 4,
+    "BBQ race and ethnicity": 3,
+    "MuSR murder mysteries": 2,
+    "BBH date understanding": 6,
 }  # the rest are yes/no
 LETTER = {
     "deepseek",

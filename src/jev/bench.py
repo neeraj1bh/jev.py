@@ -5,7 +5,7 @@ repo redistributes nothing and anyone can rebuild the same items from the Hub. S
 questions have more than 26 options form a separate "wide" part: letter-reading backends cannot
 answer them, and keeping them apart keeps the main comparison paired across every model.
 
-    uv run --no-sync jev-bench freeze                        # write benchmarks/core-v1.json once
+    uv run --no-sync jev-bench freeze                        # add sets not in benchmarks/core-v1.json yet
     uv run --no-sync jev-bench run remote:deepseek           # one model; letter readers skip wide
     uv run --no-sync jev-bench run Qwen/Qwen2.5-1.5B-Instruct  # local models answer every item
     uv run --no-sync jev-bench export                        # every item as text, for reviewers
@@ -63,8 +63,17 @@ def balanced(pairs, key, n, seed):
 
 
 def freeze():
+    """Pick items for every set not in the file yet; sets already frozen keep their items."""
+    frozen = {}
+    if os.path.exists(PATH):
+        with open(PATH) as f:
+            frozen = json.load(f)["sets"]
+    names = [*demo.DATASETS, *demo.MC]
     sets = {}
-    for name in [*demo.DATASETS, *demo.MC]:
+    for name in [*(n for n in frozen if n in names), *(n for n in names if n not in frozen)]:
+        if name in frozen:
+            sets[name] = frozen[name]
+            continue
         hub, config, split = (demo.DATASETS.get(name) or demo.MC[name])[:3]
         page = demo.download(name, hub, config, split)
         pairs = [(r, demo.row_item(name, page, r)) for r in demo.labelled_rows(name, page)]
