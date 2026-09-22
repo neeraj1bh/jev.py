@@ -933,7 +933,9 @@ def get(bid):
             if bid.startswith(("remote:", "openrouter:")):
                 kind, _, name = bid.partition(":")
                 try:
-                    LOADED[bid] = Remote(name) if kind == "remote" else Remote("openrouter", model=name)
+                    LOADED[bid] = (  # remote:llamacpp:<name> names the model loaded in llama-server
+                        Remote(*name.split(":", 1)) if kind == "remote" else Remote("openrouter", model=name)
+                    )
                 except SystemExit as e:  # no key
                     raise ValueError(str(e)) from None
             else:

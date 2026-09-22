@@ -201,11 +201,12 @@ models. Everyone else answers the other 2,145, and every comparison stays paired
 ```sh
 uv run jev-bench run remote:deepseek              # one model, saved to Past runs
 uv run jev-bench run Qwen/Qwen2.5-1.5B-Instruct   # a local model, wide items included
+uv run jev-bench run remote:llamacpp:qwen2.5-7b-q4  # whatever GGUF llama-server has loaded
 uv run jev-bench export                           # every item with its text, into local/review/
 ```
 
 Run each model separately, then open the runs together in Past runs. The models to run are in
-`benchmarks/core-v1-models.json`. Before the list is final, two strong models check every label
+`benchmarks/core-v1-models.json`, with the GGUF to load for each llama.cpp one. Before the list is final, two strong models check every label
 and people settle where they disagree. After that v1 never changes; new items make a v2.
 
 ## Demo

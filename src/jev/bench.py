@@ -157,7 +157,7 @@ def reads_wide(model):
     if model.startswith("openrouter:"):
         return False
     kind, _, name = model.partition(":")
-    return kind != "remote" or name not in demo.LETTER
+    return kind != "remote" or name.split(":")[0] not in demo.LETTER
 
 
 def run(model):

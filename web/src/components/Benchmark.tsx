@@ -121,7 +121,9 @@ export function Benchmark(props: BenchmarkProps) {
     fetchPresets().then(setPresets);
   }, []);
   const known = new Set(backends.map((backend) => backend.id));
-  const presetOn = (preset: Preset) => preset.models.every((id) => picked.includes(id));
+  // The page lists one llama.cpp server, not each GGUF in a list, so only listed models count.
+  const pickable = (preset: Preset) => preset.models.filter((id) => known.has(id));
+  const presetOn = (preset: Preset) => pickable(preset).every((id) => picked.includes(id));
   const [menu, setMenu] = useState("");
   const menuHandler = (name: string) => (open: boolean) => setMenu(open ? name : "");
   const [dataset, setDataset] = useState("");
@@ -214,14 +216,14 @@ export function Benchmark(props: BenchmarkProps) {
               onSelect={toggleModel}
               lists={presets.map((preset) => ({
                 name: preset.name,
-                count: preset.models.length,
+                count: pickable(preset).length,
                 on: presetOn(preset),
                 onToggle: () => {
                   if (presetOn(preset)) {
                     setPicked([]);
                     return;
                   }
-                  setPicked(preset.models.filter((id) => known.has(id)));
+                  setPicked(pickable(preset));
                   setDataset(preset.dataset);
                 },
               }))}
