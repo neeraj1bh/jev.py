@@ -90,3 +90,17 @@ const PROVIDER_NAMES: Record<string, string> = {
 };
 
 export const providerName = (slug = "") => PROVIDER_NAMES[slug] ?? slug;
+
+// One full run of the frozen set: about 4,000 questions, ~0.75M input tokens, one output token each.
+export const RUN_QUESTIONS = 4_000;
+const RUN_INPUT_TOKENS = 750_000;
+
+/** Dollars for one full run: 0 when free, null when the price is unknown. */
+export function runDollars(backend: Backend) {
+  if (backend.free || backend.price === 0) return 0;
+  if (backend.price === undefined) return null;
+  return ((backend.price ?? 0) * RUN_INPUT_TOKENS + (backend.price_out ?? 0) * RUN_QUESTIONS) / 1e6;
+}
+
+export const dollarText = (dollars: number) =>
+  `$${dollars < 1 ? dollars.toFixed(2) : dollars.toFixed(dollars < 10 ? 1 : 0)}`;

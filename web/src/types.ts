@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type Mode = "compare" | "generate" | "past";
+export type Mode = "compare" | "generate" | "benchmark" | "past";
 export type RunKind = "cmp" | "gen";
 export type BackendGroup = "local" | "server" | "hosted" | "gateway";
 

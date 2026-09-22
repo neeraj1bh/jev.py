@@ -4,8 +4,9 @@ import { useElapsed } from "../hooks/useElapsed";
 import { cn } from "../styles";
 import type { PanelState } from "../types";
 import { InfoTip } from "./InfoTip";
+import type { Place } from "./RaceClocks";
 
-function Clock({ state }: { state: PanelState }) {
+export function Clock({ state }: { state: PanelState }) {
   const ms = useElapsed(state);
   return (
     <div
@@ -20,15 +21,34 @@ function Clock({ state }: { state: PanelState }) {
   );
 }
 
+const ordinal = (n: number) =>
+  `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10 < 4 ? n % 10 : 0]}`;
+
+export function PlaceBadge({ place }: { place?: Place }) {
+  return (
+    <p className="-mt-2 mb-3 min-h-5 font-mono text-[13px] text-dim tabular-nums">
+      {place && (
+        <>
+          <span className={cn("font-semibold", place.place === 1 ? "text-good" : "text-ink")}>
+            {ordinal(place.place)}
+          </span>
+          {place.behind > 0 && ` · +${place.behind.toLocaleString()} ms`}
+        </>
+      )}
+    </p>
+  );
+}
+
 interface PanelProps {
   title: ReactNode;
   subtitle: string;
   info?: ReactNode;
   state: PanelState;
+  place?: Place;
   children: ReactNode;
 }
 
-export function Panel({ title, subtitle, info, state, children }: PanelProps) {
+export function Panel({ title, subtitle, info, state, place, children }: PanelProps) {
   return (
     <section className="flex min-h-[260px] min-w-0 flex-col rounded-lg border border-rule bg-panel px-5 py-[18px]">
       <h2 className="m-0 text-sm font-semibold text-ink">
@@ -41,6 +61,7 @@ export function Panel({ title, subtitle, info, state, children }: PanelProps) {
         </small>
       </h2>
       <Clock state={state} />
+      <PlaceBadge place={place} />
       {children}
       <div className="mt-auto pt-3.5 text-[13px] text-dim">{state.footer}</div>
     </section>

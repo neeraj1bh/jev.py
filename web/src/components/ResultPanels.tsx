@@ -3,6 +3,7 @@ import type { PanelState } from "../types";
 import { Answers } from "./Answers";
 import { CompareTable } from "./CompareTable";
 import { Panel } from "./Panel";
+import { finishOrder } from "./RaceClocks";
 import { AnswerSkeleton } from "./Skeleton";
 
 const idle: PanelState = { status: "idle", footer: "Waiting to run." };
@@ -59,6 +60,7 @@ export function GenerateView({
   return (
     <main className="grid grid-cols-2 gap-3.5 max-[860px]:grid-cols-1">
       {GENERATE_PANELS.map((panel, k) => {
+        const place = finishOrder(panels.slice(0, 2))[k];
         const state = panels[k] ?? idle;
         const savedName = savedNames?.[k];
         return (
@@ -74,6 +76,7 @@ export function GenerateView({
             }
             info={savedName ? undefined : panel.info}
             state={state}
+            place={place}
           >
             {k === 0 && !writtenAsAnswers ? (
               <pre>{state.text ?? ""}</pre>

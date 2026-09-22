@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useRef, useState } from "react";
 
 import { fetchProgress, fetchRun, fetchRuns, loadModel, sampleItem } from "./api";
 import { isHosted, TEXTLESS } from "./backends";
+import { Benchmark } from "./components/Benchmark";
 import { EditDialog } from "./components/EditDialog";
 import { GenerateReplay } from "./components/GenerateReplay";
 import { Header } from "./components/Header";
@@ -11,6 +12,7 @@ import { KeyDialog } from "./components/KeyDialog";
 import { ModelPicker } from "./components/ModelPicker";
 import { ModelsPicker } from "./components/ModelsPicker";
 import { type KindFilter, PastRuns, runTime } from "./components/PastRuns";
+import { RaceClocks } from "./components/RaceClocks";
 import { CompareView, GenerateView } from "./components/ResultPanels";
 import { ResultsView } from "./components/ResultsView";
 import { Toast } from "./components/Toast";
@@ -215,7 +217,7 @@ export default function App() {
     setMode(next);
     closeSavedRun();
     setTableVisible(false);
-    if (next === "past") {
+    if (next === "past" || next === "benchmark") {
       if (!savedRuns.length) setRunsLoading(true); // keep showing the list we have while it refreshes
       fetchRuns()
         .then(setSavedRuns)
@@ -226,6 +228,21 @@ export default function App() {
     exampleResults.current = {};
     resetPanels(next === "compare" ? compareModels.length : 2);
     reload();
+  }
+
+  /** Loads a benchmark into Compare; the run itself waits for Run batch, so nothing is spent here. */
+  async function setUpBenchmark(models: string[], name: string, items: number) {
+    setCompareModels(models);
+    setBatchSize(String(items));
+    switchMode("compare");
+    setSource("dataset");
+    await chooseDataset(name);
+    const keyless = models.some((id) => !backends[id]?.ready);
+    toast.show(
+      keyless
+        ? `${models.length} models set up on ${name}. Add your OpenRouter key, then press Run batch.`
+        : `${models.length} models set up on ${name}. Press Run batch to start.`,
+    );
   }
 
   function askForKey(backend: string, forCompare: boolean, add?: string) {
@@ -834,7 +851,15 @@ export default function App() {
         onPreferenceChange={theme.setPreference}
       />
 
-      {mode === "past" ? (
+      {mode === "benchmark" ? (
+        <Benchmark
+          backends={backendList}
+          datasets={datasets}
+          runs={savedRuns}
+          backendLabel={columnName}
+          onSetUp={setUpBenchmark}
+        />
+      ) : mode === "past" ? (
         <PastRuns
           runs={savedRuns}
           loading={runsLoading}
@@ -1005,6 +1030,9 @@ export default function App() {
           </p>
 
           <div ref={panelsRef} hidden={!panelsVisible}>
+            {isCompare && panels.some((panel) => panel.status !== "idle") && (
+              <RaceClocks names={compareNames} panels={panels} />
+            )}
             {isCompare ? (
               <CompareView
                 names={compareNames}

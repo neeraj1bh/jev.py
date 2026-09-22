@@ -1,4 +1,13 @@
-import { Columns3, History, type LucideIcon, Monitor, Moon, Split, Sun } from "lucide-react";
+import {
+  Columns3,
+  History,
+  type LucideIcon,
+  Monitor,
+  Moon,
+  Split,
+  Sun,
+  Trophy,
+} from "lucide-react";
 import { motion } from "motion/react";
 
 import type { ThemePreference } from "../hooks/useTheme";
@@ -9,6 +18,7 @@ import { Icon } from "./Icon";
 const TABS: { mode: Mode; name: string; icon: LucideIcon }[] = [
   { mode: "compare", name: "Compare", icon: Columns3 },
   { mode: "generate", name: "Generate vs readout", icon: Split },
+  { mode: "benchmark", name: "Benchmark", icon: Trophy },
   { mode: "past", name: "Past runs", icon: History },
 ];
 
@@ -21,6 +31,7 @@ const THEMES: { preference: ThemePreference; name: string; icon: LucideIcon }[] 
 const LEDE: Record<Mode, string> = {
   compare: "The same questions to several models, side by side.",
   generate: "One model, two ways to ask it the same questions.",
+  benchmark: "Many models on one set, and how they rank.",
   past: "Batches you ran, saved on this machine.",
 };
 

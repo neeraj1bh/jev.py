@@ -1,7 +1,7 @@
 import { ChevronRight, Search } from "lucide-react";
 import { Fragment, type ReactNode, useMemo, useState } from "react";
 
-import { groupBackends, providerName } from "../backends";
+import { dollarText, groupBackends, providerName, runDollars } from "../backends";
 import { cn } from "../styles";
 import type { Backend } from "../types";
 import { CheckMark } from "./CheckMark";
@@ -10,19 +10,13 @@ import { MenuHeading, MenuHint, MenuItem } from "./Menu";
 
 const MAX_MATCHES = 40;
 
-// One full run of the frozen set: about 4,000 questions, ~0.75M input tokens, one output token each.
-const RUN_INPUT_TOKENS = 750_000;
-const RUN_OUTPUT_TOKENS = 4_000;
-
 /** What one full run costs, which is what matters here; the tooltip carries both token prices. */
 function runCost(backend: Backend) {
-  if (backend.free || backend.price === 0)
-    return { text: "free", title: "Free on OpenRouter, rate-limited" };
-  if (backend.price === undefined) return { text: "", title: undefined };
-  const dollars =
-    ((backend.price ?? 0) * RUN_INPUT_TOKENS + (backend.price_out ?? 0) * RUN_OUTPUT_TOKENS) / 1e6;
+  const dollars = runDollars(backend);
+  if (dollars === 0) return { text: "free", title: "Free on OpenRouter, rate-limited" };
+  if (dollars === null) return { text: "", title: undefined };
   return {
-    text: `≈ $${dollars < 1 ? dollars.toFixed(2) : dollars.toFixed(dollars < 10 ? 1 : 0)} a run`,
+    text: `≈ ${dollarText(dollars)} a run`,
     title: `Input $${backend.price}/M tokens · output $${backend.price_out ?? "?"}/M · a full run is ~0.75M input tokens`,
   };
 }
