@@ -1,5 +1,5 @@
 import { ArrowLeft, Play, Square } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 import type { ReplaySpeed } from "../hooks/useBatchReplay";
 import { chipButton, cn, labelText } from "../styles";
@@ -21,6 +21,8 @@ export interface ScoreboardState {
 interface ResultsViewProps {
   /** Set while the batch runs or replays; the racing scoreboard then stands in for the summary. */
   scoreboard: ScoreboardState | null;
+  /** Generate vs readout shows its two panels instead, live or replayed, as a single run does. */
+  stage?: ReactNode;
   dataset: string;
   rows: Row[];
   columns: string[];
@@ -96,11 +98,12 @@ export function ResultsView(props: ResultsViewProps) {
           </div>
         )}
       </div>
-      {props.scoreboard ? (
-        <Scoreboard rows={props.rows} columns={props.columns} {...props.scoreboard} />
-      ) : (
-        <Summary rows={props.rows} columns={props.columns} dataset={props.dataset} />
-      )}
+      {props.stage ??
+        (props.scoreboard ? (
+          <Scoreboard rows={props.rows} columns={props.columns} {...props.scoreboard} />
+        ) : (
+          <Summary rows={props.rows} columns={props.columns} dataset={props.dataset} />
+        ))}
       <BatchTable
         rows={props.rows}
         columns={props.columns}

@@ -45,10 +45,17 @@ interface GenerateViewProps {
   panels: PanelState[];
   savedNames: string[] | null;
   writtenAsAnswers: boolean;
+  onePass: boolean;
   truth?: Record<string, string>;
 }
 
-export function GenerateView({ panels, savedNames, writtenAsAnswers, truth }: GenerateViewProps) {
+export function GenerateView({
+  panels,
+  savedNames,
+  writtenAsAnswers,
+  onePass,
+  truth,
+}: GenerateViewProps) {
   return (
     <main className="grid grid-cols-2 gap-3.5 max-[860px]:grid-cols-1">
       {GENERATE_PANELS.map((panel, k) => {
@@ -58,7 +65,13 @@ export function GenerateView({ panels, savedNames, writtenAsAnswers, truth }: Ge
           <Panel
             key={panel.key}
             title={savedName ?? panel.title}
-            subtitle={savedName ? panelSubtitle(savedName) : panel.subtitle}
+            subtitle={
+              savedName
+                ? panelSubtitle(savedName)
+                : panel.key === "readout" && !onePass
+                  ? "one request per question, sent in parallel"
+                  : panel.subtitle
+            }
             info={savedName ? undefined : panel.info}
             state={state}
           >

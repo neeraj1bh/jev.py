@@ -391,22 +391,11 @@ def record(log, jev, task, state, questions, truth, logged=None):
     return answers
 
 
-def main(model=DEFAULT_MODEL, n=60):
-    data = load_set(n)
-    if model.startswith("remote:"):
-        from remote import Remote
+def items(data):
+    """(task, state, questions, truth, logged state) for every item of the set, in run order.
 
-        jev = Remote(*model.split(":")[1:3])  # remote:<backend>[:<model>]
-    else:
-        jev = Jev(model)
-    t0, total, res = time.time(), 0, {}
-    here = os.path.dirname(os.path.abspath(__file__))
-    slug = (getattr(jev, "backend", "") + "-" if hasattr(jev, "backend") else "") + jev.model_id.split("/")[
-        -1
-    ].lower()
-    os.makedirs(os.path.join(here, "results", "logs"), exist_ok=True)
-    log = open(os.path.join(here, "results", "logs", slug + ".jsonl"), "w")
-
+    The logged state is what reaches the log: a TypeSafe case id instead of its document.
+    """
     hn_q = {
         "show": {"type": "noul", "instructions": "Is the author showing off something they built or made?"},
         "ask": {"type": "noul", "instructions": "Is the author asking the community a question?"},
@@ -417,50 +406,27 @@ def main(model=DEFAULT_MODEL, n=60):
         },
     }
     for title, truth in data["hn"]:
-        a = record(log, jev, "hn", {"hacker_news_post_title": title}, hn_q, truth)
-        for k, y in truth.items():
-            res.setdefault(k, []).append(
-                (a[k]["noul"], y) if k != "kind" else (a[k]["choice"], y, a[k]["confidence"])
-            )
-        total += 1
+        yield "hn", {"hacker_news_post_title": title}, hn_q, truth, None
+    commit_q = {
+        "type": {
+            "type": "choice",
+            "criteria": COMMIT_TYPES,
+            "instructions": "What kind of change is this commit?",
+        }
+    }
     for msg, truth in data["commits"]:
-        a = record(
-            log,
-            jev,
-            "commits",
-            {"commit_message": msg},
-            {
-                "type": {
-                    "type": "choice",
-                    "criteria": COMMIT_TYPES,
-                    "instructions": "What kind of change is this commit?",
-                }
-            },
-            truth,
-        )
-        res.setdefault("type", []).append((a["type"]["choice"], truth["type"], a["type"]["confidence"]))
-        total += 1
+        yield "commits", {"commit_message": msg}, commit_q, truth, None
+    shell_q = {
+        "writes": {
+            "type": "noul",
+            "instructions": "Does running this command create, modify or delete "
+            "any file, process, package or setting?",
+        }
+    }
     for cmd, y in data["shell"]:
-        a = record(
-            log,
-            jev,
-            "shell",
-            {"shell_command": cmd},
-            {
-                "writes": {
-                    "type": "noul",
-                    "instructions": "Does running this command create, modify or delete "
-                    "any file, process, package or setting?",
-                }
-            },
-            {"writes": y},
-        )
-        res.setdefault("writes", []).append((a["writes"]["noul"], y))
-        total += 1
+        yield "shell", {"shell_command": cmd}, shell_q, {"writes": y}, None
     for subject, question, choices, truth in data["fields"]:
-        a = record(
-            log,
-            jev,
+        yield (
             "fields",
             {"subject": subject.replace("_", " "), "question": question},
             {
@@ -471,10 +437,8 @@ def main(model=DEFAULT_MODEL, n=60):
                 }
             },
             {"answer": truth},
+            None,
         )
-        res.setdefault("answer", []).append((a["answer"]["choice"], truth, a["answer"]["confidence"]))
-        res.setdefault(subject, []).append(a["answer"]["choice"] == truth)
-        total += 1
     pub = data["public"]
     for task, ask_q, state_of in (
         ("sentiment", {"type": "noul", "instructions": "Is this review positive?"}, lambda x: {"review": x}),
@@ -513,38 +477,56 @@ def main(model=DEFAULT_MODEL, n=60):
         ),
     ):
         for x, truth in pub[task]:
-            a = record(log, jev, task, state_of(x), {task: ask_q}, {task: truth})[task]
-            if ask_q["type"] == "noul":
-                res.setdefault(task, []).append((a["noul"], int(truth)))
-            elif ask_q["type"] == "choice":
-                res.setdefault(task, []).append((a["choice"], truth, a["confidence"]))
-            else:
-                res.setdefault(task, []).append((a["score"], truth, a["confidence"]))
-            total += 1
-    items, intents = pub["intent"]
-    for x, truth in items:
-        a = record(
-            log,
-            jev,
-            "intent",
-            {"message": x},
-            {
-                "intent": {
-                    "type": "choice",
-                    "instructions": "What does the customer want?",
-                    "criteria": dict.fromkeys(intents),
-                }
-            },
-            {"intent": truth},
-        )["intent"]
-        res.setdefault("intent", []).append((a["choice"], truth, a["confidence"]))
-        total += 1
-    ts = []
+            yield task, state_of(x), {task: ask_q}, {task: truth}, None
+    rows, intents = pub["intent"]
+    intent_q = {
+        "intent": {
+            "type": "choice",
+            "instructions": "What does the customer want?",
+            "criteria": dict.fromkeys(intents),
+        }
+    }
+    for x, truth in rows:
+        yield "intent", {"message": x}, intent_q, {"intent": truth}, None
     for case, node, doc, qs, truth in typesafe_rows():
-        a = record(log, jev, "typesafe", doc, qs, truth, logged={"typesafe_case": case, "node": node})
-        for qid, ans in a.items():
-            ours = dist(ans)
-            ts.append(max(ours, key=ours.get) == truth[qid])
+        yield "typesafe", doc, qs, truth, {"typesafe_case": case, "node": node}
+
+
+def main(model=DEFAULT_MODEL, n=60):
+    data = load_set(n)
+    if model.startswith("remote:"):
+        from remote import Remote
+
+        jev = Remote(*model.split(":")[1:3])  # remote:<backend>[:<model>]
+    else:
+        jev = Jev(model)
+    t0, total = time.time(), 0
+    here = os.path.dirname(os.path.abspath(__file__))
+    slug = (getattr(jev, "backend", "") + "-" if hasattr(jev, "backend") else "") + jev.model_id.split("/")[
+        -1
+    ].lower()
+    os.makedirs(os.path.join(here, "results", "logs"), exist_ok=True)
+    log = open(os.path.join(here, "results", "logs", slug + ".jsonl"), "w")
+
+    res, ts = {}, []
+    for task, state, questions, truth, logged in items(data):
+        a = record(log, jev, task, state, questions, truth, logged)
+        if task == "typesafe":
+            for qid, ans in a.items():
+                ours = dist(ans)
+                ts.append(max(ours, key=ours.get) == truth[qid])
+            total += 1
+            continue
+        for qid, y in truth.items():
+            ans = a[qid]
+            if ans["type"] == "noul":
+                res.setdefault(qid, []).append((ans["noul"], int(y)))
+            else:
+                res.setdefault(qid, []).append((ans.get("choice", ans.get("score")), y, ans["confidence"]))
+        if task == "fields":
+            res.setdefault(state["subject"].replace(" ", "_"), []).append(
+                a["answer"]["choice"] == truth["answer"]
+            )
         total += 1
     for name, kind in (
         ("show", "noul"),
@@ -558,7 +540,7 @@ def main(model=DEFAULT_MODEL, n=60):
         ("entails", "noul"),
         ("snli", 3),
         ("topic", 4),
-        ("intent", len(intents)),
+        ("intent", len(data["public"]["intent"][1])),
         ("toxicity", "score"),
     ):
         report(name, res[name], kind)

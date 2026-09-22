@@ -10,6 +10,7 @@ import { KeyDialog } from "./components/KeyDialog";
 import { ModelPicker } from "./components/ModelPicker";
 import { ModelsPicker } from "./components/ModelsPicker";
 import { type KindFilter, PastRuns } from "./components/PastRuns";
+import { GenerateReplay } from "./components/GenerateReplay";
 import { CompareView, GenerateView } from "./components/ResultPanels";
 import { ResultsView } from "./components/ResultsView";
 import { Toast } from "./components/Toast";
@@ -109,6 +110,7 @@ export default function App() {
   const batchReplay = useBatchReplay(rows);
 
   const isCompare = mode === "compare";
+  const onePass = backends[generateModel]?.group === "local";
   const runKind: RunKind = mode === "generate" ? "gen" : "cmp";
   const compareNames = savedNames ?? compareModels.map((id) => backends[id]?.label ?? id);
   const inputName = dataset || example || "edited input";
@@ -151,6 +153,12 @@ export default function App() {
   const fillEditors = (request: Request) => {
     setStateText(prettyJson(request.state));
     setQuestionsText(prettyJson(request.questions));
+  };
+
+  /** The item on screen and the input that Run sends must be the same item. */
+  const showRequest = (next: Item) => {
+    setItem(next);
+    fillEditors(next);
   };
 
   const resetPanels = (count = isCompare ? compareNames.length : 2) => {
@@ -331,8 +339,7 @@ export default function App() {
     try {
       const next = await sampleItem(name);
       if (set && !set.local) markDatasetLocal(name);
-      setItem(next);
-      fillEditors(next);
+      showRequest(next);
       resetPanels();
       setRemaining(next.left ?? null);
       return next;
@@ -539,7 +546,7 @@ export default function App() {
             : "back"
           : "",
     }));
-    setItem(allRows[index].item);
+    showRequest(allRows[index].item);
     const recorded = rowRecording(allRows, index, columns);
     if (recorded) setRecording(recorded);
   }
@@ -600,7 +607,7 @@ export default function App() {
       },
       onRow: (next, sides) => {
         replaceRows([...rowsRef.current, { item: next, sides, isNew: true }]);
-        setItem(next);
+        showRequest(next);
         // The panels show the latest finished item, as a single run would.
         setPanels(
           sides.map((side) => ({
@@ -692,7 +699,7 @@ export default function App() {
     setOpenItem(null);
     const lastRow = loaded.at(-1);
     if (lastRow) {
-      setItem(lastRow.item);
+      showRequest(lastRow.item);
       setRecording(rowRecording(loaded, loaded.length - 1, names));
     }
     setPanelsVisible(false);
@@ -813,6 +820,24 @@ export default function App() {
               : liveBatch && batchRunning
                 ? { ...liveBatch, pace: 1, label: `Running ${inputName}` }
                 : null
+          }
+          stage={
+            isCompare ? undefined : batchReplay.replaying ? (
+              <GenerateReplay
+                rows={rows}
+                startedAt={batchReplay.startedAt}
+                pace={batchReplay.speed}
+                onePass={onePass}
+              />
+            ) : batchRunning ? (
+              <GenerateView
+                panels={panels}
+                savedNames={null}
+                writtenAsAnswers={writtenAsAnswers}
+                onePass={onePass}
+                truth={labels}
+              />
+            ) : undefined
           }
           dataset={inputName}
           rows={batchReplay.visibleRows}
@@ -947,6 +972,7 @@ export default function App() {
                 panels={panels}
                 savedNames={savedNames}
                 writtenAsAnswers={writtenAsAnswers}
+                onePass={onePass}
                 truth={labels}
               />
             )}
@@ -971,8 +997,14 @@ export default function App() {
         onClose={() => setEditing(false)}
         state={stateText}
         questions={questionsText}
-        onStateChange={setStateText}
-        onQuestionsChange={setQuestionsText}
+        onStateChange={(text) => {
+          setStateText(text);
+          resetPanels();
+        }}
+        onQuestionsChange={(text) => {
+          setQuestionsText(text);
+          resetPanels();
+        }}
       />
       {keyBackend && (
         <KeyDialog backend={keyBackend} onCancel={() => setKeyRequest(null)} onSaved={onKeySaved} />
