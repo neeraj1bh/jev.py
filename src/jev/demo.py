@@ -926,7 +926,11 @@ def backends(extra):
         gguf = found["kind"] == "gguf"
         entry = {"id": fid, "label": found["label"], "gb": found["gb"], "path": fid.removeprefix("gguf:")}
         if gguf:  # read by letter through a llama-server started for it
-            out.append(entry | {"group": "gguf", "ready": bool(folders.llama_server()), "max": 26})
+            running = llamaserver.running(entry["path"])
+            out.append(
+                entry
+                | {"group": "gguf", "ready": bool(folders.llama_server()), "max": 26, "running": running}
+            )
         else:
             need = round(found["gb"] * (1 if BF16 else 2) * 1.3, 1)
             out.append(entry | {"group": "local", "ready": True, "device": DEVICE, "need_gb": need})
@@ -1348,7 +1352,9 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 bid = body.get("backend") or model_id
                 if not bid.startswith(("remote:", "openrouter:")) and bid not in local_ids([model_id])[0]:
                     raise ValueError(f"{bid} is not in the model menu; add it there first")
-                if self.path.endswith("/stop"):
+                if self.path.endswith("/stop"):  # a download, or the llama-server of a GGUF model
+                    if bid.startswith("gguf:"):
+                        llamaserver.stop(bid.removeprefix("gguf:"))
                     downloads.stop(bid)
                     return self._send(200, b"{}")
                 if self.path.endswith("/delete"):

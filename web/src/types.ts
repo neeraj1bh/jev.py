@@ -26,6 +26,8 @@ export interface Backend {
   /** Dollars per million input and output tokens, for gateway models. */
   price?: number;
   price_out?: number;
+  /** A GGUF model whose llama-server is running now. */
+  running?: boolean;
 }
 
 export interface Dataset {

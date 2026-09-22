@@ -9,7 +9,7 @@ Read `README.md` before changing anything; its commands are the release test.
 
 This repository is public. Write nothing into it that comes from the machine you work on:
 
-- no IP addresses, host names or ports other than the documented defaults (8080, 8081, 8082);
+- no IP addresses, host names or ports other than the documented defaults (8080, 8081);
 - no real paths, drive letters, user names or folder layouts. Examples use placeholders:
   `/path/to/models`, `<windows-address>`, `C:\models`;
 - no keys, tokens, `.env` contents, downloaded models, datasets, run logs or screenshots.

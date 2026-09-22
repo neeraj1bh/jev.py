@@ -19,7 +19,10 @@ export function statusText(backend: Backend) {
     return backend.ready ? `${backend.gb ? `${backend.gb} GB · ` : ""}on disk` : `download${size}`;
   }
   if (backend.group === "server") return backend.ready ? "running" : "not running";
-  if (backend.group === "gguf") return backend.ready ? `${backend.gb} GB` : "needs llama-server";
+  if (backend.group === "gguf") {
+    if (!backend.ready) return "needs llama-server";
+    return backend.running ? "running" : `${backend.gb} GB`;
+  }
   const model = backend.model ? `${backend.model} · ` : "";
   return model + (backend.ready ? "key set" : "add key");
 }

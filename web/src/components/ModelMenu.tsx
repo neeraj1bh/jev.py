@@ -1,4 +1,4 @@
-import { ChevronRight, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronRight, Plus, Search, Square, Trash2 } from "lucide-react";
 import { Fragment, type ReactNode, useMemo, useState } from "react";
 
 import { dollarText, groupBackends, providerName, runDollars } from "../backends";
@@ -37,6 +37,7 @@ export interface ModelList {
 export interface LocalModelActions {
   onAddModel: () => void;
   onDelete: (backend: Backend) => void;
+  onStop: (backend: Backend) => void;
 }
 
 interface ModelMenuProps {
@@ -52,6 +53,8 @@ interface ModelMenuProps {
   onAddModel?: () => void;
   /** Deletes a downloaded local model's files. */
   onDelete?: (backend: Backend) => void;
+  /** Stops the llama-server of a running GGUF model. */
+  onStop?: (backend: Backend) => void;
   /** Frozen model lists, each picked or dropped as a whole. */
   lists?: ModelList[];
 }
@@ -59,7 +62,7 @@ interface ModelMenuProps {
 /** Search over every model, the direct groups, and OpenRouter's models under their makers. */
 export function ModelMenu(props: ModelMenuProps) {
   const { backends, isSelected, isDisabled, detail, onSelect, showChecks, lists } = props;
-  const { onAddModel, onDelete } = props;
+  const { onAddModel, onDelete, onStop } = props;
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
   const [allProviders, setAllProviders] = useState(false);
@@ -95,6 +98,22 @@ export function ModelMenu(props: ModelMenuProps) {
 
   const item = (backend: Backend, inTree = false) => {
     const row = menuItem(backend, inTree);
+    if (onStop && backend.running) {
+      return (
+        <div key={backend.id} className="grid grid-cols-[1fr_auto] items-center gap-1">
+          {row}
+          <button
+            type="button"
+            aria-label={`Stop ${backend.label}`}
+            title="Stop it and free its memory"
+            onClick={() => onStop(backend)}
+            className="rounded-md border-0 bg-transparent p-1.5 text-dim transition-colors hover:bg-lift hover:text-ink"
+          >
+            <Icon icon={Square} size={14} />
+          </button>
+        </div>
+      );
+    }
     if (!(onDelete && backend.group === "local" && backend.ready)) return row;
     return (
       <div key={backend.id} className="grid grid-cols-[1fr_auto] items-center gap-1">

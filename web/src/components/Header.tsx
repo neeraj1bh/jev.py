@@ -6,6 +6,7 @@ import {
   Monitor,
   Moon,
   Split,
+  Square,
   Sun,
   Trophy,
 } from "lucide-react";
@@ -43,6 +44,8 @@ interface HeaderProps {
   preference: ThemePreference;
   onPreferenceChange: (preference: ThemePreference) => void;
   onOpenKeys: () => void;
+  /** The GGUF models llama.cpp is running now, and how to stop each. */
+  running: { id: string; label: string; onStop: () => void }[];
 }
 
 export function Header({
@@ -51,6 +54,7 @@ export function Header({
   preference,
   onPreferenceChange,
   onOpenKeys,
+  running,
 }: HeaderProps) {
   return (
     <>
@@ -61,6 +65,19 @@ export function Header({
         <p className="m-0 ml-1.5 min-w-0 flex-1 text-sm text-dim max-[860px]:hidden">
           {LEDE[mode]}
         </p>
+        {running.map((model) => (
+          <Tip key={model.id} content="llama.cpp is running this model; stop it to free its memory">
+            <button
+              type="button"
+              onClick={model.onStop}
+              className="flex max-w-[240px] items-center gap-1.5 rounded-full border border-rule bg-transparent py-1 pr-2 pl-2.5 text-[13px] text-dim transition-colors hover:border-dim hover:text-ink"
+            >
+              <span className="size-1.5 shrink-0 rounded-full bg-good" />
+              <span className="min-w-0 truncate">{model.label}</span>
+              <Icon icon={Square} size={14} />
+            </button>
+          </Tip>
+        ))}
         <Tip content="Keys and tokens">
           <button
             type="button"

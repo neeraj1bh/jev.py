@@ -56,14 +56,14 @@ export function DatasetMenu({
             {heading && <MenuHeading>{heading}</MenuHeading>}
             <MenuItem
               label={set.name}
-              title={set.about}
+              title={blocker ? `${blocker.label} reads ${blocker.max} options at most` : set.about}
               selected={set.name === value}
               disabled={!!blocker}
               onSelect={() => onChange(set.name)}
               highlightDetail={set.local && !blocker}
               detail={
                 blocker
-                  ? `pick 1 of ${set.options} · ${blocker.label} takes ${blocker.max}`
+                  ? `1 of ${set.options} · too many for this model`
                   : set.needs_token
                     ? "needs a Hugging Face token"
                     : answerShape(set) + (set.local ? " · on disk" : " · download")

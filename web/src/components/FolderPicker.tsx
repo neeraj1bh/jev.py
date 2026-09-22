@@ -101,20 +101,30 @@ export function FolderPicker({ pick, onPick, onCancel, problem, onSearch }: Fold
         )}
       </ul>
       <div className="flex items-center justify-end gap-2 border-t border-rule p-2">
-        <p className={cn("m-0 mr-auto px-1 text-xs", error || problem ? "text-warn" : "text-dim")}>
+        <p
+          title={error || problem || undefined}
+          className={cn(
+            "m-0 mr-auto min-w-0 truncate px-1 text-xs",
+            error || problem ? "text-warn" : "text-dim",
+          )}
+        >
           {error ||
             problem ||
             (pick === "folder" && listing?.listed ? "These models are already in the menu." : "") ||
             (pick === "program" ? "Open the llama.cpp folder, then search it." : "")}
         </p>
-        <button type="button" className={cn(ghostButton, "px-3 py-1 text-sm")} onClick={onCancel}>
+        <button
+          type="button"
+          className={cn(ghostButton, "shrink-0 px-3 py-1 text-sm")}
+          onClick={onCancel}
+        >
           Cancel
         </button>
         {pick === "program" && onSearch && (
           <button
             type="button"
             disabled={!listing}
-            className={cn(solidButton, "px-3 py-1 text-sm")}
+            className={cn(solidButton, "shrink-0 px-3 py-1 text-sm whitespace-nowrap")}
             onClick={() => listing && onSearch(listing.path)}
           >
             Search this folder
@@ -124,7 +134,7 @@ export function FolderPicker({ pick, onPick, onCancel, problem, onSearch }: Fold
           <button
             type="button"
             disabled={!listing || listing.listed}
-            className={cn(solidButton, "px-3 py-1 text-sm")}
+            className={cn(solidButton, "shrink-0 px-3 py-1 text-sm whitespace-nowrap")}
             onClick={() => listing && onPick(listing.path)}
           >
             Use this folder

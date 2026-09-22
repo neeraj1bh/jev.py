@@ -100,15 +100,31 @@ export function ModelFolders({ onChanged }: { onChanged: () => void }) {
           />
         )}
       </Modal>
-      {state?.has_gguf && (
+      {state?.has_gguf && state.llama_server && (
+        <div className="mt-3 flex items-center gap-3 border-t border-rule pt-2">
+          <span className="shrink-0 text-xs text-dim">llama-server</span>
+          <span
+            className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink"
+            title={state.llama_server}
+          >
+            {state.llama_server}
+          </span>
+          <button
+            type="button"
+            disabled={busy}
+            className={cn(ghostButton, "shrink-0 px-2.5 py-1 text-xs")}
+            onClick={() => {
+              setError("");
+              setPicking("program");
+            }}
+          >
+            Change
+          </button>
+        </div>
+      )}
+      {state?.has_gguf && !state.llama_server && (
         <p className="mt-2 mb-0 text-xs text-dim">
-          {state.llama_server ? (
-            <>
-              GGUF files run with <span className="font-mono break-all">{state.llama_server}</span>
-            </>
-          ) : (
-            "GGUF files need llama.cpp's llama-server program."
-          )}
+          GGUF files need llama.cpp's llama-server program.
         </p>
       )}
       {error && !picking && <p className="mt-2 mb-0 text-xs text-warn">{error}</p>}

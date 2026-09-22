@@ -64,8 +64,9 @@ the menu lists what they hold:
   machine*; they run through PyTorch like any other.
 - **GGUF files** under *GGUF files · llama.cpp*. Split files (`-00001-of-00003.gguf`) count as one
   model. They need llama.cpp's `llama-server`: one on the PATH is found by itself, otherwise
-  **Choose llama-server…** picks the program the same way. Picking a GGUF model starts llama-server with it on port
-  8082, on the GPU, and stops the GGUF model it ran before; jev.py stops it when it exits.
+  **Choose llama-server…** picks the program the same way. Picking a GGUF model starts llama-server
+  with it, sized to fit the GPU's memory, and stops the one it ran before. The ■ beside a running
+  model stops it and frees its memory; it also stops after 15 minutes unused, and when jev.py exits.
 
 One GGUF model runs at a time, so comparing two of them restarts llama-server between them; the
 restart is not counted in the times. From WSL, the Windows `llama-server.exe` works: jev.py passes

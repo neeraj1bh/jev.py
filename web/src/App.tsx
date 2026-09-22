@@ -9,6 +9,7 @@ import {
   loadModel,
   sampleItem,
   stopDownload,
+  stopModel,
 } from "./api";
 import { isHosted } from "./backends";
 import { AddModelDialog } from "./components/AddModelDialog";
@@ -364,6 +365,10 @@ export default function App() {
       setAddingFor(target);
     },
     onDelete: deleteLocalModel,
+    onStop: async (backend) => {
+      await stopModel(backend.id).catch((error) => toast.show(errorMessage(error)));
+      await reload();
+    },
   });
 
   function toggleCompareModel(id: string) {
@@ -476,6 +481,8 @@ export default function App() {
       if (!ok) return false;
       setVerdict(`Downloading ${names}. First time only; this can take minutes.`);
     }
+    // A download changes what is on disk; a GGUF model starts llama-server, shown in the header.
+    const refresh = missing.length > 0 || picked.some((backend) => backend.group === "gguf");
     try {
       await Promise.all(missing.map((backend) => loadModel(backend.id)));
       for (const backend of picked) {
@@ -486,10 +493,10 @@ export default function App() {
     } catch (error) {
       setVerdict(errorMessage(error));
       toast.show(errorMessage(error));
-      if (missing.length) await reload();
+      if (refresh) await reload();
       return false;
     }
-    if (missing.length) await reload();
+    if (refresh) await reload();
     return true;
   }
 
@@ -930,6 +937,7 @@ export default function App() {
 
   const backendList = Object.values(backends);
   const noModel = isCompare ? compareModels.length === 0 : !generateModel;
+  const runningModels = backendList.filter((backend) => backend.running);
   // Memory a local model needs per GB of weights here, as the server works it out.
   const localModel = backendList.find((backend) => backend.group === "local" && backend.gb);
   const memoryPerGb =
@@ -941,6 +949,11 @@ export default function App() {
   return (
     <div className="mx-auto max-w-[1280px] px-6 pt-7 pb-14 max-[600px]:px-4">
       <Header
+        running={runningModels.map((backend) => ({
+          id: backend.id,
+          label: backend.label,
+          onStop: () => localActions("compare").onStop(backend),
+        }))}
         mode={mode}
         onModeChange={switchMode}
         preference={theme.preference}
