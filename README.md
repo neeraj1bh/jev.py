@@ -213,10 +213,10 @@ and people settle where they disagree. After that v1 never changes; new items ma
 ```sh
 cd web && pnpm install && pnpm build && cd ..   # Node 20.19+ and pnpm; again after a pull
 uv run prod                                      # http://localhost:8080
-uv run prod Qwen/Qwen2.5-7B-Instruct             # also lists any Hugging Face chat model
 ```
 
-Any Hugging Face model, or a llama.cpp server: [docs/local-models.md](docs/local-models.md).
+Other Hugging Face models can be added from the model menu; they and llama.cpp are covered in
+[docs/local-models.md](docs/local-models.md).
 
 - **Compare.** The same request to several models at once (2–6 picked by hand, any number from
   Benchmark): local, a llama.cpp server, a direct API or any OpenRouter model that returns

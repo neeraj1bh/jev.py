@@ -14,13 +14,16 @@ jev.py runs local models in two ways. Both appear in the page's model menu.
 
 The page lists three Qwen2.5 models (0.5B, 1.5B, 3B). Each downloads the first time it is picked.
 
-To add any other chat model, pass its id when starting the page:
+To add any other chat model, choose **Add a model from Hugging Face** in the model menu and enter
+its id, such as `Qwen/Qwen2.5-7B-Instruct`. The id is checked on the Hub first. These are refused,
+with the reason:
 
-```sh
-uv run prod Qwen/Qwen2.5-7B-Instruct
-```
+- repositories with GGUF files only (use llama.cpp, below);
+- models transformers cannot load as text generators (speech, vision-only, embeddings);
+- base models without a chat template;
+- gated models while no Hugging Face token is set.
 
-The same id works from the terminal:
+Added models are remembered in `data/added-models.json`. The same id works from the terminal:
 
 ```sh
 uv run jev serve Qwen/Qwen2.5-7B-Instruct   # API on :8080
