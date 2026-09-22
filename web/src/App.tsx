@@ -4,6 +4,8 @@ import { type ReactNode, useCallback, useRef, useState } from "react";
 import { fetchProgress, fetchRun, fetchRuns, loadModel, sampleItem } from "./api";
 import { isHosted } from "./backends";
 import { Benchmark } from "./components/Benchmark";
+import { ConfirmDialog, type ConfirmRequest } from "./components/ConfirmDialog";
+import { type Download, DownloadBar } from "./components/DownloadBar";
 import { EditDialog } from "./components/EditDialog";
 import { EmptyState } from "./components/EmptyState";
 import { GenerateReplay } from "./components/GenerateReplay";
@@ -75,6 +77,8 @@ export default function App() {
 
   const [mode, setMode] = useState<Mode>("compare");
   const [keysOpen, setKeysOpen] = useState(false);
+  const [download, setDownload] = useState<Download | null>(null);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [source, setSource] = useState<InputSource>("examples");
   const [example, setExample] = useState<ExampleName | "">(FIRST_EXAMPLE);
   const [dataset, setDataset] = useState("");
@@ -290,7 +294,8 @@ export default function App() {
     setOpenMenu("");
     const backend = backends[id];
     if (!backend) return;
-    if (!backend.ready) {
+    // A local model that is not on disk yet downloads when it first runs; only hosted ones need a key.
+    if (!backend.ready && backend.group !== "local") {
       if (backend.group === "gateway") askForKey("remote:openrouter", false, id);
       else askForKey(id, false);
       return;
@@ -342,23 +347,30 @@ export default function App() {
 
   /** Polls download progress so a long first download shows how far it is. */
   function watchDownload(key: string, what: string) {
+    setDownload({ what, done: 0, total: 0, unit: "bytes" });
     const timer = setInterval(async () => {
       const progress = (await fetchProgress().catch(() => null))?.[key];
-      if (!progress) return;
-      if (progress.unit !== "bytes") {
-        setVerdict(
-          `Downloading ${what} · page ${Math.min(progress.done + 1, progress.total)} of ${progress.total}`,
-        );
-        return;
-      }
-      const gb = (bytes: number) => (bytes / 1e9).toFixed(1);
-      const share = progress.total
-        ? ` of ${gb(progress.total)} GB (${Math.min(99, Math.round((100 * progress.done) / progress.total))}%)`
-        : " GB";
-      setVerdict(`Downloading ${what} · ${gb(progress.done)}${share}`);
+      if (progress) setDownload({ what, ...progress });
     }, 500);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      setDownload(null);
+    };
   }
+
+  /** The page's own confirm box; resolves true on the confirm button. */
+  const askConfirm = (title: string, body: string, confirmLabel: string) =>
+    new Promise<boolean>((resolve) =>
+      setConfirmRequest({
+        title,
+        body,
+        confirmLabel,
+        resolve: (ok) => {
+          setConfirmRequest(null);
+          resolve(ok);
+        },
+      }),
+    );
 
   async function nextItem(name = dataset): Promise<Item | null> {
     const set = datasets.find((d) => d.name === name);
@@ -409,7 +421,12 @@ export default function App() {
     const downloading = backend.group === "local" && !backend.ready;
     if (downloading) {
       const size = backend.gb ? ` (${backend.gb} GB)` : "";
-      if (!confirm(`Download ${backend.label}${size} into ${backend.path}?`)) return false;
+      const ok = await askConfirm(
+        `Download ${backend.label}${size}?`,
+        `It is saved to ${backend.path} and used from there next time.`,
+        "Download",
+      );
+      if (!ok) return false;
       setVerdict(`Downloading ${backend.label}. First time only; this can take minutes.`);
     } else if (backend.group === "local") {
       setVerdict(`Loading ${backend.label}…`);
@@ -878,6 +895,8 @@ export default function App() {
         onOpenKeys={() => setKeysOpen(true)}
       />
       <KeysDialog open={keysOpen} onClose={() => setKeysOpen(false)} onChanged={reload} />
+      <ConfirmDialog request={confirmRequest} />
+      <DownloadBar download={download} />
 
       <div key={mode} className="animate-fade motion-reduce:animate-none">
         {mode === "benchmark" ? (

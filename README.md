@@ -310,11 +310,13 @@ echo "LLAMACPP_URL=http://localhost:8081/v1/chat/completions" >> .env
 
 ## Development
 
+Only for changing the code. To use jev.py, [Run](#run) and [Demo](#demo) are all you need.
+
 ```sh
 uv run jev                         # self-check against the example ticket
 uvx ruff format . && uvx ruff check .
 cd web && pnpm check               # Biome, the type check and the build
-cd web && pnpm dev                 # the page on :3000 with live reload, API calls to jev-demo
+cd web && pnpm dev                 # the page on :3000, reloading as you edit; run jev-demo alongside
 ```
 
 | path | what |
