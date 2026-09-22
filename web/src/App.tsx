@@ -1,7 +1,7 @@
 import { Columns3 } from "lucide-react";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 
-import { fetchProgress, fetchRun, fetchRuns, loadModel, sampleItem } from "./api";
+import { addModel, fetchProgress, fetchRun, fetchRuns, loadModel, sampleItem } from "./api";
 import { isHosted } from "./backends";
 import { Benchmark } from "./components/Benchmark";
 import { ConfirmDialog, type ConfirmRequest } from "./components/ConfirmDialog";
@@ -305,6 +305,12 @@ export default function App() {
     exampleResults.current = {};
     resetPanels();
     warnIfTooManyOptions([id]);
+  }
+
+  /** Adds a Hugging Face model to the menu; the new entry is not in `backends` until the reload. */
+  async function addLocalModel(id: string) {
+    await addModel(id);
+    await reload();
   }
 
   function toggleCompareModel(id: string) {
@@ -906,6 +912,7 @@ export default function App() {
             runs={savedRuns}
             backendLabel={columnName}
             onSetUp={setUpBenchmark}
+            onAddModel={addLocalModel}
           />
         ) : mode === "past" ? (
           <PastRuns
@@ -1002,6 +1009,13 @@ export default function App() {
                         backends={backendList}
                         selected={compareModels}
                         onToggle={toggleCompareModel}
+                        onAdd={async (id) => {
+                          await addLocalModel(id);
+                          const next = [...compareModels, id];
+                          setCompareModels(next);
+                          clearBatch();
+                          resetPanels(next.length);
+                        }}
                         open={openMenu === "models"}
                         onOpenChange={menuHandler("models")}
                       />
@@ -1024,6 +1038,13 @@ export default function App() {
                       backends={backendList}
                       value={generateModel}
                       onPick={pickGenerateModel}
+                      onAdd={async (id) => {
+                        await addLocalModel(id);
+                        setGenerateModel(id);
+                        clearBatch();
+                        exampleResults.current = {};
+                        resetPanels();
+                      }}
                       open={openMenu === "model"}
                       onOpenChange={menuHandler("model")}
                     />

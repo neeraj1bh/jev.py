@@ -11,6 +11,7 @@ interface ModelsPickerProps extends MenuState {
   backends: Backend[];
   selected: string[];
   onToggle: (id: string) => void;
+  onAdd: (id: string) => Promise<void>;
 }
 
 /** Two to six models for Compare; the menu stays open between picks. */
@@ -18,6 +19,7 @@ export function ModelsPicker({
   backends,
   selected,
   onToggle,
+  onAdd,
   open,
   onOpenChange,
 }: ModelsPickerProps) {
@@ -56,6 +58,7 @@ export function ModelsPicker({
         }
         detail={statusText}
         onSelect={onToggle}
+        onAdd={onAdd}
       />
     </Dropdown>
   );

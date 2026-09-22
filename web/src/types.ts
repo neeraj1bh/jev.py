@@ -41,6 +41,9 @@ export interface Dataset {
   about?: string;
   /** The menu heading it sits under, e.g. "Knowledge and exams". */
   group?: string;
+  /** Measured input tokens and questions per item, as a letter-reading API receives them. */
+  tokens?: number;
+  questions?: number;
 }
 
 /** One entry of the Keys view: whether it is set, never its value. */

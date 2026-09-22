@@ -4,6 +4,7 @@ import { Fragment, type ReactNode, useMemo, useState } from "react";
 import { dollarText, groupBackends, providerName, runDollars } from "../backends";
 import { cn } from "../styles";
 import type { Backend } from "../types";
+import { AddModelForm } from "./AddModelForm";
 import { CheckMark } from "./CheckMark";
 import { Icon } from "./Icon";
 import { MenuHeading, MenuHint, MenuItem } from "./Menu";
@@ -26,6 +27,13 @@ const FREE = "free";
 const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
 const TOP_PROVIDERS = 6;
 
+export interface ModelList {
+  name: string;
+  count: number;
+  on: boolean;
+  onToggle: () => void;
+}
+
 interface ModelMenuProps {
   backends: Backend[];
   isSelected: (backend: Backend) => boolean;
@@ -35,11 +43,15 @@ interface ModelMenuProps {
   /** Multi-select shows a check beside each chosen model. */
   showChecks?: boolean;
   hint?: ReactNode;
+  /** Adds a Hugging Face model by id; rejects with the reason it cannot run. */
+  onAdd?: (id: string) => Promise<void>;
+  /** Frozen model lists, each picked or dropped as a whole. */
+  lists?: ModelList[];
 }
 
 /** Search over every model, the direct groups, and OpenRouter's models under their makers. */
 export function ModelMenu(props: ModelMenuProps) {
-  const { backends, isSelected, isDisabled, detail, onSelect, showChecks } = props;
+  const { backends, isSelected, isDisabled, detail, onSelect, showChecks, onAdd, lists } = props;
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
   const [allProviders, setAllProviders] = useState(false);
@@ -140,10 +152,32 @@ export function ModelMenu(props: ModelMenuProps) {
         )
       ) : (
         <>
+          {lists && lists.length > 0 && (
+            <>
+              <MenuHeading>Frozen lists</MenuHeading>
+              {lists.map((list) => (
+                <MenuItem
+                  key={list.name}
+                  selected={list.on}
+                  onSelect={list.onToggle}
+                  label={
+                    <>
+                      <i className="inline-block w-[18px] text-good">
+                        {list.on && <CheckMark ok />}
+                      </i>
+                      {list.name}
+                    </>
+                  }
+                  detail={`${list.count} models`}
+                />
+              ))}
+            </>
+          )}
           {groupBackends(backends).map(({ group, heading, backends: members }) => (
             <Fragment key={group}>
               <MenuHeading>{heading}</MenuHeading>
               {members.map((member) => item(member))}
+              {group === "local" && onAdd && <AddModelForm onAdd={onAdd} />}
             </Fragment>
           ))}
           {gateway.length > 0 && (

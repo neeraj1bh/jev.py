@@ -58,6 +58,8 @@ export const loadModel = (backend: string) => postOrThrow<unknown>("/v1/load", {
 /** `backend` is a backend id such as remote:deepseek, or a key name such as HF_TOKEN. */
 export const saveKey = (backend: string, key: string, save: boolean) =>
   postOrThrow<unknown>("/v1/key", { backend, key, save });
+/** Checks a Hugging Face model id on the Hub and adds it to the model menu. */
+export const addModel = (id: string) => postOrThrow<unknown>("/v1/models", { id });
 export const fetchKeys = () => getJson<KeyInfo[]>("/v1/keys");
 /** Forgets a key for this session and removes it from .env. */
 export const clearKey = (backend: string) =>

@@ -99,9 +99,11 @@ interface BenchmarkProps {
   runs: SavedRun[];
   backendLabel: (id: string, kind: RunKind) => string;
   onSetUp: (models: string[], dataset: string, items: number) => void;
+  onAddModel: (id: string) => Promise<void>;
 }
 
-export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: BenchmarkProps) {
+export function Benchmark(props: BenchmarkProps) {
+  const { backends, datasets, runs, backendLabel, onSetUp, onAddModel } = props;
   const gateway = backends.filter((backend) => backend.group === "gateway");
   const makers = Object.entries(
     gateway.reduce<Record<string, number>>((counts, backend) => {
@@ -124,6 +126,10 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
   const menuHandler = (name: string) => (open: boolean) => setMenu(open ? name : "");
   const [dataset, setDataset] = useState("");
   const set = dataset || (datasets[0]?.name ?? "");
+  const chosenSet = datasets.find((candidate) => candidate.name === set);
+  const sizeNote = chosenSet?.tokens
+    ? `, about ${chosenSet.tokens.toLocaleString("en-US")} input tokens each`
+    : "";
   const [items, setItems] = useState(50);
   const chosen = backends.filter((backend) => picked.includes(backend.id));
   const toggleModel = (id: string) =>
@@ -144,7 +150,8 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
   const onMachine = (backend: Backend) => backend.group === "local" || backend.group === "server";
   const unpriced = chosen.filter((backend) => !onMachine(backend) && runDollars(backend) === null);
   const dollars = chosen.reduce(
-    (sum, backend) => sum + (onMachine(backend) ? 0 : (itemsDollars(backend, items) ?? 0)),
+    (sum, backend) =>
+      sum + (onMachine(backend) ? 0 : (itemsDollars(backend, items, chosenSet) ?? 0)),
     0,
   );
   const names = chosen.map((backend) => backend.label);
@@ -205,6 +212,23 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
               isDisabled={isOffline}
               detail={statusText}
               onSelect={toggleModel}
+              lists={presets.map((preset) => ({
+                name: preset.name,
+                count: preset.models.length,
+                on: presetOn(preset),
+                onToggle: () => {
+                  if (presetOn(preset)) {
+                    setPicked([]);
+                    return;
+                  }
+                  setPicked(preset.models.filter((id) => known.has(id)));
+                  setDataset(preset.dataset);
+                },
+              }))}
+              onAdd={async (id) => {
+                await onAddModel(id);
+                toggleModel(id);
+              }}
             />
           </Dropdown>
           <DatasetMenu
@@ -228,27 +252,6 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
           />
           <span className={labelText}>items each</span>
         </div>
-        {presets.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className={labelText}>Frozen lists</span>
-            {presets.map((preset) => (
-              <MakerChip
-                key={preset.name}
-                label={preset.name}
-                count={preset.models.length}
-                on={presetOn(preset)}
-                onToggle={() => {
-                  if (presetOn(preset)) {
-                    setPicked([]);
-                    return;
-                  }
-                  setPicked(preset.models.filter((id) => known.has(id)));
-                  setDataset(preset.dataset);
-                }}
-              />
-            ))}
-          </div>
-        )}
         {makers.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className={labelText}>Add all from</span>
@@ -285,7 +288,7 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
         </p>
         <p className={cn(labelText, "mb-4")}>
           {picked.length
-            ? `${picked.length} models × ${items} items. Models on this machine and free ones cost nothing${unpricedNote}.`
+            ? `${picked.length} models × ${items} items${sizeNote}. Models on this machine and free ones cost nothing${unpricedNote}.`
             : "Pick models to see what the run would cost."}
         </p>
         <button

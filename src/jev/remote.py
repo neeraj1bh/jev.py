@@ -46,6 +46,7 @@ BACKENDS = {
     # llama.cpp's llama-server on this machine or the LAN; no key, LLAMACPP_URL overrides the address
     "llamacpp": ("", "http://localhost:8081/v1/chat/completions", "local"),
 }
+LETTER_SYSTEM = "You are a calibrated decision engine. Reply with one letter."
 # thinking must be off (else the first token is reasoning); each provider's accepted temperature
 EXTRAS = {
     "deepseek": {"thinking": {"type": "disabled"}, "temperature": 1},
@@ -155,28 +156,14 @@ class Remote:
         return {"model": self.model_id, "answers": answers, "usage": res.get("usage", {})}
 
     def _one(self, state, q):
-        labels, descs = _options(q)
-        if len(labels) > len(LETTERS):
-            raise ValueError(f"hosted backends take at most {len(LETTERS)} options, got {len(labels)}")
-        lines = []
-        for letter, la, d in zip(LETTERS, labels, descs, strict=False):
-            name = f"level {la}" if q["type"] == "score" else la
-            lines.append(f"{letter}. {name}" + (f" — {_text(d)}" if d else ""))
-        user = (
-            f"STATE:\n{_text(state)}\n\nQUESTION: {_text(q['instructions'])}\nOPTIONS:\n"
-            + "\n".join(lines)
-            + "\nAnswer with the letter only."
-        )
+        labels, user = letter_prompt(state, q)
         res = post(
             self.url,
             self.key,
             {
                 "model": self.model_id,
                 "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a calibrated decision engine. Reply with one letter.",
-                    },
+                    {"role": "system", "content": LETTER_SYSTEM},
                     {"role": "user", "content": user},
                 ],
                 "max_tokens": 1,
@@ -198,6 +185,23 @@ class Remote:
         z = max(lp)
         w = [math.exp(x - z) for x in lp]
         return [round(x / sum(w), 4) for x in w], res.get("usage", {}).get("prompt_tokens", 0)
+
+
+def letter_prompt(state, q):
+    """The option labels and the user message for one question, its options lettered A, B, C…"""
+    labels, descs = _options(q)
+    if len(labels) > len(LETTERS):
+        raise ValueError(f"hosted backends take at most {len(LETTERS)} options, got {len(labels)}")
+    lines = []
+    for letter, la, d in zip(LETTERS, labels, descs, strict=False):
+        name = f"level {la}" if q["type"] == "score" else la
+        lines.append(f"{letter}. {name}" + (f" — {_text(d)}" if d else ""))
+    user = (
+        f"STATE:\n{_text(state)}\n\nQUESTION: {_text(q['instructions'])}\nOPTIONS:\n"
+        + "\n".join(lines)
+        + "\nAnswer with the letter only."
+    )
+    return labels, user
 
 
 def cli():

@@ -9,6 +9,7 @@ answer them, and keeping them apart keeps the main comparison paired across ever
     uv run --no-sync jev-bench run remote:deepseek           # one model; letter readers skip wide
     uv run --no-sync jev-bench run Qwen/Qwen2.5-1.5B-Instruct  # local models answer every item
     uv run --no-sync jev-bench export                        # every item as text, for reviewers
+    uv run --no-sync jev-bench tokens                        # input tokens per item, for cost estimates
 
 Each run is saved like a demo batch, so Past runs lists it and can compare runs side by side.
 """
@@ -26,6 +27,8 @@ from jev.core import ROOT
 
 NAME = "core-v1"
 PATH = os.path.join(ROOT, "benchmarks", f"{NAME}.json")
+TOKENS_PATH = os.path.join(ROOT, "benchmarks", f"{NAME}-tokens.json")
+TOKENIZER = "Qwen/Qwen2.5-0.5B-Instruct"
 PER_SET = 50
 LETTER_LIMIT = 26
 DATASET = "Core v1"
@@ -206,12 +209,49 @@ def export():
     print(os.path.relpath(path, ROOT))
 
 
+def tokens():
+    """Input tokens per item as a letter-reading API receives them: one request per question, each
+    with the whole state. Measured with a Qwen tokenizer; other tokenizers differ by some percent."""
+    from transformers import AutoTokenizer
+
+    from jev.remote import LETTER_SYSTEM, letter_prompt
+
+    tok = AutoTokenizer.from_pretrained(TOKENIZER)
+    per_set = {}
+    for item in load("main"):
+        size = 0
+        for q in item["questions"].values():
+            _, user = letter_prompt(item["state"], q)
+            messages = [{"role": "system", "content": LETTER_SYSTEM}, {"role": "user", "content": user}]
+            prompt = tok.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+            size += len(tok(prompt)["input_ids"])
+        total, questions, count = per_set.get(item["set"], (0, 0, 0))
+        per_set[item["set"]] = (total + size, questions + len(item["questions"]), count + 1)
+    sets = {
+        name: {"tokens": round(total / count), "questions": round(questions / count, 2)}
+        for name, (total, questions, count) in per_set.items()
+    }
+    items = sum(count for _, _, count in per_set.values())
+    sets[DATASET] = {
+        "tokens": round(sum(total for total, _, _ in per_set.values()) / items),
+        "questions": round(sum(q for _, q, _ in per_set.values()) / items, 2),
+    }
+    with open(TOKENS_PATH, "w") as f:
+        json.dump(
+            {"measured": time.strftime("%Y-%m-%d"), "tokenizer": TOKENIZER, "per_item": sets}, f, indent=1
+        )
+    average = sets[DATASET]["tokens"]
+    print(f"{os.path.relpath(TOKENS_PATH, ROOT)}: {DATASET} averages {average} tokens an item")
+
+
 def cli():
     args = sys.argv[1:]
     if args[:1] == ["freeze"]:
         freeze()
     elif args[:1] == ["export"]:
         export()
+    elif args[:1] == ["tokens"]:
+        tokens()
     elif args[:1] == ["run"] and len(args) == 2:
         run(args[1])
     else:

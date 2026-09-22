@@ -33,8 +33,9 @@ export function Dropdown({
 
   useEffect(() => {
     if (!open) return;
+    // The path is fixed when the click starts, so an item the click replaced still counts as inside.
     const onClick = (event: MouseEvent) => {
-      if (!root.current?.contains(event.target as Node)) onOpenChange(false);
+      if (root.current && !event.composedPath().includes(root.current)) onOpenChange(false);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onOpenChange(false);

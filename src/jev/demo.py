@@ -32,6 +32,7 @@ from huggingface_hub import try_to_load_from_cache
 from huggingface_hub.constants import HF_HUB_CACHE
 from transformers import TextIteratorStreamer
 
+from jev import hub
 from jev.core import DEFAULT_MODEL, ROOT, SYSTEM, Jev, _options, _text
 from jev.eval import typesafe_rows
 from jev.remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env
@@ -52,6 +53,7 @@ HOSTED = {
     "vercel": "Jev (Vercel)",
 }
 DATA = os.path.join(ROOT, "data")  # dataset rows fetched for the demo, git-ignored
+ADDED_PATH = os.path.join(DATA, "added-models.json")  # Hugging Face models added in the page: id -> GB
 LOGS = os.path.join(ROOT, "results", "logs", "demo")  # one .jsonl per batch, git-ignored
 ROWS = "https://datasets-server.huggingface.co/rows?dataset={}&config={}&split={}&offset={}&length=100"
 # name: (Hub dataset, config, split, state fields, question, label field, the label meaning yes)
@@ -373,6 +375,11 @@ ABOUT = {  # one line per set, shown when hovering it in the page
     ),
 }
 CORE = ("Core v1",)  # frozen benchmarks, see bench.py
+try:  # input tokens per item, measured by `jev-bench tokens`, for the page's cost estimates
+    with open(os.path.join(ROOT, "benchmarks", "core-v1-tokens.json")) as f:
+        SIZES = json.load(f)["per_item"]
+except (OSError, ValueError):
+    SIZES = {}
 GATED = {"GPQA Diamond"}  # need a Hugging Face token and the set's terms accepted
 CORE_ITEMS = {}
 GROUPS = {  # menu headings, in order; every set belongs to one
@@ -836,14 +843,35 @@ def gateway():
     ]
 
 
+def added():
+    try:
+        with open(ADDED_PATH) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def add_model(model_id):
+    """Check a Hugging Face id and remember it; nothing downloads until it is picked."""
+    gb = hub.check(model_id, env("HF_TOKEN"))
+    models = added() | {model_id: gb}
+    os.makedirs(DATA, exist_ok=True)
+    with open(ADDED_PATH, "w") as f:
+        json.dump(models, f, indent=1)
+
+
+def model_gb(model_id):
+    return LOCAL.get(model_id) or added().get(model_id)
+
+
 def backends(extra):
     """Everything the page can pick, with what it needs before it can run."""
     out, mem = [], memory_gb()
-    for m in dict.fromkeys([*LOCAL, *extra]):
+    for m in dict.fromkeys([*LOCAL, *added(), *extra]):
         if m.startswith("remote:"):
             continue
         cache, have = where(m)
-        gb = LOCAL.get(m)
+        gb = model_gb(m)
         out.append(
             {
                 "id": m,
@@ -916,12 +944,14 @@ def get(bid):
                     torch.cuda.empty_cache()
                 cache, have = where(bid)
                 if not have:
-                    gb = LOCAL.get(bid)
+                    gb = model_gb(bid)
                     PROGRESS[bid] = [
                         os.path.join(cache, "models--" + bid.replace("/", "--")),
                         gb and gb * 1e9,
                         "bytes",
                     ]
+                if env("HF_TOKEN"):  # a gated model downloads with the token saved under Keys
+                    os.environ["HF_TOKEN"] = env("HF_TOKEN")
                 try:
                     LOADED[bid] = Jev(bid, cache_dir=cache)
                 finally:
@@ -1168,6 +1198,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 order = [n for names in GROUPS.values() for n in names]
                 for x in sets:
                     x["about"] = ABOUT[x["name"]]
+                    x |= SIZES.get(x["name"], {})
                     x["group"] = group[x["name"]]
                 sets.sort(key=lambda x: order.index(x["name"]))
                 return self._send(200, json.dumps(sets).encode())
@@ -1211,7 +1242,13 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     else:
                         set_key(body["backend"], body["key"].strip(), body.get("save", False))
                     return self._send(200, b"{}")
-                jev = get(body.get("backend") or model_id)
+                if self.path.endswith("/models"):
+                    add_model(body["id"].strip())
+                    return self._send(200, b"{}")
+                bid = body.get("backend") or model_id
+                if not bid.startswith(("remote:", "openrouter:")) and bid not in {*LOCAL, *added(), model_id}:
+                    raise ValueError(f"{bid} is not in the model menu; add it there first")
+                jev = get(bid)
                 if self.path.endswith("/load"):  # downloads a local model the first time
                     return self._send(200, json.dumps({"device": jev.device}).encode())
                 if self.path.endswith("/generate"):

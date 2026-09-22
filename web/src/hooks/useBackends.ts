@@ -5,13 +5,6 @@ import { isUsable, TEXTLESS } from "../backends";
 import type { Backend, Dataset } from "../types";
 import { isString, isStringList, usePersistentState } from "./usePersistentState";
 
-/** The model the server was started with, written into the page by demo.py. */
-const startupModel = (() => {
-  const content =
-    document.querySelector<HTMLMetaElement>('meta[name="default-model"]')?.content ?? "";
-  return content.includes("{{") ? "" : content;
-})();
-
 export function useBackends() {
   const [backends, setBackends] = useState<Record<string, Backend>>({});
   const [datasets, setDatasets] = useState<Dataset[]>([]);
@@ -22,35 +15,16 @@ export function useBackends() {
     isStringList,
   );
 
-  /** Keeps the current picks when they still work, otherwise falls back to usable ones. */
+  /** Keeps the viewer's picks while they still work. */
   const apply = useCallback(
     (list: Backend[]) => {
       const byId = Object.fromEntries(list.map((backend) => [backend.id, backend]));
       const usable = (id?: string) => !!id && isUsable(byId[id]);
       const canGenerate = (id?: string) => id !== undefined && usable(id) && !TEXTLESS.has(id);
       setBackends(byId);
-      setGenerateModel((previous) => {
-        const keep = previous || startupModel;
-        if (canGenerate(keep)) return keep;
-        const local = list.find((b) => canGenerate(b.id) && b.group === "local");
-        return (local ?? list.find((b) => canGenerate(b.id)))?.id ?? "";
-      });
-      // Defaults come only from models that are ready now, so a fresh machine never starts a
-      // download or a keyless request just by pressing Run; the viewer's own picks are kept.
-      const ready = (id?: string) => usable(id) && !!id && !!byId[id]?.ready;
-      setCompareModels((previous) => {
-        let picked = previous.filter(usable);
-        if (!picked.length && ready(startupModel)) picked = [startupModel];
-        while (picked.length < 2) {
-          const hosted = list.find(
-            (b) => ready(b.id) && b.group === "hosted" && !picked.includes(b.id),
-          );
-          const next = hosted ?? list.find((b) => ready(b.id) && !picked.includes(b.id));
-          if (!next) break;
-          picked = [...picked, next.id];
-        }
-        return picked.length >= 2 ? picked : previous.filter(usable);
-      });
+      // Both start empty: nothing runs, downloads or spends a key until a model is picked.
+      setGenerateModel((previous) => (canGenerate(previous) ? previous : ""));
+      setCompareModels((previous) => previous.filter(usable));
     },
     [setCompareModels, setGenerateModel],
   );

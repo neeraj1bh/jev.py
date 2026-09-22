@@ -1,0 +1,182 @@
+{
+ "measured": "2026-09-22",
+ "tokenizer": "Qwen/Qwen2.5-0.5B-Instruct",
+ "per_item": {
+  "SST-2 sentiment": {
+   "tokens": 80,
+   "questions": 1.0
+  },
+  "RTE entailment": {
+   "tokens": 133,
+   "questions": 1.0
+  },
+  "BoolQ": {
+   "tokens": 194,
+   "questions": 1.0
+  },
+  "SNLI": {
+   "tokens": 95,
+   "questions": 1.0
+  },
+  "AG News topic": {
+   "tokens": 126,
+   "questions": 1.0
+  },
+  "Tweet emotion": {
+   "tokens": 92,
+   "questions": 1.0
+  },
+  "Tweet sentiment": {
+   "tokens": 90,
+   "questions": 1.0
+  },
+  "Tweet hate": {
+   "tokens": 94,
+   "questions": 1.0
+  },
+  "Tweet irony": {
+   "tokens": 79,
+   "questions": 1.0
+  },
+  "Tweet offensive": {
+   "tokens": 90,
+   "questions": 1.0
+  },
+  "ANLI round 3": {
+   "tokens": 162,
+   "questions": 1.0
+  },
+  "MultiNLI mismatched": {
+   "tokens": 110,
+   "questions": 1.0
+  },
+  "ContractNLI": {
+   "tokens": 192,
+   "questions": 1.0
+  },
+  "MultiRC": {
+   "tokens": 404,
+   "questions": 1.0
+  },
+  "ToxicChat": {
+   "tokens": 118,
+   "questions": 1.0
+  },
+  "SMS spam": {
+   "tokens": 94,
+   "questions": 1.0
+  },
+  "IMDB": {
+   "tokens": 329,
+   "questions": 1.0
+  },
+  "DBpedia-14": {
+   "tokens": 197,
+   "questions": 1.0
+  },
+  "MMLU": {
+   "tokens": 129,
+   "questions": 1.0
+  },
+  "MMLU-Pro": {
+   "tokens": 233,
+   "questions": 1.0
+  },
+  "ARC-Challenge": {
+   "tokens": 108,
+   "questions": 1.0
+  },
+  "HellaSwag": {
+   "tokens": 247,
+   "questions": 1.0
+  },
+  "TruthfulQA": {
+   "tokens": 124,
+   "questions": 1.0
+  },
+  "CommonsenseQA": {
+   "tokens": 89,
+   "questions": 1.0
+  },
+  "OpenBookQA": {
+   "tokens": 88,
+   "questions": 1.0
+  },
+  "WinoGrande": {
+   "tokens": 83,
+   "questions": 1.0
+  },
+  "MedQA": {
+   "tokens": 276,
+   "questions": 1.0
+  },
+  "PubMedQA": {
+   "tokens": 380,
+   "questions": 1.0
+  },
+  "Arena votes": {
+   "tokens": 746,
+   "questions": 1.0
+  },
+  "RewardBench": {
+   "tokens": 688,
+   "questions": 1.0
+  },
+  "GPQA Diamond": {
+   "tokens": 252,
+   "questions": 1.0
+  },
+  "XNLI Hindi": {
+   "tokens": 213,
+   "questions": 1.0
+  },
+  "LegalBench hearsay": {
+   "tokens": 87,
+   "questions": 1.0
+  },
+  "LegalBench definitions": {
+   "tokens": 127,
+   "questions": 1.0
+  },
+  "HaluEval QA": {
+   "tokens": 187,
+   "questions": 1.0
+  },
+  "Prompt injection": {
+   "tokens": 96,
+   "questions": 1.0
+  },
+  "BBH causal judgement": {
+   "tokens": 272,
+   "questions": 1.0
+  },
+  "Global-MMLU Hindi": {
+   "tokens": 745,
+   "questions": 1.0
+  },
+  "Global-MMLU Chinese": {
+   "tokens": 273,
+   "questions": 1.0
+  },
+  "BBQ race and ethnicity": {
+   "tokens": 132,
+   "questions": 1.0
+  },
+  "MuSR murder mysteries": {
+   "tokens": 1284,
+   "questions": 1.0
+  },
+  "BBH date understanding": {
+   "tokens": 164,
+   "questions": 1.0
+  },
+  "TypeSafe cases": {
+   "tokens": 38897,
+   "questions": 7.87
+  },
+  "Core v1": {
+   "tokens": 1042,
+   "questions": 1.14
+  }
+ }
+}

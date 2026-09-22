@@ -13,10 +13,12 @@ interface ModelPickerProps extends MenuState {
   backends: Backend[];
   value: string;
   onPick: (id: string) => void;
+  onAdd: (id: string) => Promise<void>;
 }
 
 /** One model for generate vs readout: only models that both write text and return probabilities. */
-export function ModelPicker({ backends, value, onPick, open, onOpenChange }: ModelPickerProps) {
+export function ModelPicker(props: ModelPickerProps) {
+  const { backends, value, onPick, onAdd, open, onOpenChange } = props;
   const current = backends.find((backend) => backend.id === value);
   const bothWays = backends.filter((backend) => !TEXTLESS.has(backend.id));
   return (
@@ -45,6 +47,7 @@ export function ModelPicker({ backends, value, onPick, open, onOpenChange }: Mod
         isDisabled={isOffline}
         detail={statusText}
         onSelect={onPick}
+        onAdd={onAdd}
       />
     </Dropdown>
   );

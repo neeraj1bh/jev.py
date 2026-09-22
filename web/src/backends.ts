@@ -96,6 +96,7 @@ export const providerName = (slug = "") => PROVIDER_NAMES[slug] ?? slug;
 // of it, since each question resends its document; the other questions average 135 tokens.
 const RUN_QUESTIONS = 4_055;
 const RUN_INPUT_TOKENS = 2_250_000;
+// For a set with no measurement: the average one-question item of the frozen set above.
 const ITEM_INPUT_TOKENS = 135;
 
 const dollars = (backend: Backend, input: number, output: number) => {
@@ -107,9 +108,13 @@ const dollars = (backend: Backend, input: number, output: number) => {
 /** Dollars for one full frozen-set run: 0 when free, null when the price is unknown. */
 export const runDollars = (backend: Backend) => dollars(backend, RUN_INPUT_TOKENS, RUN_QUESTIONS);
 
-/** Dollars for `items` one-question items of a demo set; long sets such as TypeSafe's cost more. */
-export const itemsDollars = (backend: Backend, items: number) =>
-  dollars(backend, ITEM_INPUT_TOKENS * items, items);
+/** Dollars for `items` items of a set, from its measured size when there is one. */
+export const itemsDollars = (backend: Backend, items: number, dataset?: Dataset) =>
+  dollars(
+    backend,
+    (dataset?.tokens ?? ITEM_INPUT_TOKENS) * items,
+    (dataset?.questions ?? 1) * items,
+  );
 
 export const dollarText = (dollars: number) =>
   `$${dollars < 1 ? dollars.toFixed(2) : dollars.toFixed(dollars < 10 ? 1 : 0)}`;
