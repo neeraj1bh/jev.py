@@ -21,6 +21,8 @@ export interface Backend {
   provider?: string;
   created?: number;
   free?: boolean;
+  /** The model a direct API is pinned to, e.g. "deepseek-flash". */
+  model?: string;
   /** Dollars per million input and output tokens, for gateway models. */
   price?: number;
   price_out?: number;

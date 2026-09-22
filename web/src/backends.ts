@@ -1,6 +1,7 @@
 import type { Backend, BackendGroup, Dataset } from "./types";
 
 /** Jev returns probabilities only; it never writes text. */
+export const OPENROUTER = "remote:openrouter";
 export const TEXTLESS = new Set(["remote:typesafe", "remote:vercel"]);
 
 export const isOffline = (backend: Backend) => !backend.ready && backend.group === "server";
@@ -16,7 +17,8 @@ export function statusText(backend: Backend) {
     return backend.ready ? `${backend.gb ? `${backend.gb} GB · ` : ""}on disk` : `download${size}`;
   }
   if (backend.group === "server") return backend.ready ? "running" : "not running";
-  return backend.ready ? "key set" : "add key";
+  const model = backend.model ? `${backend.model} · ` : "";
+  return model + (backend.ready ? "key set" : "add key");
 }
 
 export function pickerSubtitle(backend?: Backend) {
@@ -25,7 +27,8 @@ export function pickerSubtitle(backend?: Backend) {
     return `${backend.device}${backend.gb ? ` · ${backend.gb} GB` : ""}${backend.ready ? "" : " · download"}`;
   }
   if (backend.group === "gateway") return "via OpenRouter";
-  return backend.group === "server" ? (backend.ready ? "running" : "not running") : "hosted";
+  if (backend.group === "server") return backend.ready ? "running" : "not running";
+  return backend.model ?? "direct API";
 }
 
 export function location(backend?: Backend) {
@@ -51,7 +54,7 @@ export const panelSubtitle = (name?: string) =>
 const DIRECT_GROUPS: [BackendGroup, string][] = [
   ["local", "On this machine"],
   ["server", "Local server"],
-  ["hosted", "Hosted"],
+  ["hosted", "Direct APIs · one pinned model each"],
 ];
 
 /** Usable backends first, then the ones that still need a key or a server. */
@@ -61,8 +64,9 @@ export function groupBackends(backends: Backend[]) {
   return DIRECT_GROUPS.map(([group, name]) => ({
     group,
     heading: group === "local" ? `${name} · ${device}` : name,
+    // OpenRouter's own entry only holds its key; its models are listed under their makers.
     backends: backends
-      .filter((backend) => backend.group === group)
+      .filter((backend) => backend.group === group && backend.id !== OPENROUTER)
       .sort((a, b) => rank(a) - rank(b)),
   }));
 }

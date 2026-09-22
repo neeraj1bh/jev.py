@@ -545,7 +545,15 @@ def backends(extra):
         var = BACKENDS[b][0]
         ready, most = bool(env(var)), 26 if b in LETTER else None
         out.append(
-            {"id": "remote:" + b, "group": "hosted", "label": label, "ready": ready, "key": var, "max": most}
+            {
+                "id": "remote:" + b,
+                "group": "hosted",
+                "label": label,
+                "ready": ready,
+                "key": var,
+                "max": most,
+                "model": BACKENDS[b][2],  # the one model this direct API is pinned to
+            }
         )
     return out
 
