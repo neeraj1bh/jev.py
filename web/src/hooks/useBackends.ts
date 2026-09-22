@@ -28,7 +28,12 @@ export function useBackends() {
     return [...direct, ...gateway];
   }, []);
 
-  const reload = useCallback(async () => apply(await fetchAll()), [apply, fetchAll]);
+  /** Refetches the models and returns them, for a caller that needs one just added. */
+  const reload = useCallback(async () => {
+    const list = await fetchAll();
+    apply(list);
+    return list;
+  }, [apply, fetchAll]);
 
   useEffect(() => {
     fetchAll().then(apply);

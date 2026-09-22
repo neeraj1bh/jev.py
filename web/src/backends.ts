@@ -15,6 +15,7 @@ export const isHosted = (backend?: Backend) => backend?.group === "hosted";
 
 export function statusText(backend: Backend) {
   if (backend.group === "local") {
+    if (backend.downloading !== undefined) return `downloading ${backend.downloading}%`;
     const size = backend.gb ? ` ${backend.gb} GB` : "";
     return backend.ready ? `${backend.gb ? `${backend.gb} GB · ` : ""}on disk` : `download${size}`;
   }

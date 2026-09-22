@@ -26,6 +26,8 @@ export interface Backend {
   /** Dollars per million input and output tokens, for gateway models. */
   price?: number;
   price_out?: number;
+  /** Percent done while the model downloads, from the page's progress poll. */
+  downloading?: number;
   /** A GGUF model whose llama-server is running now. */
   running?: boolean;
   /** GB that GGUF models may take together on this machine. */

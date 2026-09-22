@@ -1,5 +1,5 @@
 import { Columns3 } from "lucide-react";
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import {
   addModel,
@@ -93,6 +93,13 @@ export default function App() {
   const [mode, setMode] = useState<Mode>("compare");
   const [keysOpen, setKeysOpen] = useState(false);
   const downloads = useDownloads();
+  // A download that ends, here or in another tab, changes what is on disk: refetch the menu.
+  const wasDownloading = useRef("");
+  useEffect(() => {
+    const now = Object.keys(downloads).sort().join();
+    if (now !== wasDownloading.current && wasDownloading.current) reload();
+    wasDownloading.current = now;
+  }, [downloads, reload]);
   const [addingFor, setAddingFor] = useState<"generate" | "compare" | "benchmark" | null>(null);
   const [runningOpen, setRunningOpen] = useState(false);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
@@ -344,7 +351,8 @@ export default function App() {
   /** Adds a Hugging Face model and picks it where the dialog was opened from. */
   async function addLocalModel(id: string) {
     await addModel(id);
-    await reload();
+    const added = (await reload()).find((backend) => backend.id === id);
+    if (added) downloadIfMissing(added); // not awaited: the dialog closes, then the download asks
     if (addingFor === "generate") {
       setGenerateModel(id);
       clearBatch();
@@ -966,7 +974,12 @@ export default function App() {
     }, written.ms);
   }
 
-  const backendList = Object.values(backends);
+  const backendList = Object.values(backends).map((backend) => {
+    const got = downloads[backend.id];
+    return got
+      ? { ...backend, downloading: got.total ? Math.floor((got.done / got.total) * 100) : 0 }
+      : backend;
+  });
   const noModel = isCompare ? compareModels.length === 0 : !generateModel;
   const runningModels = backendList.filter((backend) => backend.running);
   // Memory a local model needs per GB of weights here, as the server works it out.
