@@ -131,7 +131,10 @@ export function ModelMenu(props: ModelMenuProps) {
             backend.label
           )
         }
-        title={inGateway ? runCost(backend).title : backend.label}
+        // A long name is cut short in the menu; the tooltip then shows it whole.
+        title={
+          inGateway ? runCost(backend).title : backend.label.length > 28 ? backend.label : undefined
+        }
         detail={
           inGateway
             ? [inTree ? "" : providerName(backend.provider), runCost(backend).text]

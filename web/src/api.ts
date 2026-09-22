@@ -73,7 +73,11 @@ export interface FolderState {
 export const fetchFolders = () => getJson<FolderState>("/v1/folders");
 /** Adds or removes a models folder, or sets the llama-server program. */
 export const changeFolders = (
-  change: { add: string } | { remove: string } | { llama_server: string },
+  change:
+    | { add: string }
+    | { remove: string }
+    | { llama_server: string }
+    | { find_llama_server: string },
 ) => postOrThrow<FolderState>("/v1/folders", change);
 export interface Listing {
   path: string;

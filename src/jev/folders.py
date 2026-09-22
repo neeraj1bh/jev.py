@@ -69,7 +69,7 @@ def known_folders():
                 check=True,
                 cwd="/mnt/c",
             ).stdout
-            homes.append(_local(windows))
+            homes.append(local_path(windows))
     places = [".cache/llama.cpp", "AppData/Local/llama.cpp", ".lmstudio/models", ".cache/lm-studio/models"]
     return [os.path.join(h, p) for h in homes for p in places if os.path.isdir(os.path.join(h, p))]
 
@@ -88,7 +88,7 @@ def _save(values):
         json.dump(values, f, indent=1)
 
 
-def _local(path):
+def local_path(path):
     """A path as this machine names it; in WSL, C:\\models becomes /mnt/c/models."""
     path = os.path.expanduser(path.strip())
     if "microsoft" in platform.release().lower() and re.match(r"^[A-Za-z]:[\\/]", path):
@@ -106,7 +106,7 @@ def is_hf_cache(folder):
 def add(folder, listed=()):
     """Remember a folder that holds models; returns how many it holds. `listed` are the cache
     folders the menu already reads, which need no adding."""
-    folder = _local(folder)
+    folder = local_path(folder)
     if not os.path.isdir(folder):
         raise ValueError(f"No folder at {folder}")
     if folder in listed:
@@ -126,6 +126,26 @@ def remove(folder):
     _save(values)
 
 
+PROGRAMS = ("llama-server", "llama-server.exe")
+
+
+def find_program(folder, depth=6):
+    """The llama-server program somewhere inside a folder, such as a llama.cpp build tree."""
+    folder = local_path(folder)
+    top = folder.rstrip(os.sep).count(os.sep)
+    for here, subfolders, files in os.walk(folder):
+        found = next((f for f in files if f.lower() in PROGRAMS), None)
+        if found and os.access(os.path.join(here, found), os.X_OK):
+            return os.path.join(here, found)
+        # sources, git history and dependencies never hold the built program
+        subfolders[:] = [
+            s for s in subfolders if s[0] != "." and s not in ("node_modules", "src", "tests", "docs")
+        ]
+        if here.count(os.sep) - top >= depth:
+            subfolders[:] = []
+    raise ValueError(f"No llama-server program in {folder}")
+
+
 def llama_server():
     """The llama-server program: the one set in the page, else one on the PATH."""
     return (
@@ -137,7 +157,7 @@ def llama_server():
 
 
 def set_llama_server(path):
-    path = _local(path)
+    path = local_path(path)
     if not (os.path.isfile(path) and os.access(path, os.X_OK)):
         raise ValueError(f"{path} is not a program this machine can run")
     values = settings()
@@ -199,7 +219,7 @@ def browse(path, files=False, hidden=False, places=()):
     """One folder's subfolders, and with files=True its llama-server programs, for the page's picker;
     folders starting with a dot are left out unless hidden=True. `places` are folders known to hold
     models, so every folder on the way to one is marked, however deep."""
-    path = _local(path) if path else os.path.expanduser("~")
+    path = local_path(path) if path else os.path.expanduser("~")
     if not os.path.isdir(path):
         raise ValueError(f"No folder at {path}")
     try:
@@ -224,7 +244,7 @@ def browse(path, files=False, hidden=False, places=()):
         "files": [
             {"name": e.name, "path": e.path}
             for e in visible
-            if files and e.is_file() and e.name.lower() in ("llama-server", "llama-server.exe")
+            if files and e.is_file() and e.name.lower() in PROGRAMS
         ]
         if files
         else [],

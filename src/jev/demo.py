@@ -867,7 +867,14 @@ def model_places():
 
 
 def model_dirs():
-    return list(dict.fromkeys([*folders.settings()["folders"], *folders.KNOWN]))
+    """Folders added in the page and the known llama.cpp and LM Studio ones; a folder inside a
+    Hugging Face cache is left out, since the cache itself is read by model name."""
+    added = [*folders.settings()["folders"], *folders.KNOWN]
+    return [d for d in dict.fromkeys(added) if not in_cache(d)]
+
+
+def in_cache(folder):
+    return any(folder.startswith(c.rstrip(os.sep) + os.sep) for c in (HF_HUB_CACHE, MODELS))
 
 
 def folder_state():
@@ -1242,7 +1249,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     listing = folders.browse(
                         path, files="files" in query, hidden="hidden" in query, places=model_places()
                     )
-                    listing["listed"] = listing["path"] in (HF_HUB_CACHE, MODELS, *model_dirs())
+                    shown = listing["path"]
+                    listing["listed"] = shown in (HF_HUB_CACHE, MODELS, *model_dirs()) or in_cache(shown)
                 except ValueError as e:
                     return self._send(400, json.dumps({"error": {"message": str(e)}}).encode())
                 return self._send(200, json.dumps(listing).encode())
@@ -1327,9 +1335,13 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     if self.client_address[0] not in ("127.0.0.1", "::1"):
                         raise ValueError("folders can only be changed from this machine")
                     if "add" in body:
+                        if in_cache(folders.local_path(body["add"])):
+                            raise ValueError("These models are already in the menu.")
                         folders.add(body["add"], listed=(HF_HUB_CACHE, MODELS))
                     elif "remove" in body:
                         folders.remove(body["remove"])
+                    elif "find_llama_server" in body:
+                        folders.set_llama_server(folders.find_program(body["find_llama_server"]))
                     else:
                         folders.set_llama_server(body["llama_server"])
                     return self._send(200, json.dumps(folder_state()).encode())

@@ -12,13 +12,15 @@ interface FolderPickerProps {
   onCancel: () => void;
   /** Why the last pick was refused, shown beside the buttons. */
   problem?: string;
+  /** For "program": look for llama-server anywhere inside the folder being shown. */
+  onSearch?: (path: string) => void;
 }
 
 const row =
   "flex w-full items-center gap-2 rounded-md border-0 bg-transparent px-2 py-1.5 text-left text-sm text-ink transition-colors hover:bg-lift";
 
 /** Browses the machine jev.py runs on; a page cannot read a folder's path from the browser. */
-export function FolderPicker({ pick, onPick, onCancel, problem }: FolderPickerProps) {
+export function FolderPicker({ pick, onPick, onCancel, problem, onSearch }: FolderPickerProps) {
   const [listing, setListing] = useState<Listing | null>(null);
   const [error, setError] = useState("");
   const [hidden, setHidden] = useState(false);
@@ -102,11 +104,22 @@ export function FolderPicker({ pick, onPick, onCancel, problem }: FolderPickerPr
         <p className={cn("m-0 mr-auto px-1 text-xs", error || problem ? "text-warn" : "text-dim")}>
           {error ||
             problem ||
-            (pick === "folder" && listing?.listed ? "These models are already in the menu." : "")}
+            (pick === "folder" && listing?.listed ? "These models are already in the menu." : "") ||
+            (pick === "program" ? "Open the llama.cpp folder, then search it." : "")}
         </p>
         <button type="button" className={cn(ghostButton, "px-3 py-1 text-sm")} onClick={onCancel}>
           Cancel
         </button>
+        {pick === "program" && onSearch && (
+          <button
+            type="button"
+            disabled={!listing}
+            className={cn(solidButton, "px-3 py-1 text-sm")}
+            onClick={() => listing && onSearch(listing.path)}
+          >
+            Search this folder
+          </button>
+        )}
         {pick === "folder" && (
           <button
             type="button"

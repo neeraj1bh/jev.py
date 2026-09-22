@@ -96,6 +96,7 @@ export function ModelFolders({ onChanged }: { onChanged: () => void }) {
             onPick={(path) => change(picking === "folder" ? { add: path } : { llama_server: path })}
             onCancel={() => setPicking(null)}
             problem={error}
+            onSearch={(path) => change({ find_llama_server: path })}
           />
         )}
       </Modal>
