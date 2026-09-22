@@ -32,6 +32,7 @@ from huggingface_hub.constants import HF_HUB_CACHE
 from transformers import TextIteratorStreamer
 
 from jev.core import DEFAULT_MODEL, ROOT, SYSTEM, Jev, _options, _text
+from jev.eval import typesafe_rows
 from jev.remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env
 
 WEB = os.path.join(ROOT, "web", "dist")  # the built page; see web/
@@ -409,50 +410,43 @@ def download(name, hub, config, split):
         return json.load(f)
 
 
-def sample(name, fresh=False):
-    """One random labelled item as a request, plus its truth. The first call per dataset
-    downloads 300 rows (three random pages) into DATA; later calls deal from them."""
-    if name == "TypeSafe cases":  # several questions per document, each with its consensus label
-        import eval  # only this dataset needs it
+def typesafe_item(case, node, doc, qs, truth):
+    """One TypeSafe step: its document and every question on it, each with its consensus label."""
+    return {
+        "state": doc,
+        "questions": qs,
+        "truth": {k: {"true": "yes", "false": "no"}.get(v, v) for k, v in truth.items()},
+        "source": f"TypeSafe · {case} · {node}",
+        "options": None,
+    }
 
-        cases = eval.typesafe_rows()
-        case, node, doc, qs, truth = cases[deal(name, len(cases), fresh)]
-        truth = {k: {"true": "yes", "false": "no"}.get(v, v) for k, v in truth.items()}
-        src = f"TypeSafe · {case} · {node}"
-        pool = len(cases)
-        left = len(DECKS[name])
-        return {
-            "state": doc,
-            "questions": qs,
-            "truth": truth,
-            "source": src,
-            "options": None,
-            "pool": pool,
-            "left": left,
-        }
+
+def labelled_rows(name, page):
+    """The rows of a downloaded page that carry a label; SNLI marks unlabelled pairs -1."""
     if name in MC:
-        hub, config, split, state_of, question, options_of = MC[name]
-        rows = download(name, hub, config, split)["rows"]
-        r = rows[deal(name, len(rows), fresh)]
+        return page["rows"]
+    label = DATASETS[name][5]
+    return [r for r in page["rows"] if r["row"][label] != -1]
+
+
+def row_item(name, page, r):
+    """One downloaded row as a request with its truth, for a set in DATASETS or MC."""
+    if name in MC:
+        hub, _, split, state_of, question, options_of = MC[name]
         options, answer = options_of(r["row"])
-        q = {"type": "choice", "instructions": question, "criteria": dict.fromkeys(options)}
         return {
             "state": state_of(r["row"]),
-            "questions": {"answer": q},
+            "questions": {
+                "answer": {"type": "choice", "instructions": question, "criteria": dict.fromkeys(options)}
+            },
             "truth": {"answer": options[answer]},
             "source": f"{hub} · {split} row {r['row_idx']}",
             "options": len(options),
-            "pool": len(rows),
-            "left": len(DECKS[name]),
         }
-    hub, config, split, fields, question, label, yes = DATASETS[name]
-    page = download(name, hub, config, split)
+    hub, _, split, fields, question, label, yes = DATASETS[name]
     names = next(x["type"].get("names") for x in page["features"] if x["name"] == label)
-    rows = [r for r in page["rows"] if r["row"][label] != -1]  # SNLI marks unlabelled pairs -1
-    r = rows[deal(name, len(rows), fresh)]
     row, value = r["row"], r["row"][label]
     value = names[value] if names else value
-    state = {k: row[v] for k, v in fields.items()}
     if yes is not None:
         q = {"type": "noul", "instructions": question}
         truth = "yes" if value == yes else "no"
@@ -460,14 +454,26 @@ def sample(name, fresh=False):
         q = {"type": "choice", "instructions": question, "criteria": dict.fromkeys(names)}
         truth = value
     return {
-        "state": state,
+        "state": {k: row[v] for k, v in fields.items()},
         "questions": {"answer": q},
         "truth": {"answer": truth},
         "source": f"{hub} · {split} row {r['row_idx']}",
         "options": 2 if yes is not None else len(names),
-        "pool": len(rows),
-        "left": len(DECKS[name]),
     }
+
+
+def sample(name, fresh=False):
+    """One random labelled item as a request, plus its truth. The first call per dataset
+    downloads 300 rows (three random pages) into DATA; later calls deal from them."""
+    if name == "TypeSafe cases":
+        cases = typesafe_rows()
+        item = typesafe_item(*cases[deal(name, len(cases), fresh)])
+        return item | {"pool": len(cases), "left": len(DECKS[name])}
+    hub, config, split = (DATASETS.get(name) or MC[name])[:3]
+    page = download(name, hub, config, split)
+    rows = labelled_rows(name, page)
+    item = row_item(name, page, rows[deal(name, len(rows), fresh)])
+    return item | {"pool": len(rows), "left": len(DECKS[name])}
 
 
 DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
