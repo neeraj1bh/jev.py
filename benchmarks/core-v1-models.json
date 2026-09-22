@@ -1,0 +1,125 @@
+{
+ "name": "core-v1-models",
+ "frozen": "2026-09-22",
+ "prices": "OpenRouter list or the provider's published price on the day",
+ "rule": "the newest strong model of each family that returned probabilities, plus cheap reference points; older, dated, specialist and role-play models stay optional",
+ "models": [
+  {
+   "id": "openrouter:x-ai/grok-4.5",
+   "role": "strong",
+   "input_per_m": 2.0,
+   "output_per_m": 6.0
+  },
+  {
+   "id": "openrouter:google/gemma-4-31b-it",
+   "role": "strong",
+   "input_per_m": 0.09,
+   "output_per_m": 0.34
+  },
+  {
+   "id": "openrouter:qwen/qwen3-next-80b-a3b-instruct",
+   "role": "strong",
+   "input_per_m": 0.09,
+   "output_per_m": 1.1
+  },
+  {
+   "id": "openrouter:google/gemma-4-26b-a4b-it",
+   "role": "strong",
+   "input_per_m": 0.09,
+   "output_per_m": 0.3
+  },
+  {
+   "id": "openrouter:deepseek/deepseek-v3.2",
+   "role": "strong",
+   "input_per_m": 0.269,
+   "output_per_m": 0.4
+  },
+  {
+   "id": "openrouter:qwen/qwen3-235b-a22b-2507",
+   "role": "strong",
+   "input_per_m": 0.0875,
+   "output_per_m": 0.35
+  },
+  {
+   "id": "openrouter:openai/gpt-4o",
+   "role": "strong",
+   "input_per_m": 2.5,
+   "output_per_m": 10.0
+  },
+  {
+   "id": "openrouter:openai/gpt-4o-mini",
+   "role": "cheap reference",
+   "input_per_m": 0.15,
+   "output_per_m": 0.6
+  },
+  {
+   "id": "openrouter:meta-llama/llama-4-maverick",
+   "role": "cheap reference",
+   "input_per_m": 0.1875,
+   "output_per_m": 0.6525
+  },
+  {
+   "id": "openrouter:mistralai/mistral-small-3.2-24b-instruct",
+   "role": "cheap reference",
+   "input_per_m": 0.0938,
+   "output_per_m": 0.25
+  },
+  {
+   "id": "openrouter:meta-llama/llama-3.3-70b-instruct",
+   "role": "cheap reference",
+   "input_per_m": 0.1,
+   "output_per_m": 0.32
+  },
+  {
+   "id": "openrouter:meta-llama/llama-3.1-8b-instruct",
+   "role": "cheap reference",
+   "input_per_m": 0.05,
+   "output_per_m": 0.08
+  },
+  {
+   "id": "openrouter:ibm-granite/granite-4.0-h-micro",
+   "role": "cheap reference",
+   "input_per_m": 0.017,
+   "output_per_m": 0.112
+  },
+  {
+   "id": "remote:deepseek",
+   "model": "deepseek-flash",
+   "role": "strong",
+   "input_per_m": 0.3,
+   "output_per_m": 1.2
+  },
+  {
+   "id": "remote:moonshot",
+   "model": "kimi-k2.6",
+   "role": "strong",
+   "input_per_m": 0.95,
+   "output_per_m": 4.0
+  },
+  {
+   "id": "remote:typesafe",
+   "model": "jev-latest",
+   "role": "Jev (results private)",
+   "input_per_m": 0.042,
+   "output_per_m": 0.0
+  },
+  {
+   "id": "Qwen/Qwen2.5-0.5B-Instruct",
+   "role": "local",
+   "input_per_m": 0,
+   "output_per_m": 0
+  },
+  {
+   "id": "Qwen/Qwen2.5-1.5B-Instruct",
+   "role": "local",
+   "input_per_m": 0,
+   "output_per_m": 0
+  },
+  {
+   "id": "Qwen/Qwen2.5-3B-Instruct",
+   "role": "local",
+   "input_per_m": 0,
+   "output_per_m": 0
+  }
+ ]
+}

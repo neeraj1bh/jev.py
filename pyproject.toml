@@ -10,6 +10,7 @@ dependencies = ["torch>=2.4", "transformers>=4.45"]
 [project.scripts]
 jev = "jev.core:cli"
 jev-demo = "jev.demo:cli"
+jev-bench = "jev.bench:cli"
 jev-eval = "jev.eval:cli"
 jev-readout = "jev.readout:cli"
 jev-remote = "jev.remote:cli"
