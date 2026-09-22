@@ -1,5 +1,6 @@
 {
  "name": "core-v1",
+ "status": "draft: a balanced random pick; the final list comes from review (see README)",
  "frozen": "2026-09-22",
  "per_set": 50,
  "sets": {

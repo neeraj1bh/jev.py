@@ -8,6 +8,7 @@ answer them, and keeping them apart keeps the main comparison paired across ever
     uv run --no-sync jev-bench freeze                        # write benchmarks/core-v1.json once
     uv run --no-sync jev-bench run remote:deepseek           # one model; letter readers skip wide
     uv run --no-sync jev-bench run Qwen/Qwen2.5-1.5B-Instruct  # local models answer every item
+    uv run --no-sync jev-bench export                        # every item as text, for reviewers
 
 Each run is saved like a demo batch, so Past runs lists it and can compare runs side by side.
 """
@@ -89,6 +90,7 @@ def freeze():
         json.dump(
             {
                 "name": NAME,
+                "status": "draft: a balanced random pick; the final list comes from review (see README)",
                 "frozen": time.strftime("%Y-%m-%d"),
                 "per_set": PER_SET,
                 "sets": sets,
@@ -177,10 +179,30 @@ def run(model):
     print(f"saved to results/logs/demo/{log}.jsonl; open it in Past runs")
 
 
+def export():
+    """Every item with its text and label, one JSON line each, into local/ (git-ignored)."""
+    path = os.path.join(ROOT, "local", "review", f"{NAME}-items.jsonl")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        for part in ("main", "wide"):
+            for item in load(part):
+                keep = ("set", "source", "state", "questions", "truth")
+                f.write(
+                    json.dumps(
+                        {"part": part, "sha": fingerprint(item)} | {k: item[k] for k in keep},
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+    print(os.path.relpath(path, ROOT))
+
+
 def cli():
     args = sys.argv[1:]
     if args[:1] == ["freeze"]:
         freeze()
+    elif args[:1] == ["export"]:
+        export()
     elif args[:1] == ["run"] and len(args) == 2:
         run(args[1])
     else:

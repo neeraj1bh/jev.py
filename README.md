@@ -183,6 +183,37 @@ latency figure. DeepSeek is V4.1-Flash, hosted.
 - **The same text for every backend.** Each question's wording lives in one place,
   `items()` in `src/jev/eval.py`, and local and hosted models get identical text.
 
+### Core v1, the frozen benchmark
+
+`benchmarks/core-v1.json` fixes one set of items for every model. It is a **draft**, a balanced
+random pick made on 2026-09-22; the final list is the one that survives review (below).
+- **Items:** 50 from each of the 34 labelled sets in the demo, plus every TypeSafe step, for
+  1,745 items in all.
+- **Balance:** equal yes and no, equal counts per label, and the right answer spread evenly across
+  positions.
+- **Pointers, not text:** the file stores each item's dataset, split, row and a fingerprint.
+  Anyone rebuilds the same items from the Hub, and a changed item is reported, not silently used.
+
+Banking77, CLINC150 and LEDGAR have more than 26 options, and letter-reading backends answer 26 at
+most. So these three sets' 150 items run only for models that read every option, Jev and local
+models. Everyone else answers the other 1,595, and every comparison stays paired.
+
+```sh
+uv run --no-sync jev-bench run remote:deepseek              # one model, saved to Past runs
+uv run --no-sync jev-bench run Qwen/Qwen2.5-1.5B-Instruct   # a local model, wide items included
+```
+
+Before it counts as final, every item goes through review:
+- `uv run --no-sync jev-bench export` writes each item with its text and label to `local/review/`
+  (git-ignored);
+- two strong models check each label, flag ambiguous or trivial items, and suggest replacements;
+- people settle their disagreements;
+- what survives is frozen as the final version.
+
+Run each model separately, then open the runs together in Past runs to compare them. The models
+to run, with prices on the day, are in `benchmarks/core-v1-models.json`. A new set means a new
+version (core v2); v1 never changes, so its results stay comparable.
+
 ## Demo
 
 ```sh
