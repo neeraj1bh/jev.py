@@ -7,6 +7,7 @@ snapshot_download then fetches the small files and links the weights without dow
 again."""
 
 import os
+from collections import defaultdict
 from threading import Lock
 
 import httpx
@@ -16,7 +17,7 @@ from huggingface_hub.utils import build_hf_headers
 # What transformers reads for a safetensors model: no .bin, .gguf, ONNX or remote code.
 WEIGHTS = ["*.json", "*.safetensors", "*.txt", "*.model", "*.tiktoken", "*.jinja"]
 CHUNK = 1 << 20
-ONE_AT_A_TIME = Lock()
+LOCKS = defaultdict(Lock)  # one download per model; different models download side by side
 STOPPED = set()
 
 
@@ -26,7 +27,7 @@ class Stopped(Exception):
 
 def fetch(model_id, cache_dir, progress):
     """Download the model into cache_dir, keeping progress[model_id] = [done, total, "bytes"]."""
-    with ONE_AT_A_TIME:
+    with LOCKS[model_id]:
         STOPPED.discard(model_id)
         progress[model_id] = [0, 0, "bytes"]
         try:

@@ -454,34 +454,41 @@ export default function App() {
     if (await nextItem(name)) setVerdict("Run to score it against the dataset's label.");
   }
 
-  /** Downloads a local model on first use, then loads it, so timing starts warm. */
-  async function prepare(id: string) {
-    const backend = backends[id];
-    if (!backend) {
+  /** Downloads the local models that are not on disk yet, all at once after one question,
+   * then loads each model, so timing starts warm. */
+  async function prepare(models: string[]) {
+    const picked = models
+      .map((id) => backends[id])
+      .filter((backend): backend is Backend => !!backend);
+    if (!picked.length || picked.length !== models.length) {
       setVerdict("Pick a model first.");
       return false;
     }
-    const downloading = backend.group === "local" && !backend.ready;
-    if (downloading) {
-      const size = backend.gb ? ` (${backend.gb} GB)` : "";
+    const missing = picked.filter((backend) => backend.group === "local" && !backend.ready);
+    if (missing.length) {
+      const gb = missing.reduce((sum, backend) => sum + (backend.gb ?? 0), 0);
+      const names = missing.map((backend) => backend.label).join(", ");
       const ok = await askConfirm(
-        `Download ${backend.label}${size}?`,
-        `It is saved to ${backend.path} and used from there next time.`,
+        missing.length === 1 ? `Download ${names}?` : `Download ${missing.length} models?`,
+        `${missing.length === 1 ? "" : `${names}. `}About ${gb.toFixed(1)} GB, saved to ${missing[0]?.path?.replace(/models--.*$/, "") ?? "models/"} and used from there next time.`,
         "Download",
       );
       if (!ok) return false;
-      setVerdict(`Downloading ${backend.label}. First time only; this can take minutes.`);
-    } else if (backend.group === "local") {
-      setVerdict(`Loading ${backend.label}…`);
+      setVerdict(`Downloading ${names}. First time only; this can take minutes.`);
     }
     try {
-      await loadModel(id);
+      await Promise.all(missing.map((backend) => loadModel(backend.id)));
+      for (const backend of picked) {
+        if (backend.group === "local") setVerdict(`Loading ${backend.label}…`);
+        await loadModel(backend.id);
+      }
     } catch (error) {
       setVerdict(errorMessage(error));
       toast.show(errorMessage(error));
+      if (missing.length) await reload();
       return false;
     }
-    if (!backend.ready) await reload();
+    if (missing.length) await reload();
     return true;
   }
 
@@ -550,7 +557,7 @@ export default function App() {
     }
     const models = isCompare ? compareModels : [generateModel];
     closeSavedRun();
-    for (const id of models) if (!(await prepare(id))) return false;
+    if (!(await prepare(models))) return false;
 
     const body = { ...request, ...logFields(models, current) };
     setVerdict("Running…");
@@ -648,7 +655,7 @@ export default function App() {
 
   async function runCompareBatch(total: number) {
     const models = compareModels.slice();
-    for (const id of models) if (!(await prepare(id))) return;
+    if (!(await prepare(models))) return;
     const hostedCount = models.filter((id) => !isLocal(id)).length;
     const workers = hostedCount === models.length ? HOSTED_PARALLEL : 1;
 
