@@ -854,7 +854,14 @@ def on_disk():
 
 
 def model_dirs():
-    return [d.strip() for d in (env("MODEL_DIRS") or "").split(",") if d.strip()]
+    return folders.settings()["folders"]
+
+
+def folder_state():
+    """The folders added in the page, how many models each holds, and the llama-server in use."""
+    listed = [{"path": d, "models": len(folders.scan([d]))} for d in model_dirs()]
+    gguf = any(k.startswith("gguf:") for k in folders.scan(model_dirs()))
+    return {"folders": listed, "llama_server": folders.llama_server(), "has_gguf": gguf}
 
 
 def local_ids(extra):
@@ -895,7 +902,7 @@ def backends(extra):
         gguf = found["kind"] == "gguf"
         entry = {"id": fid, "label": found["label"], "gb": found["gb"], "path": fid.removeprefix("gguf:")}
         if gguf:  # read by letter through a llama-server started for it
-            out.append(entry | {"group": "gguf", "ready": bool(env("LLAMA_SERVER")), "max": 26})
+            out.append(entry | {"group": "gguf", "ready": bool(folders.llama_server()), "max": 26})
         else:
             need = round(found["gb"] * (1 if BF16 else 2) * 1.3, 1)
             out.append(entry | {"group": "local", "ready": True, "device": DEVICE, "need_gb": need})
@@ -942,9 +949,9 @@ LOADED, LOCK = {}, Lock()  # backend id -> Jev or Remote; at most two local mode
 
 def get(bid):
     if bid.startswith("gguf:"):
-        if not env("LLAMA_SERVER"):
-            raise ValueError("Set the llama-server program under Keys to run GGUF models")
-        url = llamaserver.serve(bid.removeprefix("gguf:"), env("LLAMA_SERVER"))
+        if not folders.llama_server():
+            raise ValueError("Set the llama-server program in Add a model to run GGUF models")
+        url = llamaserver.serve(bid.removeprefix("gguf:"), folders.llama_server())
         remote = LOADED.get(bid) or Remote("llamacpp", model=os.path.basename(bid))
         remote.url = url + "/v1/chat/completions"
         LOADED[bid] = remote
@@ -989,12 +996,6 @@ KEYS = {
         "https://huggingface.co/settings/tokens",
     ),
     "LLAMACPP_URL": ("llama.cpp server", "a llama-server address instead of the default", ""),
-    "MODEL_DIRS": ("Model folders", "folders with GGUF files or model folders, comma-separated", ""),
-    "LLAMA_SERVER": (
-        "llama-server program",
-        "runs the GGUF models found in the model folders",
-        "https://github.com/ggml-org/llama.cpp/releases",
-    ),
 }
 HF_WHOAMI = "https://huggingface.co/api/whoami-v2"
 
@@ -1028,13 +1029,6 @@ def check_key(name, key):
         with urllib.request.urlopen(key.split("/v1/")[0] + "/health", timeout=5) as r:
             if json.loads(r.read()).get("status") != "ok":
                 raise ValueError("that address answered, but not as a llama-server")
-    elif name == "MODEL_DIRS":
-        missing = [d for d in model_dirs() if not os.path.isdir(d)]
-        if missing or not model_dirs():
-            raise ValueError(f"no such folder: {', '.join(missing) or key}")
-    elif name == "LLAMA_SERVER":
-        if not (os.path.isfile(key) and os.access(key, os.X_OK)):
-            raise ValueError(f"{key} is not a program this machine can run")
     elif name == "remote:openrouter":  # its key endpoint checks the key alone, whatever a model can do
         request = urllib.request.Request(OPENROUTER_KEY_URL, headers={"Authorization": "Bearer " + key})
         urllib.request.urlopen(request, timeout=15).close()
@@ -1218,6 +1212,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 return self._send(200, run_body(name))
             if self.path.endswith("/progress"):
                 return self._send(200, json.dumps(progress()).encode())
+            if self.path.endswith("/folders"):
+                return self._send(200, json.dumps(folder_state()).encode())
             if self.path.endswith("/presets"):
                 return self._send(200, json.dumps(presets()).encode())
             if self.path.endswith("/keys"):
@@ -1295,6 +1291,14 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 if self.path.endswith("/models"):
                     add_model(body["id"].strip())
                     return self._send(200, b"{}")
+                if self.path.endswith("/folders"):
+                    if "add" in body:
+                        folders.add(body["add"])
+                    elif "remove" in body:
+                        folders.remove(body["remove"])
+                    else:
+                        folders.set_llama_server(body["llama_server"])
+                    return self._send(200, json.dumps(folder_state()).encode())
                 bid = body.get("backend") or model_id
                 if not bid.startswith(("remote:", "openrouter:")) and bid not in local_ids([model_id])[0]:
                     raise ValueError(f"{bid} is not in the model menu; add it there first")

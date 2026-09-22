@@ -52,18 +52,21 @@ uv run jev-eval Qwen/Qwen2.5-7B-Instruct    # public eval
 
 ## Models in other folders
 
-Under Keys, **Model folders** names more folders to look in, comma-separated (for example
-`/path/to/models`). The menu then lists what it finds there:
+Models already somewhere else on the machine can be listed without copying them: in **Add a
+model**, under *From a folder on this machine*, enter the folder's path (in WSL, `C:\models`
+works as well as `/mnt/c/models`). The folders are remembered in `data/model-folders.json`, and
+the menu lists what they hold:
 
 - **Hugging Face model folders** (a `config.json` and `.safetensors` weights) under *On this
   machine*; they run through PyTorch like any other.
 - **GGUF files** under *GGUF files · llama.cpp*. Split files (`-00001-of-00003.gguf`) count as one
-  model. Set **llama-server program** under Keys, and picking one starts llama-server with it on
-  port 8082 on the GPU, stopping the GGUF model it ran before. jev.py stops it when it exits.
+  model. They need llama.cpp's `llama-server`: one on the PATH is found by itself, otherwise the
+  dialog asks for the program's path. Picking a GGUF model starts llama-server with it on port
+  8082, on the GPU, and stops the GGUF model it ran before; jev.py stops it when it exits.
 
 One GGUF model runs at a time, so comparing two of them restarts llama-server between them; the
-restart is not counted in the times. From WSL, the Windows `llama-server.exe` works as the program:
-jev.py passes it Windows paths and reaches it at the Windows address, as below.
+restart is not counted in the times. From WSL, the Windows `llama-server.exe` works: jev.py passes
+it Windows paths and reaches it at the Windows address, as below.
 
 ## llama.cpp
 

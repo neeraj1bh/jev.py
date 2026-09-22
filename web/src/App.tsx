@@ -961,6 +961,7 @@ export default function App() {
         memoryGb={localModel?.have_gb}
         onClose={() => setAddingFor(null)}
         onAdd={addLocalModel}
+        onFoldersChanged={reload}
       />
 
       <div key={mode} className="animate-fade motion-reduce:animate-none">

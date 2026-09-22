@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 
 import { cn, ghostButton } from "../styles";
 import { Modal } from "./Modal";
+import { ModelFolders } from "./ModelFolders";
 
 const HUB_ID = /^[\w.-]+\/[\w.-]+$/;
 
@@ -31,12 +32,14 @@ interface AddModelDialogProps {
   memoryGb?: number;
   onClose: () => void;
   onAdd: (id: string) => Promise<void>;
+  /** A folder was added or removed, so the menu's models changed. */
+  onFoldersChanged: () => void;
 }
 
-/** Adds a Hugging Face model to the menu; the server checks it on the Hub before anything
- * downloads, and it downloads the first time it runs. */
+/** Adds a model to the menu: from Hugging Face, checked on the Hub before anything downloads, or
+ * from a folder on this machine that already holds models. */
 export function AddModelDialog(props: AddModelDialogProps) {
-  const { open, listed, memoryPerGb, memoryGb, onClose, onAdd } = props;
+  const { open, listed, memoryPerGb, memoryGb, onClose, onAdd, onFoldersChanged } = props;
   const [id, setId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -65,9 +68,9 @@ export function AddModelDialog(props: AddModelDialogProps) {
 
   return (
     <Modal open={open} onClose={onClose} className="w-[min(560px,calc(100vw-32px))] px-6 py-5">
-      <h2 className="mt-0 mb-4 text-[15px] font-semibold">Add a model from Hugging Face</h2>
+      <h2 className="mt-0 mb-4 text-[15px] font-semibold">Add a model</h2>
 
-      <h3 className="mt-0 mb-1 text-xs font-medium text-dim">Small models</h3>
+      <h3 className="mt-0 mb-1 text-xs font-medium text-dim">Small models from Hugging Face</h3>
       <ul className="m-0 mb-5 list-none p-0">
         {STARTERS.map((starter) => {
           const warning = tooBig(starter.gb, memoryPerGb, memoryGb);
@@ -98,7 +101,7 @@ export function AddModelDialog(props: AddModelDialogProps) {
 
       <form onSubmit={submit}>
         <label htmlFor="hub-id" className="mb-1 block text-xs font-medium text-dim">
-          Any other model
+          Any other Hugging Face model
         </label>
         <div className="flex gap-2">
           <input
@@ -122,6 +125,8 @@ export function AddModelDialog(props: AddModelDialogProps) {
         </div>
         {error && <p className="mt-2 mb-0 text-xs text-warn">{error}</p>}
       </form>
+
+      {open && <ModelFolders onChanged={onFoldersChanged} />}
     </Modal>
   );
 }

@@ -65,6 +65,16 @@ export const stopDownload = (backend: string) => postOrThrow<unknown>("/v1/stop"
 /** Deletes a downloaded model's files; returns the bytes freed. */
 export const deleteModel = (backend: string) =>
   postOrThrow<{ freed: number }>("/v1/delete", { backend });
+export interface FolderState {
+  folders: { path: string; models: number }[];
+  llama_server: string;
+  has_gguf: boolean;
+}
+export const fetchFolders = () => getJson<FolderState>("/v1/folders");
+/** Adds or removes a models folder, or sets the llama-server program. */
+export const changeFolders = (
+  change: { add: string } | { remove: string } | { llama_server: string },
+) => postOrThrow<FolderState>("/v1/folders", change);
 export const fetchKeys = () => getJson<KeyInfo[]>("/v1/keys");
 /** Forgets a key for this session and removes it from .env. */
 export const clearKey = (backend: string) =>

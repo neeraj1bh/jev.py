@@ -211,7 +211,7 @@ export function ModelMenu(props: ModelMenuProps) {
                   className="flex w-full items-center gap-1.5 rounded-md border-0 bg-transparent px-2.5 py-1.5 text-left text-sm text-dim transition-colors hover:bg-lift hover:text-ink"
                 >
                   <Icon icon={Plus} size={14} />
-                  Add a model from Hugging Face
+                  Add a model
                 </button>
               )}
             </Fragment>

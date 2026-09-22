@@ -12,8 +12,6 @@ import { Skeleton } from "./Skeleton";
 /** Settings that are addresses or paths, typed in the open rather than as secrets. */
 const HINTS: Record<string, string> = {
   LLAMACPP_URL: "The llama-server address, e.g. http://localhost:8081/v1/chat/completions",
-  MODEL_DIRS: "Folders to look in, comma-separated, e.g. /path/to/models",
-  LLAMA_SERVER: "The llama-server program, e.g. /path/to/llama-server.exe",
 };
 
 interface KeysDialogProps {
