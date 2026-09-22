@@ -35,6 +35,8 @@ export interface Dataset {
   yes_no?: boolean;
   /** A frozen benchmark: a fixed mix of items from many sets. */
   frozen?: boolean;
+  /** Behind a Hugging Face login, and no token is set yet. */
+  needs_token?: boolean;
   local: boolean;
   about?: string;
   /** The menu heading it sits under, e.g. "Knowledge and exams". */

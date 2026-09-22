@@ -1,7 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { fetchKeys } from "../api";
+import { clearKey, fetchKeys } from "../api";
 import { chipButton, cn, labelText } from "../styles";
 import type { KeyInfo } from "../types";
 import { Icon } from "./Icon";
@@ -20,6 +20,7 @@ interface KeysDialogProps {
 export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
   const [keys, setKeys] = useState<KeyInfo[] | null>(null);
   const [editing, setEditing] = useState("");
+  const [clearing, setClearing] = useState("");
 
   useEffect(() => {
     if (open) fetchKeys().then(setKeys);
@@ -61,6 +62,25 @@ export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
                 >
                   <Icon icon={ExternalLink} size={14} />
                 </a>
+              )}
+              {key.set && (
+                <button
+                  type="button"
+                  className="border-0 bg-transparent px-1.5 py-1 text-[13px] text-dim transition-colors hover:text-warn"
+                  onClick={async () => {
+                    if (clearing !== key.var) {
+                      setClearing(key.var);
+                      return;
+                    }
+                    await clearKey(key.backend ?? key.var);
+                    setClearing("");
+                    fetchKeys().then(setKeys);
+                    onChanged();
+                  }}
+                  onBlur={() => setClearing("")}
+                >
+                  {clearing === key.var ? "Clear from .env?" : "Clear"}
+                </button>
               )}
               <button
                 type="button"

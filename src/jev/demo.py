@@ -299,6 +299,7 @@ ABOUT = {  # one line per set, shown when hovering it in the page
     ),
 }
 CORE = ("Core v1",)  # frozen benchmarks, see bench.py
+GATED = {"GPQA Diamond"}  # need a Hugging Face token and the set's terms accepted
 CORE_ITEMS = {}
 GROUPS = {  # menu headings, in order; every set belongs to one
     "Frozen benchmarks": list(CORE),
@@ -662,14 +663,20 @@ GATEWAY = {"at": 0.0, "models": []}  # OpenRouter's catalog, refetched every few
 
 
 GATEWAY_CHECKED = os.path.join(DATA, "gateway-checked.json")  # model -> did it return probabilities
+# The same check as shipped with the package (2026-09-22), so a fresh clone lists the working
+# models before any key is set; this machine's own checks, in DATA, take precedence.
+SHIPPED_CHECKED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "openrouter-checked.json")
 
 
 def read_checked():
-    try:
-        with open(GATEWAY_CHECKED) as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {}
+    checked = {}
+    for path in (SHIPPED_CHECKED, GATEWAY_CHECKED):
+        try:
+            with open(path) as f:
+                checked |= json.load(f)
+        except (OSError, ValueError):
+            pass
+    return checked
 
 
 CHECKED = read_checked()
@@ -772,16 +779,18 @@ def backends(extra):
             )  # llama-server's reply, not a page that mentions "ok"
     except (OSError, ValueError, AttributeError):
         up = False
-    out.append(
-        {
-            "id": "remote:llamacpp",
-            "group": "server",
-            "label": "llama.cpp server",
-            "ready": up,
-            "url": url,
-            "max": 26,
-        }
-    )
+    # Listed only when a llama-server answers or its address was set under Keys; most machines have none.
+    if up or env("LLAMACPP_URL"):
+        out.append(
+            {
+                "id": "remote:llamacpp",
+                "group": "server",
+                "label": "llama.cpp server",
+                "ready": up,
+                "url": url,
+                "max": 26,
+            }
+        )
     for b, label in HOSTED.items():
         var = BACKENDS[b][0]
         ready, most = bool(env(var)), 26 if b in LETTER else None
@@ -851,6 +860,16 @@ KEYS = {
 HF_WHOAMI = "https://huggingface.co/api/whoami-v2"
 
 
+def presets():
+    """Model lists frozen with a benchmark, e.g. Core v1's, for one-click selection in the page."""
+    path = os.path.join(ROOT, "benchmarks", "core-v1-models.json")
+    if not os.path.exists(path):
+        return []
+    with open(path) as f:
+        frozen = json.load(f)
+    return [{"name": "Core v1 models", "dataset": "Core v1", "models": [m["id"] for m in frozen["models"]]}]
+
+
 def keys():
     """Which keys are set; never their values."""
     backend = {v[0]: "remote:" + b for b, v in BACKENDS.items() if v[0]}
@@ -877,16 +896,43 @@ def check_key(name, key):
         get(name).ask({"text": "hello"}, {"q": {"type": "noul", "instructions": "Is this a greeting?"}})
 
 
-def set_key(name, key, save):
-    """Use a key typed into the page: test it with one tiny request, then keep it for this
-    session and, if asked, write it to .env (git-ignored). A rejected key changes nothing.
-    `name` is a backend id such as remote:deepseek, or a KEYS name such as HF_TOKEN."""
+def key_target(name):
+    """The backend id (or None) and .env name for a backend id or a KEYS name."""
     bid = (
         name if name.startswith("remote:") else next((k["backend"] for k in keys() if k["var"] == name), None)
     )
     if bid is None and name not in KEYS:
         raise ValueError(f"unknown key {name}")
-    var = BACKENDS[bid.split(":", 1)[1]][0] if bid else name
+    return bid, BACKENDS[bid.split(":", 1)[1]][0] if bid else name
+
+
+def clear_key(name):
+    """Forget a key: out of this session and out of .env, with the note saved above it."""
+    bid, var = key_target(name)
+    os.environ.pop(var, None)
+    LOADED.pop(bid, None)
+    path = os.path.join(ROOT, ".env")
+    if not os.path.exists(path):
+        return
+    with open(path) as f:
+        lines = f.read().splitlines()
+    label = KEYS.get(var, (var,))[0]
+    out = []
+    for line in lines:
+        if line.partition("=")[0].strip() == var:
+            if out and out[-1].startswith(f"# {label}:"):
+                out.pop()
+            continue
+        out.append(line)
+    with open(path, "w") as f:
+        f.write("\n".join(out) + "\n")
+
+
+def set_key(name, key, save):
+    """Use a key typed into the page: test it with one tiny request, then keep it for this
+    session and, if asked, write it to .env (git-ignored). A rejected key changes nothing.
+    `name` is a backend id such as remote:deepseek, or a KEYS name such as HF_TOKEN."""
+    bid, var = key_target(name)
     old = os.environ.get(var)
     os.environ[var] = key
     LOADED.pop(bid, None)
@@ -1010,6 +1056,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 return self._send(200, run_body(name))
             if self.path.endswith("/progress"):
                 return self._send(200, json.dumps(progress()).encode())
+            if self.path.endswith("/presets"):
+                return self._send(200, json.dumps(presets()).encode())
             if self.path.endswith("/keys"):
                 return self._send(200, json.dumps(keys()).encode())
             if self.path.endswith("/datasets"):
@@ -1018,6 +1066,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                         "name": n,
                         "options": OPTIONS.get(n, 2),
                         "yes_no": n in DATASETS and DATASETS[n][6] is not None,
+                        "needs_token": n in GATED and not env("HF_TOKEN"),
                         "local": os.path.exists(dataset_path(n)),
                     }
                     for n in [*DATASETS, *MC]
@@ -1070,7 +1119,10 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 if self.path.endswith("/key"):
                     if self.client_address[0] not in ("127.0.0.1", "::1"):
                         raise ValueError("keys can only be set from this machine")
-                    set_key(body["backend"], body["key"].strip(), body.get("save", False))
+                    if body.get("clear"):
+                        clear_key(body["backend"])
+                    else:
+                        set_key(body["backend"], body["key"].strip(), body.get("save", False))
                     return self._send(200, b"{}")
                 jev = get(body.get("backend") or model_id)
                 if self.path.endswith("/load"):  # downloads a local model the first time

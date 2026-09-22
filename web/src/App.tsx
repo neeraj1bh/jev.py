@@ -257,7 +257,8 @@ export default function App() {
     switchMode("compare");
     setSource("dataset");
     await chooseDataset(name);
-    const keyless = models.some((id) => !backends[id]?.ready);
+    const keyless = models.some((id) => !backends[id]?.ready && backends[id]?.group !== "local");
+    if (keyless) setKeysOpen(true);
     toast.show(
       keyless
         ? `${models.length} models set up on ${name}. Add your OpenRouter key, then press Run batch.`

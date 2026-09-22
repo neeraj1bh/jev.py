@@ -64,7 +64,9 @@ export function DatasetMenu({
               detail={
                 blocker
                   ? `pick 1 of ${set.options} · ${blocker.label} takes ${blocker.max}`
-                  : answerShape(set) + (set.local ? " · on disk" : " · download")
+                  : set.needs_token
+                    ? "needs a Hugging Face token"
+                    : answerShape(set) + (set.local ? " · on disk" : " · download")
               }
             />
           </Fragment>

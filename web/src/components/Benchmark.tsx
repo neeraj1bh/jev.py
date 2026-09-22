@@ -1,6 +1,6 @@
 import { Check, Trophy } from "lucide-react";
-import { useState } from "react";
-
+import { useEffect, useState } from "react";
+import { fetchPresets, type Preset } from "../api";
 import {
   dollarText,
   isOffline,
@@ -114,6 +114,12 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
     .slice(0, TOP_MAKERS);
   const freeCount = gateway.filter((backend) => backend.free).length;
   const [picked, setPicked] = useState<string[]>([]);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  useEffect(() => {
+    fetchPresets().then(setPresets);
+  }, []);
+  const known = new Set(backends.map((backend) => backend.id));
+  const presetOn = (preset: Preset) => preset.models.every((id) => picked.includes(id));
   const [menu, setMenu] = useState("");
   const menuHandler = (name: string) => (open: boolean) => setMenu(open ? name : "");
   const [dataset, setDataset] = useState("");
@@ -222,6 +228,27 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
           />
           <span className={labelText}>items each</span>
         </div>
+        {presets.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className={labelText}>Frozen lists</span>
+            {presets.map((preset) => (
+              <MakerChip
+                key={preset.name}
+                label={preset.name}
+                count={preset.models.length}
+                on={presetOn(preset)}
+                onToggle={() => {
+                  if (presetOn(preset)) {
+                    setPicked([]);
+                    return;
+                  }
+                  setPicked(preset.models.filter((id) => known.has(id)));
+                  setDataset(preset.dataset);
+                }}
+              />
+            ))}
+          </div>
+        )}
         {makers.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className={labelText}>Add all from</span>

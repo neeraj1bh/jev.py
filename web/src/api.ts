@@ -59,6 +59,16 @@ export const loadModel = (backend: string) => postOrThrow<unknown>("/v1/load", {
 export const saveKey = (backend: string, key: string, save: boolean) =>
   postOrThrow<unknown>("/v1/key", { backend, key, save });
 export const fetchKeys = () => getJson<KeyInfo[]>("/v1/keys");
+/** Forgets a key for this session and removes it from .env. */
+export const clearKey = (backend: string) =>
+  postOrThrow<unknown>("/v1/key", { backend, clear: true });
+
+export interface Preset {
+  name: string;
+  dataset: string;
+  models: string[];
+}
+export const fetchPresets = () => getJson<Preset[]>("/v1/presets");
 
 export async function readout(
   body: Request & { backend: string } & Record<string, unknown>,
