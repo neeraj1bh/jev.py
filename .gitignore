@@ -7,6 +7,7 @@ __pycache__/
 .env
 results/logs/
 results/typesafe/
+results/errors/
 .vscode/
 .specstory/
 models/
