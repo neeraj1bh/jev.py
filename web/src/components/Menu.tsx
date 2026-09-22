@@ -120,7 +120,7 @@ export function MenuItem({
         aria-selected={!!selected}
         disabled={disabled}
         onClick={onSelect}
-        className="flex w-full items-baseline justify-between gap-3 rounded-md border-0 bg-transparent px-2.5 py-1.5 text-left text-sm text-ink transition-colors duration-150 hover:enabled:bg-lift disabled:text-dim disabled:opacity-100 aria-selected:bg-lift"
+        className="flex w-full items-baseline justify-between gap-3 rounded-md border-0 bg-transparent px-2.5 py-1.5 text-left text-sm text-ink transition-colors duration-150 hover:enabled:bg-lift disabled:cursor-not-allowed disabled:opacity-40 aria-selected:bg-lift"
       >
         <span className="min-w-0 truncate">{label}</span>
         <span

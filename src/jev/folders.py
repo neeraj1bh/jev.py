@@ -22,37 +22,74 @@ def _gb(folder, names):
     return round(sum(os.path.getsize(os.path.join(folder, n)) for n in names) / 1e9, 1)
 
 
+DEPTH = 4  # levels below an added folder; adding a whole drive stays quick
+SKIP = {"node_modules", "__pycache__", "site-packages", "Windows", "Program Files", "Program Files (x86)"}
+SCANS = {}  # folder -> what it held; read again when folders are added or removed
+SMALLEST_GB = 0.1  # smaller .gguf files are tokenizer fixtures, not models
+
+
 def scan(dirs):
+    found = {}
+    for top in dirs:
+        if top not in SCANS:
+            SCANS[top] = _scan_one(top)
+        found |= SCANS[top]
+    return found
+
+
+def _keep(name):
+    """Dot-folders, dependencies, system folders and a cache's own folders never hold models to
+    list; a Hugging Face cache is read through the cache, by model name (cache.py)."""
+    skipped = name.startswith((".", "$", "models--")) or name in SKIP or name == "blobs"
+    return not skipped and ".venv" not in name
+
+
+QUANT = re.compile(r"[-_.]((?:i?q\d|f16|fp16|bf16|f32)[a-z0-9_]*)$", re.IGNORECASE)
+
+
+def gguf_label(stem):
+    """A GGUF file name as a readable model name: qwen2.5-14b-instruct-q4_k_m -> Qwen2.5-14B · Q4_K_M."""
+    stem = re.sub(
+        r"^.*-GGUF_|-instruct", "", stem, flags=re.IGNORECASE
+    )  # llama.cpp's cache: owner_repo-GGUF_file
+    quant = QUANT.search(stem)
+    name = stem[: quant.start()] if quant else stem
+    name = re.sub(r"(?<=\d)b\b", "B", name)  # 14b -> 14B, a3b -> A3B keeps its a
+    name = re.sub(r"-a(\d+B)", r"-A\1", name)
+    name = name[:1].upper() + name[1:]
+    if not quant:
+        return name
+    code = quant.group(1).upper()
+    bits = "16" if code in ("F16", "FP16", "BF16") else "32" if code == "F32" else re.sub(r"\D", "", code)[:1]
+    return f"{name} · {bits}-bit ({code})"
+
+
+def _scan_one(top):
     """{id: {"label", "gb", "kind"}}. A GGUF model's id is "gguf:" and the path of its first file
     (llama.cpp finds the other shards itself); a model folder's id is its path."""
     found = {}
-    # Walks the whole tree: quick for a models folder, slow if pointed at a home folder.
-    for top in dirs:
-        for folder, subfolders, files in os.walk(top):
-            # A Hugging Face cache's own folders are read through the cache, by model name (cache.py).
-            subfolders[:] = [s for s in subfolders if not s.startswith((".", "models--")) and s != "blobs"]
-            if runnable({f: os.path.join(folder, f) for f in files}):
-                found[folder] = {
-                    "label": os.path.basename(folder),
-                    "gb": _gb(folder, files),
-                    "kind": "folder",
-                }
+    base = top.rstrip(os.sep).count(os.sep)
+    for folder, subfolders, files in os.walk(top):
+        subfolders[:] = [] if folder.count(os.sep) - base >= DEPTH else list(filter(_keep, subfolders))
+        if runnable({f: os.path.join(folder, f) for f in files}):
+            found[folder] = {"label": os.path.basename(folder), "gb": _gb(folder, files), "kind": "folder"}
+            continue
+        for name in files:
+            # mmproj files hold a vision encoder, not a model
+            if not name.lower().endswith(".gguf") or name.lower().startswith("mmproj"):
                 continue
-            for name in files:
-                # mmproj files hold a vision encoder, not a model
-                if not name.lower().endswith(".gguf") or name.lower().startswith("mmproj"):
-                    continue
-                shard = SHARD.search(name)
-                if shard and shard.group(1) != "00001":
-                    continue
-                stem = SHARD.sub("", name) if shard else name[: -len(".gguf")]
-                parts = [f for f in files if SHARD.sub("", f) == stem] if shard else [name]
-                found["gguf:" + os.path.join(folder, name)] = {
-                    # llama.cpp's cache names files owner_repo-GGUF_file
-                    "label": re.sub(r"^.*-GGUF_|-instruct", "", stem, flags=re.IGNORECASE),
-                    "gb": _gb(folder, parts),
-                    "kind": "gguf",
-                }
+            shard = SHARD.search(name)
+            if shard and shard.group(1) != "00001":
+                continue
+            stem = SHARD.sub("", name) if shard else name[: -len(".gguf")]
+            parts = [f for f in files if SHARD.sub("", f) == stem] if shard else [name]
+            if _gb(folder, parts) < SMALLEST_GB:
+                continue
+            found["gguf:" + os.path.join(folder, name)] = {
+                "label": gguf_label(stem),
+                "gb": _gb(folder, parts),
+                "kind": "gguf",
+            }
     return found
 
 
@@ -117,6 +154,7 @@ def add(folder, listed=()):
     values = settings()
     values["folders"] = list(dict.fromkeys([*values["folders"], folder]))
     _save(values)
+    SCANS.clear()
     return found
 
 
@@ -124,6 +162,7 @@ def remove(folder):
     values = settings()
     values["folders"] = [f for f in values["folders"] if f != folder]
     _save(values)
+    SCANS.clear()
 
 
 PROGRAMS = ("llama-server", "llama-server.exe")

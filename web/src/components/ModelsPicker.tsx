@@ -50,7 +50,11 @@ export function ModelsPicker({
       <ModelMenu
         backends={backends}
         showChecks
-        hint={`Up to ${MAX_COMPARE} models · click to add or remove`}
+        hint={
+          selected.length >= MAX_COMPARE
+            ? `${MAX_COMPARE} of ${MAX_COMPARE} picked · remove one to add another`
+            : `Up to ${MAX_COMPARE} models · click to add or remove`
+        }
         isSelected={chosen}
         isDisabled={(backend) =>
           (!chosen(backend) && selected.length >= MAX_COMPARE) || isOffline(backend)
