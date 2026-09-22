@@ -140,6 +140,10 @@ def is_hf_cache(folder):
         return False
 
 
+def _inside(child, parent):
+    return child.startswith(parent.rstrip(os.sep) + os.sep)
+
+
 def add(folder, listed=()):
     """Remember a folder that holds models; returns how many it holds. `listed` are the cache
     folders the menu already reads, which need no adding."""
@@ -152,7 +156,11 @@ def add(folder, listed=()):
     if not found:
         raise ValueError(f"No GGUF files or model folders in {folder}")
     values = settings()
-    values["folders"] = list(dict.fromkeys([*values["folders"], folder]))
+    covering = next((f for f in values["folders"] if f == folder or _inside(folder, f)), None)
+    if covering:
+        raise ValueError(f"Already listed through {covering}")
+    # a folder added above ones already listed replaces them
+    values["folders"] = [f for f in values["folders"] if not _inside(f, folder)] + [folder]
     _save(values)
     SCANS.clear()
     return found
