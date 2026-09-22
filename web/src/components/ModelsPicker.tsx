@@ -33,6 +33,8 @@ export function ModelsPicker({
       button={
         backends.length === 0 ? (
           <Skeleton className="my-1 w-44" />
+        ) : selected.length === 0 ? (
+          "Pick models"
         ) : (
           <>
             {selected.length} models
@@ -50,9 +52,7 @@ export function ModelsPicker({
         hint={`Compare 2 to ${MAX_MODELS} · click to add or remove`}
         isSelected={chosen}
         isDisabled={(backend) =>
-          (chosen(backend) && selected.length <= 2) ||
-          (!chosen(backend) && selected.length >= MAX_MODELS) ||
-          isOffline(backend)
+          (!chosen(backend) && selected.length >= MAX_MODELS) || isOffline(backend)
         }
         detail={statusText}
         onSelect={onToggle}

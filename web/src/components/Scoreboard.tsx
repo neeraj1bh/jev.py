@@ -5,6 +5,7 @@ import { useCountUp } from "../hooks/useCountUp";
 import { scoreResponse } from "../scoring";
 import { cn, labelText } from "../styles";
 import type { Row } from "../types";
+import { Tip } from "./Tip";
 
 interface Lane {
   name: string;
@@ -62,9 +63,9 @@ function LaneRow({ lane, leading, labelled }: { lane: Lane; leading: boolean; la
       transition={{ type: "spring", stiffness: 380, damping: 32 }}
       className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 border-t border-rule py-3 first:border-t-0"
     >
-      <span className="truncate text-sm font-semibold text-ink" title={lane.name}>
-        {lane.name}
-      </span>
+      <Tip content={lane.name}>
+        <span className="truncate text-sm font-semibold text-ink">{lane.name}</span>
+      </Tip>
       <span
         className={cn(
           "text-right font-mono text-[26px] leading-none font-semibold tabular-nums transition-colors",

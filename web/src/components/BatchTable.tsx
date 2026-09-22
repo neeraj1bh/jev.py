@@ -4,6 +4,7 @@ import { answerLabel, inputSnippet, matchesLabel, scoreResponse } from "../scori
 import { cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
 import type { Response, Row } from "../types";
 import { CheckMark } from "./CheckMark";
+import { Tip } from "./Tip";
 
 function ResultCell({
   response,
@@ -115,9 +116,9 @@ export function BatchTable({
             </span>
           )}
         </h2>
-        <span className={labelText} title={file.path}>
-          {file.text}
-        </span>
+        <Tip content={file.path}>
+          <span className={labelText}>{file.text}</span>
+        </Tip>
       </div>
       <div className="max-h-[460px] overflow-auto">
         <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px]">
@@ -135,9 +136,9 @@ export function BatchTable({
               <th className={tableHead}>Input</th>
               {labelled && <th className={tableHead}>Label</th>}
               {columns.map((column) => (
-                <th key={column} className={cn(tableHead, "truncate")} title={column}>
-                  {column}
-                </th>
+                <Tip key={column} content={column}>
+                  <th className={cn(tableHead, "truncate")}>{column}</th>
+                </Tip>
               ))}
             </tr>
           </thead>
@@ -158,9 +159,9 @@ export function BatchTable({
                   <td className={tableCell}>
                     <span className={monoDim}>{i + 1}</span>
                   </td>
-                  <td className={cn(tableCell, "max-w-none text-ink")} title={input}>
-                    {input}
-                  </td>
+                  <Tip content={input}>
+                    <td className={cn(tableCell, "max-w-none text-ink")}>{input}</td>
+                  </Tip>
                   {labelled && (
                     <td className={tableCell}>
                       {questionCount > 1 ? (

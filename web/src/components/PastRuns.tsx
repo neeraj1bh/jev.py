@@ -7,10 +7,12 @@ import type { RunKind, SavedRun } from "../types";
 import { Icon } from "./Icon";
 import { type KindFilter, RunFilter } from "./RunFilter";
 import { Skeleton } from "./Skeleton";
+import { Tip } from "./Tip";
 
 export type { KindFilter } from "./RunFilter";
 
 const PAGE_SIZE = 20;
+const SHOWN_MODELS = 3; // the rest sit behind "+N more", so a row never wraps or cuts a score
 const pagerButton =
   "rounded-md border border-rule bg-transparent px-3 py-1.5 text-ink hover:enabled:border-dim max-[600px]:min-h-11 max-[600px]:flex-1";
 
@@ -97,7 +99,7 @@ export function PastRuns(props: PastRunsProps) {
     const active = sort.column === column;
     return (
       <th
-        className={tableHead}
+        className={cn(tableHead, column === "items" && "text-right")}
         aria-sort={active ? (sort.descending ? "descending" : "ascending") : "none"}
       >
         <button
@@ -218,6 +220,15 @@ export function PastRuns(props: PastRunsProps) {
               const best = Math.max(...run.backends.map((backend) => accuracy(run, backend)));
               const singleBest =
                 run.backends.filter((backend) => accuracy(run, backend) === best).length === 1;
+              const score = (backend: string) => {
+                const [correct, total] = run.score?.[backend] ?? [0, 0];
+                const won = singleBest && total > 0 && accuracy(run, backend) === best;
+                return (
+                  <i className={cn("font-mono text-xs not-italic", won ? "text-good" : "text-dim")}>
+                    {total ? `${((100 * correct) / total).toFixed(1)}%` : ""}
+                  </i>
+                );
+              };
               return (
                 <tr
                   key={run.name}
@@ -225,20 +236,25 @@ export function PastRuns(props: PastRunsProps) {
                   className="cursor-pointer transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md"
                 >
                   <td className={tableCell}>
-                    <input
-                      type="checkbox"
-                      checked={picked.includes(run.name)}
-                      disabled={!picked.includes(run.name) && !canPick(run)}
-                      onClick={(event) => event.stopPropagation()}
-                      onChange={() => togglePicked(run.name)}
-                      aria-label={`Pick the ${run.dataset} run of ${runTime(run.name)} to compare`}
-                      title={
+                    <Tip
+                      content={
                         picked.includes(run.name) || canPick(run)
-                          ? "Pick runs that share items to compare them"
+                          ? "Pick runs that share items to compare them side by side"
                           : "No item in common with the runs already picked"
                       }
-                      className="size-4 accent-current disabled:opacity-30"
-                    />
+                    >
+                      <span className="inline-flex">
+                        <input
+                          type="checkbox"
+                          checked={picked.includes(run.name)}
+                          disabled={!picked.includes(run.name) && !canPick(run)}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() => togglePicked(run.name)}
+                          aria-label={`Pick the ${run.dataset} run of ${runTime(run.name)} to compare`}
+                          className="size-4 accent-current disabled:opacity-30"
+                        />
+                      </span>
+                    </Tip>
                   </td>
                   <td className={tableCell}>
                     <span className={monoDim}>{runTime(run.name)}</span>
@@ -246,35 +262,44 @@ export function PastRuns(props: PastRunsProps) {
                   <td className={tableCell}>
                     {run.dataset}
                     {run.item && (
-                      <span className={cn(monoDim, "ml-1.5")} title={run.item}>
-                        {run.item
-                          .split("·")
-                          .pop()
-                          ?.trim()
-                          .replace(/^\w+ row/, "row")}
-                      </span>
+                      <Tip content={run.item}>
+                        <span className={cn(monoDim, "ml-1.5")}>
+                          {run.item
+                            .split("·")
+                            .pop()
+                            ?.trim()
+                            .replace(/^\w+ row/, "row")}
+                        </span>
+                      </Tip>
                     )}
                   </td>
                   <td className={tableCell}>
-                    {run.backends.map((backend) => {
-                      const [correct, total] = run.score?.[backend] ?? [0, 0];
-                      const won = singleBest && total > 0 && accuracy(run, backend) === best;
-                      return (
-                        <span key={backend} className="mr-3.5 whitespace-nowrap">
-                          {props.backendLabel(backend, run.mode)}{" "}
-                          <i
-                            className={cn(
-                              "font-mono text-xs not-italic",
-                              won ? "text-good" : "text-dim",
-                            )}
-                          >
-                            {total ? `${((100 * correct) / total).toFixed(1)}%` : ""}
-                          </i>
+                    {run.backends.slice(0, SHOWN_MODELS).map((backend) => (
+                      <span key={backend} className="mr-3.5 whitespace-nowrap">
+                        {props.backendLabel(backend, run.mode)} {score(backend)}
+                      </span>
+                    ))}
+                    {run.backends.length > SHOWN_MODELS && (
+                      <Tip
+                        content={
+                          <span className="grid gap-1">
+                            {run.backends.slice(SHOWN_MODELS).map((backend) => (
+                              <span key={backend} className="flex justify-between gap-5">
+                                {props.backendLabel(backend, run.mode)} {score(backend)}
+                              </span>
+                            ))}
+                          </span>
+                        }
+                      >
+                        <span className="cursor-default font-mono text-xs text-dim underline decoration-dotted underline-offset-2">
+                          +{run.backends.length - SHOWN_MODELS} more
                         </span>
-                      );
-                    })}
+                      </Tip>
+                    )}
                   </td>
-                  <td className={tableCell}>{run.items}</td>
+                  <td className={cn(tableCell, "text-right font-mono tabular-nums")}>
+                    {run.items.toLocaleString()}
+                  </td>
                 </tr>
               );
             })}

@@ -1,5 +1,6 @@
 import type { PanelState } from "../types";
 import { Clock, PlaceBadge } from "./Panel";
+import { Tip } from "./Tip";
 
 export interface Place {
   place: number;
@@ -33,9 +34,9 @@ export function RaceClocks({ names, panels }: { names: string[]; panels: PanelSt
           key={names[k]}
           className="min-w-0 rounded-lg border border-rule bg-panel px-5 py-4"
         >
-          <h2 className="m-0 truncate text-sm font-semibold text-ink" title={names[k]}>
-            {names[k]}
-          </h2>
+          <Tip content={names[k]}>
+            <h2 className="m-0 truncate text-sm font-semibold text-ink">{names[k]}</h2>
+          </Tip>
           <Clock state={panel} />
           <PlaceBadge place={places[k]} />
         </section>

@@ -54,14 +54,9 @@ const DIRECT_GROUPS: [BackendGroup, string][] = [
   ["hosted", "Hosted"],
 ];
 
-/** Usable backends first; with `textlessLast`, Jev (which cannot write text) after the rest. */
-export function groupBackends(backends: Backend[], textlessLast: boolean) {
-  const rank = (backend: Backend) =>
-    textlessLast && TEXTLESS.has(backend.id)
-      ? 1
-      : backend.ready || backend.group === "local"
-        ? 0
-        : 2;
+/** Usable backends first, then the ones that still need a key or a server. */
+export function groupBackends(backends: Backend[]) {
+  const rank = (backend: Backend) => (backend.ready || backend.group === "local" ? 0 : 1);
   const device = backends.find((backend) => backend.group === "local")?.device ?? "";
   return DIRECT_GROUPS.map(([group, name]) => ({
     group,

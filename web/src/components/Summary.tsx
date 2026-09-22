@@ -2,6 +2,7 @@ import { answerLabel, percent, scoreResponse } from "../scoring";
 import { cn, labelText } from "../styles";
 import type { Answer, Row } from "../types";
 import { InfoTip } from "./InfoTip";
+import { Tip } from "./Tip";
 
 interface ColumnStats {
   correct: number;
@@ -139,9 +140,9 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
               key={column}
               className="rounded-lg border border-rule bg-panel px-4 pt-3.5 pb-1.5"
             >
-              <h3 className="m-0 truncate text-sm font-semibold text-ink" title={column}>
-                {column}
-              </h3>
+              <Tip content={column}>
+                <h3 className="m-0 truncate text-sm font-semibold text-ink">{column}</h3>
+              </Tip>
               {labelled ? (
                 <>
                   <p className="mt-2.5 mb-0 flex items-baseline gap-2">

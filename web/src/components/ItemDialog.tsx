@@ -3,6 +3,7 @@ import { cn, labelText } from "../styles";
 import type { PanelState, Row, Side } from "../types";
 import { CompareTable } from "./CompareTable";
 import { Modal } from "./Modal";
+import { Tip } from "./Tip";
 
 const iconButton =
   "grid size-8 place-items-center rounded-md border border-rule bg-transparent p-0 text-lg leading-none text-dim transition-colors hover:enabled:border-dim hover:enabled:text-ink";
@@ -54,40 +55,40 @@ export function ItemDialog(props: ItemDialogProps) {
           <h2 className="m-0 text-base font-semibold tabular-nums">
             Item {index + 1} of {rows.length}
           </h2>
-          <p className={cn(labelText, "mt-1 mb-0 truncate")} title={item.source}>
-            {dataset} · {item.source}
-          </p>
+          <Tip content={item.source}>
+            <p className={cn(labelText, "mt-1 mb-0 truncate")}>
+              {dataset} · {item.source}
+            </p>
+          </Tip>
         </div>
         <div className="flex flex-none gap-1.5">
-          <button
-            type="button"
-            className={iconButton}
-            aria-label="Previous item"
-            title="Previous (←)"
-            disabled={isFirst}
-            onClick={() => onNavigate(index - 1)}
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            className={iconButton}
-            aria-label="Next item"
-            title="Next (→)"
-            disabled={isLast}
-            onClick={() => onNavigate(index + 1)}
-          >
-            ›
-          </button>
-          <button
-            type="button"
-            className={iconButton}
-            aria-label="Close"
-            title="Close (Esc)"
-            onClick={onClose}
-          >
-            ×
-          </button>
+          <Tip content="Previous (←)">
+            <button
+              type="button"
+              className={iconButton}
+              aria-label="Previous item"
+              disabled={isFirst}
+              onClick={() => onNavigate(index - 1)}
+            >
+              ‹
+            </button>
+          </Tip>
+          <Tip content="Next (→)">
+            <button
+              type="button"
+              className={iconButton}
+              aria-label="Next item"
+              disabled={isLast}
+              onClick={() => onNavigate(index + 1)}
+            >
+              ›
+            </button>
+          </Tip>
+          <Tip content="Close (Esc)">
+            <button type="button" className={iconButton} aria-label="Close" onClick={onClose}>
+              ×
+            </button>
+          </Tip>
         </div>
       </div>
 

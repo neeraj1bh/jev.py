@@ -8,6 +8,7 @@ import type { Answer, PanelState } from "../types";
 import { CheckMark } from "./CheckMark";
 import { Icon } from "./Icon";
 import { Skeleton } from "./Skeleton";
+import { Tip } from "./Tip";
 
 /** The probability behind the answer shown, or null for a written answer with no probabilities. */
 function confidence(answer: Answer) {
@@ -21,9 +22,9 @@ function ModelHeading({ name, state }: { name: string; state: PanelState }) {
   const ms = useElapsed(state);
   return (
     <th className={cn(tableHead, "min-w-[150px] align-bottom")}>
-      <span className="line-clamp-2 text-[13px] font-semibold text-ink" title={name}>
-        {name}
-      </span>
+      <Tip content={name}>
+        <span className="line-clamp-2 text-[13px] font-semibold text-ink">{name}</span>
+      </Tip>
       <span
         className={cn(
           "font-mono text-xs tabular-nums transition-colors",
@@ -77,15 +78,16 @@ function AnswerCell({
   return (
     <td className={cell}>
       <span className="flex items-start gap-3">
-        <span
-          title={shown}
-          className={cn(
-            "line-clamp-2 min-w-0 flex-1 font-medium break-words",
-            correct === null ? "text-ink" : correct ? "text-good" : "text-warn",
-          )}
-        >
-          {shown} {correct !== null && <CheckMark ok={correct} />}
-        </span>
+        <Tip content={shown}>
+          <span
+            className={cn(
+              "line-clamp-2 min-w-0 flex-1 font-medium break-words",
+              correct === null ? "text-ink" : correct ? "text-good" : "text-warn",
+            )}
+          >
+            {shown} {correct !== null && <CheckMark ok={correct} />}
+          </span>
+        </Tip>
         {probability !== null && (
           <span className="mt-[3px] ml-auto flex flex-none items-center gap-2">
             <span className="hidden h-1 w-12 overflow-hidden rounded-full bg-bar sm:block">
@@ -124,9 +126,9 @@ function OptionBreakdown({ answer, written }: { answer?: Answer; written: boolea
             option === best ? "text-ink" : "text-dim",
           )}
         >
-          <span className="truncate" title={option}>
-            {answer.type === "score" ? `level ${option}` : option}
-          </span>
+          <Tip content={option}>
+            <span className="truncate">{answer.type === "score" ? `level ${option}` : option}</span>
+          </Tip>
           <span className="h-1 overflow-hidden rounded-full bg-bar">
             <span
               className={cn(
@@ -241,9 +243,11 @@ export function CompareTable({ names, panels, questionIds, truth, bare }: Compar
                       )}
                     </td>
                     {truth && (
-                      <td className={cn(rowCell, "text-dim")} title={truth[id]}>
-                        <span className="line-clamp-2 break-words">{truth[id] ?? "–"}</span>
-                      </td>
+                      <Tip content={truth[id]}>
+                        <td className={cn(rowCell, "text-dim")}>
+                          <span className="line-clamp-2 break-words">{truth[id] ?? "–"}</span>
+                        </td>
+                      </Tip>
                     )}
                     {names.map((name, k) => (
                       <AnswerCell

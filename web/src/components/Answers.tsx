@@ -4,6 +4,7 @@ import { answerLabel, matchesLabel } from "../scoring";
 import { cn } from "../styles";
 import type { Answer, Response } from "../types";
 import { CheckMark } from "./CheckMark";
+import { Tip } from "./Tip";
 
 /** snake_case names wrap after an underscore instead of mid-word. */
 const breakable = (name: string) => name.replaceAll("_", "_\u200b");
@@ -79,27 +80,29 @@ function AnswerRow({ id, answer, truth, collapsible, expanded, onToggle }: Answe
         )}
       >
         {breakable(id)}
-        <b
-          className={cn(
-            "font-mono text-ink",
-            collapsed ? "line-clamp-1 text-[13px]" : "line-clamp-2 text-sm",
-          )}
-          title={headline}
-        >
-          {headline}
-        </b>
-        {truth !== undefined && (
-          <span
+        <Tip content={headline}>
+          <b
             className={cn(
-              "block overflow-hidden text-[13px]",
-              correct ? "text-good" : "text-warn",
-              collapsed ? "ml-auto max-w-[45%] flex-none" : "mt-[3px]",
+              "font-mono text-ink",
+              collapsed ? "line-clamp-1 text-[13px]" : "line-clamp-2 text-sm",
             )}
-            title={truth}
           >
-            label: {truth}&nbsp;
-            <CheckMark ok={correct} />
-          </span>
+            {headline}
+          </b>
+        </Tip>
+        {truth !== undefined && (
+          <Tip content={truth}>
+            <span
+              className={cn(
+                "block overflow-hidden text-[13px]",
+                correct ? "text-good" : "text-warn",
+                collapsed ? "ml-auto max-w-[45%] flex-none" : "mt-[3px]",
+              )}
+            >
+              label: {truth}&nbsp;
+              <CheckMark ok={correct} />
+            </span>
+          </Tip>
         )}
       </Heading>
       {!collapsed && (
@@ -113,9 +116,11 @@ function AnswerRow({ id, answer, truth, collapsible, expanded, onToggle }: Answe
                 option === best ? "font-semibold text-ink" : "text-dim",
               )}
             >
-              <span className="truncate" title={option}>
-                {answer.type === "score" ? `level ${option}` : option}
-              </span>
+              <Tip content={option}>
+                <span className="truncate">
+                  {answer.type === "score" ? `level ${option}` : option}
+                </span>
+              </Tip>
               <ProbabilityBar percent={probability * 100} top={option === best} />
               <span className="text-right tabular-nums">{probability.toFixed(2)}</span>
             </div>

@@ -15,9 +15,10 @@ interface ModelPickerProps extends MenuState {
   onPick: (id: string) => void;
 }
 
-/** One model for generate vs readout; Jev never writes text, so it is marked compare only. */
+/** One model for generate vs readout: only models that both write text and return probabilities. */
 export function ModelPicker({ backends, value, onPick, open, onOpenChange }: ModelPickerProps) {
   const current = backends.find((backend) => backend.id === value);
+  const bothWays = backends.filter((backend) => !TEXTLESS.has(backend.id));
   return (
     <Dropdown
       open={open}
@@ -38,12 +39,11 @@ export function ModelPicker({ backends, value, onPick, open, onOpenChange }: Mod
       }
     >
       <ModelMenu
-        backends={backends}
-        textlessLast
-        hint="Claude and Groq return no probabilities, so they are not listed"
+        backends={bothWays}
+        hint="Models that write text and return probabilities · Jev only compares"
         isSelected={(backend) => backend.id === value}
         isDisabled={isOffline}
-        detail={(backend) => (TEXTLESS.has(backend.id) ? "compare only" : statusText(backend))}
+        detail={statusText}
         onSelect={onPick}
       />
     </Dropdown>

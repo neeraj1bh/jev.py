@@ -1,7 +1,7 @@
 import { type ReactNode, useCallback, useRef, useState } from "react";
 
 import { fetchProgress, fetchRun, fetchRuns, loadModel, sampleItem } from "./api";
-import { isHosted, TEXTLESS } from "./backends";
+import { isHosted } from "./backends";
 import { Benchmark } from "./components/Benchmark";
 import { EditDialog } from "./components/EditDialog";
 import { GenerateReplay } from "./components/GenerateReplay";
@@ -15,6 +15,7 @@ import { type KindFilter, PastRuns, runTime } from "./components/PastRuns";
 import { RaceClocks } from "./components/RaceClocks";
 import { CompareView, GenerateView } from "./components/ResultPanels";
 import { ResultsView } from "./components/ResultsView";
+import { Tip } from "./components/Tip";
 import { Toast } from "./components/Toast";
 import { EXAMPLES, type ExampleName, isExampleName } from "./examples";
 import { useBackends } from "./hooks/useBackends";
@@ -269,17 +270,6 @@ export default function App() {
     setOpenMenu("");
     const backend = backends[id];
     if (!backend) return;
-    if (TEXTLESS.has(id)) {
-      // Jev never writes text, so it can only be compared.
-      if (!backend.ready) {
-        askForKey(id, true);
-        return;
-      }
-      if (!compareModels.includes(id))
-        setCompareModels((models) => [...models.slice(0, 1), id, ...models.slice(2)]);
-      switchMode("compare");
-      return;
-    }
     if (!backend.ready) {
       if (backend.group === "gateway") askForKey("remote:openrouter", false, id);
       else askForKey(id, false);
@@ -657,6 +647,10 @@ export default function App() {
   }
 
   async function runBatch(all: boolean) {
+    if (isCompare && compareModels.length < 2) {
+      toast.show("Pick at least two models to compare.");
+      return;
+    }
     const total = all ? (remaining ?? 0) : Math.max(1, Math.floor(Number(batchSize) || 1));
     setBusy(true);
     setBatchRunning(true);
@@ -949,13 +943,28 @@ export default function App() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex min-w-0 flex-wrap items-center gap-2.5">
                 {isCompare ? (
-                  <ModelsPicker
-                    backends={backendList}
-                    selected={compareModels}
-                    onToggle={toggleCompareModel}
-                    open={openMenu === "models"}
-                    onOpenChange={menuHandler("models")}
-                  />
+                  <>
+                    <ModelsPicker
+                      backends={backendList}
+                      selected={compareModels}
+                      onToggle={toggleCompareModel}
+                      open={openMenu === "models"}
+                      onOpenChange={menuHandler("models")}
+                    />
+                    {compareModels.length > 0 && (
+                      <button
+                        type="button"
+                        className="border-0 bg-transparent px-1.5 py-1 text-[13px] text-dim hover:text-ink"
+                        onClick={() => {
+                          setCompareModels([]);
+                          clearBatch();
+                          resetPanels(0);
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <ModelPicker
                     backends={backendList}
@@ -975,14 +984,20 @@ export default function App() {
                 >
                   Replay together
                 </button>
-                <button
-                  type="button"
-                  className={solidButton}
-                  disabled={busy || replaying}
-                  onClick={onRun}
+                <Tip
+                  content={
+                    isCompare && compareModels.length < 2 ? "Pick at least two models" : undefined
+                  }
                 >
-                  Run
-                </button>
+                  <button
+                    type="button"
+                    className={solidButton}
+                    disabled={busy || replaying || (isCompare && compareModels.length < 2)}
+                    onClick={onRun}
+                  >
+                    Run
+                  </button>
+                </Tip>
               </div>
             </div>
             <InputBar

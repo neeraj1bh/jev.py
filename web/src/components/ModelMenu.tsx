@@ -34,22 +34,12 @@ interface ModelMenuProps {
   onSelect: (id: string) => void;
   /** Multi-select shows a check beside each chosen model. */
   showChecks?: boolean;
-  /** Rank models that cannot write text after the others. */
-  textlessLast?: boolean;
   hint?: ReactNode;
 }
 
 /** Search over every model, the direct groups, and OpenRouter's models under their makers. */
 export function ModelMenu(props: ModelMenuProps) {
-  const {
-    backends,
-    isSelected,
-    isDisabled,
-    detail,
-    onSelect,
-    showChecks,
-    textlessLast = false,
-  } = props;
+  const { backends, isSelected, isDisabled, detail, onSelect, showChecks } = props;
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
   const [allProviders, setAllProviders] = useState(false);
@@ -150,7 +140,7 @@ export function ModelMenu(props: ModelMenuProps) {
         )
       ) : (
         <>
-          {groupBackends(backends, textlessLast).map(({ group, heading, backends: members }) => (
+          {groupBackends(backends).map(({ group, heading, backends: members }) => (
             <Fragment key={group}>
               <MenuHeading>{heading}</MenuHeading>
               {members.map((member) => item(member))}

@@ -3,6 +3,7 @@ import { Info } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Icon } from "./Icon";
+import { tipBox } from "./Tip";
 
 interface InfoTipProps {
   children: ReactNode;
@@ -23,10 +24,7 @@ export function InfoTip({ children, label = "What this means" }: InfoTipProps) {
         </button>
       </Tooltip.Trigger>
       <Tooltip.Portal>
-        <Tooltip.Content
-          sideOffset={6}
-          className="z-30 max-w-[300px] animate-fade rounded-md border border-rule bg-panel px-3 py-2 text-[13px] leading-[1.45] font-normal text-ink shadow-[0_10px_28px_var(--color-shadow)]"
-        >
+        <Tooltip.Content sideOffset={6} className={tipBox}>
           {children}
           <Tooltip.Arrow className="fill-panel" />
         </Tooltip.Content>

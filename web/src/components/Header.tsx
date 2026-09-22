@@ -14,6 +14,7 @@ import type { ThemePreference } from "../hooks/useTheme";
 import { cn } from "../styles";
 import type { Mode } from "../types";
 import { Icon } from "./Icon";
+import { Tip } from "./Tip";
 
 const TABS: { mode: Mode; name: string; icon: LucideIcon }[] = [
   { mode: "compare", name: "Compare", icon: Columns3 },
@@ -52,24 +53,24 @@ export function Header({ mode, onModeChange, preference, onPreferenceChange }: H
         <p className="m-0 ml-1.5 min-w-0 flex-1 text-sm text-dim max-[860px]:hidden">
           {LEDE[mode]}
         </p>
-        <div className="inline-flex rounded-full border border-rule p-0.5" title="Theme">
+        <div className="inline-flex rounded-full border border-rule p-0.5">
           {THEMES.map((theme) => (
-            <button
-              key={theme.preference}
-              type="button"
-              aria-pressed={preference === theme.preference}
-              aria-label={`${theme.name} theme`}
-              title={theme.name}
-              onClick={() => onPreferenceChange(theme.preference)}
-              className={cn(
-                "grid size-7 place-items-center rounded-full border-0 transition-colors",
-                preference === theme.preference
-                  ? "bg-lift text-ink"
-                  : "bg-transparent text-dim hover:text-ink",
-              )}
-            >
-              <Icon icon={theme.icon} size={14} />
-            </button>
+            <Tip key={theme.preference} content={theme.name}>
+              <button
+                type="button"
+                aria-pressed={preference === theme.preference}
+                aria-label={`${theme.name} theme`}
+                onClick={() => onPreferenceChange(theme.preference)}
+                className={cn(
+                  "grid size-7 place-items-center rounded-full border-0 transition-colors",
+                  preference === theme.preference
+                    ? "bg-lift text-ink"
+                    : "bg-transparent text-dim hover:text-ink",
+                )}
+              >
+                <Icon icon={theme.icon} size={14} />
+              </button>
+            </Tip>
           ))}
         </div>
       </header>
