@@ -12,6 +12,7 @@ Face cache if it is already there, else into ./models (git-ignored; JEV_MODELS o
 
 import contextlib
 import gc
+import gzip
 import hashlib
 import json
 import mimetypes
@@ -582,6 +583,19 @@ def runs():
     return [summary(f) for f in sorted(os.listdir(LOGS), reverse=True) if f.endswith(".jsonl")]
 
 
+RUN_BODIES = {}  # file name -> (mtime, size, JSON body); a big run is merged once, not per open
+
+
+def run_body(name):
+    """run_rows as the JSON the page fetches, rebuilt only when the file changes."""
+    path = os.path.join(LOGS, os.path.basename(name) + ".jsonl")
+    stat = os.stat(path)
+    cached = RUN_BODIES.get(path)
+    if not cached or cached[:2] != (stat.st_mtime, stat.st_size):
+        cached = RUN_BODIES[path] = (stat.st_mtime, stat.st_size, json.dumps(run_rows(name)).encode())
+    return cached[2]
+
+
 def run_rows(name):
     """One saved batch as items, each with both sides' answers, in the order they ran."""
     path = os.path.join(LOGS, os.path.basename(name) + ".jsonl")
@@ -951,7 +965,13 @@ def main(model_id=DEFAULT_MODEL, port=8080):
         protocol_version = "HTTP/1.1"  # chunked streaming needs 1.1; 1.0 clients would see the size markers
 
         def _send(self, code, data, ctype="application/json"):
-            self.send_response(code)
+            # A 9-model run is 11 MB of JSON; compressed it is a tenth of that.
+            if len(data) > 64_000 and "gzip" in self.headers.get("accept-encoding", ""):
+                data = gzip.compress(data, compresslevel=1)
+                self.send_response(code)
+                self.send_header("content-encoding", "gzip")
+            else:
+                self.send_response(code)
             self.send_header("content-type", ctype)
             self.send_header("content-length", str(len(data)))
             self.end_headers()
@@ -966,7 +986,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 return self._send(200, json.dumps(runs()).encode())
             if "/run?" in self.path:
                 name = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)["name"][0]
-                return self._send(200, json.dumps(run_rows(name)).encode())
+                return self._send(200, run_body(name))
             if self.path.endswith("/progress"):
                 return self._send(200, json.dumps(progress()).encode())
             if self.path.endswith("/keys"):
