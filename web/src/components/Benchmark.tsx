@@ -189,7 +189,6 @@ export function Benchmark(props: BenchmarkProps) {
           <Dropdown
             open={menu === "models"}
             onOpenChange={menuHandler("models")}
-            title={names.join(", ")}
             buttonClassName="max-w-[min(560px,80vw)]"
             menuClassName="w-[360px]"
             button={

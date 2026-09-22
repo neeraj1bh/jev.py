@@ -27,7 +27,7 @@ export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
   }, [open]);
 
   return (
-    <Modal open={open} onClose={onClose} className="w-[min(520px,calc(100vw-32px))] px-6 py-5">
+    <Modal open={open} onClose={onClose} className="w-[min(600px,calc(100vw-32px))] px-6 py-5">
       <h2 className="mt-0 mb-1 text-[15px] font-semibold">Keys and tokens</h2>
       <p className="mt-0 mb-3 text-xs text-dim">
         Kept on this machine. Each is checked with one small request first.

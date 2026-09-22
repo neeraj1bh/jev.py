@@ -29,7 +29,6 @@ export function ModelsPicker({
     <Dropdown
       open={open}
       onOpenChange={onOpenChange}
-      title={names.join(", ")}
       buttonClassName="max-w-[min(560px,60vw)]"
       menuClassName="w-[360px]"
       button={

@@ -64,7 +64,7 @@ export function AddModelDialog(props: AddModelDialogProps) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} className="w-[min(460px,calc(100vw-32px))] px-6 py-5">
+    <Modal open={open} onClose={onClose} className="w-[min(560px,calc(100vw-32px))] px-6 py-5">
       <h2 className="mt-0 mb-4 text-[15px] font-semibold">Add a model from Hugging Face</h2>
 
       <h3 className="mt-0 mb-1 text-xs font-medium text-dim">Small models</h3>
