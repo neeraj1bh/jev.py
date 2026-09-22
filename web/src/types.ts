@@ -82,6 +82,9 @@ export interface SavedRun {
   items: number;
   /** The dataset row of a one-item run, e.g. "truthfulqa/truthful_qa · validation row 16". */
   item?: string;
+  /** Short fingerprints of the run's items, or one digest of them all for a big run. */
+  keys?: string[];
+  digest?: string;
   score?: Record<string, [number, number]>;
 }
 

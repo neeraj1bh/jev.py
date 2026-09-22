@@ -5,16 +5,11 @@ import { usePersistentState } from "../hooks/usePersistentState";
 import { chipButton, cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
 import type { RunKind, SavedRun } from "../types";
 import { Icon } from "./Icon";
-import { Dropdown, MenuItem } from "./Menu";
+import { type KindFilter, RunFilter } from "./RunFilter";
 import { Skeleton } from "./Skeleton";
 
-export type KindFilter = RunKind | "";
+export type { KindFilter } from "./RunFilter";
 
-const KIND_LABELS: Record<KindFilter, string> = {
-  "": "All runs",
-  cmp: "Compare",
-  gen: "Generate vs readout",
-};
 const PAGE_SIZE = 20;
 const pagerButton =
   "rounded-md border border-rule bg-transparent px-3 py-1.5 text-ink hover:enabled:border-dim max-[600px]:min-h-11 max-[600px]:flex-1";
@@ -44,6 +39,14 @@ function compare(a: SavedRun, b: SavedRun, column: SortColumn) {
   return a.name.localeCompare(b.name);
 }
 
+export /** Whether two runs have an item in common; a big run and a small one are checked when opened. */
+function shareItems(a: SavedRun, b: SavedRun) {
+  if (a.dataset !== b.dataset) return false;
+  if (a.keys && b.keys) return a.keys.some((key) => b.keys?.includes(key));
+  if (a.digest && b.digest) return a.digest === b.digest;
+  return true;
+}
+
 export const runTime = (name: string) => name.slice(5, 16).replace(/-(\d\d)-(\d\d)$/, " $1:$2");
 
 interface PastRunsProps {
@@ -68,8 +71,10 @@ export function PastRuns(props: PastRunsProps) {
     isSort,
   );
   const [query, setQuery] = useState("");
+  const [set, setSet] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
-  const pickedInput = runs.find((run) => run.name === picked[0])?.dataset;
+  const pickedRuns = runs.filter((run) => picked.includes(run.name));
+  const canPick = (run: SavedRun) => pickedRuns.every((other) => shareItems(run, other));
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   const searchText = (run: SavedRun) =>
     [
@@ -85,7 +90,7 @@ export function PastRuns(props: PastRunsProps) {
       names.includes(name) ? names.filter((other) => other !== name) : [...names, name],
     );
   const matching = runs
-    .filter((run) => !kind || run.mode === kind)
+    .filter((run) => (!kind || run.mode === kind) && (!set || run.dataset === set))
     .filter((run) => words.every((word) => searchText(run).includes(word)))
     .sort((a, b) => (sort.descending ? -1 : 1) * compare(a, b, sort.column));
   const header = (column: SortColumn, label: string) => {
@@ -159,22 +164,20 @@ export function PastRuns(props: PastRunsProps) {
               className="w-52 border-0 bg-transparent p-0 text-sm text-ink outline-none placeholder:text-dim max-[600px]:w-full"
             />
           </label>
-          <Dropdown
+          <RunFilter
+            runs={runs}
+            kind={kind}
+            onKindChange={props.onKindChange}
+            set={set}
+            onSetChange={(name) => {
+              setSet(name);
+              props.onPageChange(1);
+              props.onMenuOpenChange(false);
+            }}
+            allSets
             open={props.menuOpen}
             onOpenChange={props.onMenuOpenChange}
-            button={KIND_LABELS[kind]}
-            menuClassName="right-0 left-auto w-60"
-          >
-            {(Object.keys(KIND_LABELS) as KindFilter[]).map((option) => (
-              <MenuItem
-                key={option}
-                label={KIND_LABELS[option]}
-                detail={runs.filter((run) => !option || run.mode === option).length}
-                selected={option === kind}
-                onSelect={() => props.onKindChange(option)}
-              />
-            ))}
-          </Dropdown>
+          />
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -206,7 +209,7 @@ export function PastRuns(props: PastRunsProps) {
                 <td colSpan={5} className={tableCell}>
                   {words.length
                     ? "No run matches the search"
-                    : `Nothing saved yet${kind && " of this kind"}`}
+                    : `Nothing saved yet${kind || set ? " that matches the filter" : ""}`}
                   .
                 </td>
               </tr>
@@ -225,13 +228,15 @@ export function PastRuns(props: PastRunsProps) {
                     <input
                       type="checkbox"
                       checked={picked.includes(run.name)}
-                      disabled={
-                        !picked.includes(run.name) && !!pickedInput && run.dataset !== pickedInput
-                      }
+                      disabled={!picked.includes(run.name) && !canPick(run)}
                       onClick={(event) => event.stopPropagation()}
                       onChange={() => togglePicked(run.name)}
                       aria-label={`Pick the ${run.dataset} run of ${runTime(run.name)} to compare`}
-                      title="Runs on the same input can be compared"
+                      title={
+                        picked.includes(run.name) || canPick(run)
+                          ? "Pick runs that share items to compare them"
+                          : "No item in common with the runs already picked"
+                      }
                       className="size-4 accent-current disabled:opacity-30"
                     />
                   </td>

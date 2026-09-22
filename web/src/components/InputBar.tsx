@@ -1,18 +1,10 @@
-import { blockingBackend } from "../backends";
 import { EXAMPLE_NAMES, EXAMPLES, type ExampleName } from "../examples";
-import { chipButton, cn } from "../styles";
+import { chipButton, cn, numberInput } from "../styles";
 import type { Backend, Dataset } from "../types";
+import { DatasetMenu } from "./DatasetMenu";
 import { Dropdown, MenuHeading, MenuItem } from "./Menu";
-import { Skeleton } from "./Skeleton";
 
 export type InputSource = "examples" | "dataset";
-
-const answerShape = (dataset: Dataset) =>
-  dataset.options === 2
-    ? "yes / no"
-    : dataset.options
-      ? `pick 1 of ${dataset.options}`
-      : "several questions each";
 
 interface InputBarProps {
   source: InputSource;
@@ -84,40 +76,14 @@ export function InputBar(props: InputBarProps) {
 
       {source === "dataset" && (
         <>
-          <Dropdown
-            compact
-            active={!!dataset}
+          <DatasetMenu
+            datasets={props.datasets}
+            value={dataset}
+            onChange={props.onDatasetChange}
+            pickedBackends={props.pickedBackends}
             open={props.datasetMenuOpen}
             onOpenChange={props.onDatasetMenuOpenChange}
-            button={dataset || "Choose a set"}
-          >
-            <MenuHeading>Public datasets</MenuHeading>
-            {props.datasets.length === 0 &&
-              ["w-32", "w-24", "w-36", "w-28"].map((width) => (
-                <div key={width} className="px-2.5 py-2">
-                  <Skeleton className={width} />
-                </div>
-              ))}
-            {props.datasets.map((set) => {
-              const blocker = blockingBackend(set, props.pickedBackends);
-              return (
-                <MenuItem
-                  key={set.name}
-                  label={set.name}
-                  title={set.about}
-                  selected={set.name === dataset}
-                  disabled={!!blocker}
-                  onSelect={() => props.onDatasetChange(set.name)}
-                  highlightDetail={set.local && !blocker}
-                  detail={
-                    blocker
-                      ? `pick 1 of ${set.options} · ${blocker.label} takes ${blocker.max}`
-                      : answerShape(set) + (set.local ? " · on disk" : " · download")
-                  }
-                />
-              );
-            })}
-          </Dropdown>
+          />
           {dataset && (
             <>
               <button
@@ -135,7 +101,7 @@ export function InputBar(props: InputBarProps) {
                 onChange={(event) => props.onBatchSizeChange(event.target.value)}
                 disabled={busy || setExhausted}
                 aria-label="Items in the batch"
-                className="ml-2 w-16 rounded-full border border-rule bg-paper px-2 py-1 text-center font-mono text-[13.5px] text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-dim"
+                className={cn(numberInput, "ml-2")}
               />
               <button
                 type="button"

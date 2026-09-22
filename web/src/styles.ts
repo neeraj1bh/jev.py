@@ -20,3 +20,5 @@ export const tableHead =
 export const tableCell =
   "max-w-[260px] overflow-hidden border-b border-rule px-2 py-[7px] align-top text-ellipsis whitespace-nowrap";
 export const monoDim = "font-mono text-xs text-dim";
+export const numberInput =
+  "w-16 rounded-full border border-rule bg-paper px-2 py-1 text-center font-mono text-[13.5px] text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-dim";

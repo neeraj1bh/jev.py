@@ -11,6 +11,7 @@ Face cache if it is already there, else into ./models (git-ignored; JEV_MODELS o
 """
 
 import gc
+import hashlib
 import json
 import mimetypes
 import os
@@ -358,6 +359,12 @@ def summary(f):
     out = {"name": f[:-6], "dataset": ds, "backends": sides, "items": items, "score": score, "mode": kind}
     if items == 1:  # which item, so runs that can be compared are visible before opening them
         out["item"] = lines[0].get("source")
+    # Short item fingerprints, so the page knows which runs share items before opening any; a big
+    # run sends one digest of all of them instead.
+    keys = sorted({hashlib.sha1(json.dumps(item_key(x)).encode()).hexdigest()[:8] for x in lines})
+    out["keys" if len(keys) <= 200 else "digest"] = (
+        keys if len(keys) <= 200 else hashlib.sha1(",".join(keys).encode()).hexdigest()[:12]
+    )
     SUMMARIES[f] = stat.st_mtime, stat.st_size, out
     return out
 

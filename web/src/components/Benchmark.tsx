@@ -1,21 +1,34 @@
+import { Check } from "lucide-react";
 import { useState } from "react";
 
-import { dollarText, providerName, RUN_QUESTIONS, runDollars } from "../backends";
+import {
+  dollarText,
+  isOffline,
+  providerName,
+  RUN_QUESTIONS,
+  runDollars,
+  statusText,
+} from "../backends";
 import { percent } from "../scoring";
 import {
-  chipButton,
   cn,
   labelText,
   monoDim,
+  numberInput,
   panelBox,
   solidButton,
   tableCell,
   tableHead,
 } from "../styles";
 import type { Backend, Dataset, RunKind, SavedRun } from "../types";
+import { DatasetMenu } from "./DatasetMenu";
+import { Icon } from "./Icon";
+import { Dropdown } from "./Menu";
+import { ModelMenu } from "./ModelMenu";
+import { type KindFilter, RunFilter } from "./RunFilter";
 
 const FREE = "free";
-const TOP_MAKERS = 12;
+const TOP_MAKERS = 6; // the rest are one click away in the model menu, under their maker
 
 interface Standing {
   name: string;
@@ -53,6 +66,32 @@ function standings(
   return [...byName.values()].sort((a, b) => share(b) - share(a) || b.total - a.total);
 }
 
+interface MakerChipProps {
+  label: string;
+  count: number;
+  on: boolean;
+  onToggle: () => void;
+}
+
+/** Adds or removes every model of one maker; an outline and a check, so a full row stays light. */
+function MakerChip({ label, count, on, onToggle }: MakerChipProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onToggle}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border bg-transparent px-3 py-1 text-[13.5px] transition-colors",
+        on ? "border-ink text-ink" : "border-rule text-dim hover:border-dim hover:text-ink",
+      )}
+    >
+      {on && <Icon icon={Check} size={14} />}
+      {label}
+      <span className="font-mono text-xs text-dim tabular-nums">{count}</span>
+    </button>
+  );
+}
+
 interface BenchmarkProps {
   backends: Backend[];
   datasets: Dataset[];
@@ -73,18 +112,40 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
     .sort((a, b) => b[1] - a[1])
     .slice(0, TOP_MAKERS);
   const freeCount = gateway.filter((backend) => backend.free).length;
-  const [groups, setGroups] = useState<string[]>([]);
-  const [dataset, setDataset] = useState(datasets[0]?.name ?? "");
+  const [picked, setPicked] = useState<string[]>([]);
+  const [menu, setMenu] = useState("");
+  const menuHandler = (name: string) => (open: boolean) => setMenu(open ? name : "");
+  const [dataset, setDataset] = useState("");
+  const set = dataset || (datasets[0]?.name ?? "");
   const [items, setItems] = useState(50);
-  const picked = gateway.filter((backend) =>
-    groups.some((group) => (group === FREE ? backend.free : backend.provider === group)),
-  );
-  const prices = picked.map(runDollars);
-  const unknown = prices.filter((dollars) => dollars === null).length;
+  const chosen = backends.filter((backend) => picked.includes(backend.id));
+  const toggleModel = (id: string) =>
+    setPicked((all) => (all.includes(id) ? all.filter((other) => other !== id) : [...all, id]));
+  const makerIds = (maker: string) =>
+    gateway
+      .filter((backend) => (maker === FREE ? backend.free : backend.provider === maker))
+      .map((backend) => backend.id);
+  const makerOn = (maker: string) => makerIds(maker).every((id) => picked.includes(id));
+  const toggleMaker = (maker: string) => {
+    const ids = makerIds(maker);
+    const on = makerOn(maker);
+    setPicked((all) =>
+      on ? all.filter((id) => !ids.includes(id)) : [...new Set([...all, ...ids])],
+    );
+  };
+  // Models on this machine cost nothing; hosted ones without a listed price are named, not guessed.
+  const onMachine = (backend: Backend) => backend.group === "local" || backend.group === "server";
+  const unpriced = chosen.filter((backend) => !onMachine(backend) && runDollars(backend) === null);
   const dollars =
-    prices.reduce<number>((sum, run) => sum + (run ?? 0), 0) * (items / RUN_QUESTIONS);
-  const toggle = (group: string) =>
-    setGroups((all) => (all.includes(group) ? all.filter((g) => g !== group) : [...all, group]));
+    chosen.reduce(
+      (sum, backend) => sum + (onMachine(backend) ? 0 : (runDollars(backend) ?? 0)),
+      0,
+    ) *
+    (items / RUN_QUESTIONS);
+  const names = chosen.map((backend) => backend.label);
+  const unpricedNote = unpriced.length
+    ? `; ${unpriced.map((backend) => backend.label).join(", ")} ${unpriced.length === 1 ? "has no listed price here and is" : "have no listed price here and are"} not counted`
+    : "";
 
   const inputs = [...new Set(runs.map((run) => run.dataset))];
   const [chosenBoard, setBoard] = useState("");
@@ -94,7 +155,12 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
     : inputs.includes("Frozen eval set")
       ? "Frozen eval set"
       : (inputs[0] ?? "");
-  const table = standings(runs, board, backendLabel);
+  const [boardKind, setBoardKind] = useState<KindFilter>("");
+  const table = standings(
+    runs.filter((run) => !boardKind || run.mode === boardKind),
+    board,
+    backendLabel,
+  );
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3.5">
@@ -105,68 +171,102 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
             many models, one set · the cost is shown before anything runs
           </span>
         </h2>
-        <p className={cn(labelText, "mt-3 mb-2")}>OpenRouter models</p>
-        <div className="flex flex-wrap gap-2">
-          {freeCount > 0 && (
-            <button
-              type="button"
-              className={chipButton(groups.includes(FREE))}
-              onClick={() => toggle(FREE)}
-            >
-              All free · {freeCount}
-            </button>
-          )}
-          {makers.map(([maker, count]) => (
-            <button
-              key={maker}
-              type="button"
-              className={chipButton(groups.includes(maker))}
-              onClick={() => toggle(maker)}
-            >
-              {providerName(maker)} · {count}
-            </button>
-          ))}
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <select
-            value={dataset}
-            onChange={(event) => setDataset(event.target.value)}
-            aria-label="Set to run"
-            className="rounded-full border border-rule bg-paper px-3 py-1 text-[13.5px] text-ink"
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Dropdown
+            open={menu === "models"}
+            onOpenChange={menuHandler("models")}
+            title={names.join(", ")}
+            buttonClassName="max-w-[min(560px,80vw)]"
+            menuClassName="w-[360px]"
+            button={
+              picked.length ? (
+                <>
+                  {picked.length} models
+                  <span className="truncate text-[12.5px] text-dim">
+                    {names.slice(0, 2).join(", ")}
+                    {names.length > 2 && ` +${names.length - 2}`}
+                  </span>
+                </>
+              ) : (
+                "Pick models"
+              )
+            }
           >
-            {datasets.map((set) => (
-              <option key={set.name}>{set.name}</option>
-            ))}
-          </select>
+            <ModelMenu
+              backends={backends}
+              showChecks
+              hint="Any number · click to add or remove"
+              isSelected={(backend) => picked.includes(backend.id)}
+              isDisabled={isOffline}
+              detail={statusText}
+              onSelect={toggleModel}
+            />
+          </Dropdown>
+          <DatasetMenu
+            datasets={datasets}
+            value={set}
+            onChange={(name) => {
+              setDataset(name);
+              setMenu("");
+            }}
+            pickedBackends={chosen}
+            open={menu === "set"}
+            onOpenChange={menuHandler("set")}
+          />
           <input
             type="number"
             min={1}
             value={items}
             onChange={(event) => setItems(Math.max(1, Number(event.target.value) || 1))}
             aria-label="Items per model"
-            className="w-20 rounded-full border border-rule bg-paper px-2 py-1 text-center font-mono text-[13.5px] text-ink"
+            className={numberInput}
           />
           <span className={labelText}>items each</span>
         </div>
+        {makers.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className={labelText}>Add all from</span>
+            {freeCount > 0 && (
+              <MakerChip
+                label="Free"
+                count={freeCount}
+                on={makerOn(FREE)}
+                onToggle={() => toggleMaker(FREE)}
+              />
+            )}
+            {makers.map(([maker, count]) => (
+              <MakerChip
+                key={maker}
+                label={providerName(maker)}
+                count={count}
+                on={makerOn(maker)}
+                onToggle={() => toggleMaker(maker)}
+              />
+            ))}
+            {picked.length > 0 && (
+              <button
+                type="button"
+                className="border-0 bg-transparent px-1.5 py-1 text-[13px] text-dim hover:text-ink"
+                onClick={() => setPicked([])}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        )}
         <p className="mt-4 mb-3 font-mono text-[28px] leading-none font-semibold text-ink tabular-nums">
           {picked.length ? `≈ ${dollarText(dollars)}` : "—"}
         </p>
         <p className={cn(labelText, "mb-4")}>
           {picked.length
-            ? `${picked.length} models × ${items} items${unknown ? ` · ${unknown} without a listed price, not counted` : ""}. Free models cost nothing but are rate-limited.`
-            : "Pick a group of models to see what the run would cost."}
+            ? `${picked.length} models × ${items} items. Models on this machine and free ones cost nothing${unpricedNote}.`
+            : "Pick models to see what the run would cost."}
         </p>
         <button
           type="button"
           className={solidButton}
-          disabled={!picked.length || !dataset}
-          onClick={() =>
-            onSetUp(
-              picked.map((backend) => backend.id),
-              dataset,
-              items,
-            )
-          }
+          disabled={!picked.length || !set}
+          onClick={() => onSetUp(picked, set, items)}
         >
           Set up in Compare
         </button>
@@ -183,16 +283,22 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
               from Past runs · each model's largest run on the set
             </span>
           </h2>
-          <select
-            value={board}
-            onChange={(event) => setBoard(event.target.value)}
-            aria-label="Leaderboard set"
-            className="rounded-full border border-rule bg-paper px-3 py-1 text-[13.5px] text-ink"
-          >
-            {inputs.map((input) => (
-              <option key={input}>{input}</option>
-            ))}
-          </select>
+          <RunFilter
+            runs={runs}
+            kind={boardKind}
+            onKindChange={(kind) => {
+              setBoardKind(kind);
+              setMenu("");
+            }}
+            set={board}
+            onSetChange={(name) => {
+              setBoard(name);
+              setMenu("");
+            }}
+            allSets={false}
+            open={menu === "board"}
+            onOpenChange={menuHandler("board")}
+          />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[13px]">
