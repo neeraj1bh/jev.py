@@ -9,6 +9,7 @@ import { Header } from "./components/Header";
 import { InputBar, type InputSource } from "./components/InputBar";
 import { ItemDialog } from "./components/ItemDialog";
 import { KeyDialog } from "./components/KeyDialog";
+import { KeysDialog } from "./components/KeysDialog";
 import { ModelPicker } from "./components/ModelPicker";
 import { ModelsPicker } from "./components/ModelsPicker";
 import { type KindFilter, PastRuns, runTime } from "./components/PastRuns";
@@ -61,6 +62,7 @@ export default function App() {
   } = usePanels();
 
   const [mode, setMode] = useState<Mode>("compare");
+  const [keysOpen, setKeysOpen] = useState(false);
   const [source, setSource] = useState<InputSource>("examples");
   const [example, setExample] = useState<ExampleName | "">(FIRST_EXAMPLE);
   const [dataset, setDataset] = useState("");
@@ -843,7 +845,9 @@ export default function App() {
         onModeChange={switchMode}
         preference={theme.preference}
         onPreferenceChange={theme.setPreference}
+        onOpenKeys={() => setKeysOpen(true)}
       />
+      <KeysDialog open={keysOpen} onClose={() => setKeysOpen(false)} onChanged={reload} />
 
       <div key={mode} className="animate-fade motion-reduce:animate-none">
         {mode === "benchmark" ? (

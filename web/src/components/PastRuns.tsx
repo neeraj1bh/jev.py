@@ -1,9 +1,10 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, History, Search, SearchX } from "lucide-react";
 import { useState } from "react";
 
 import { usePersistentState } from "../hooks/usePersistentState";
 import { chipButton, cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
 import type { RunKind, SavedRun } from "../types";
+import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
 import { type KindFilter, RunFilter } from "./RunFilter";
 import { Skeleton } from "./Skeleton";
@@ -208,11 +209,29 @@ export function PastRuns(props: PastRunsProps) {
               ))}
             {!props.loading && shown.length === 0 && (
               <tr>
-                <td colSpan={5} className={tableCell}>
-                  {words.length
-                    ? "No run matches the search"
-                    : `Nothing saved yet${kind || set ? " that matches the filter" : ""}`}
-                  .
+                <td colSpan={5}>
+                  {runs.length === 0 ? (
+                    <EmptyState icon={History} title="No runs yet">
+                      Every batch you run in Compare, Generate vs readout or Benchmark is saved
+                      here, and reopens without sending a request.
+                    </EmptyState>
+                  ) : (
+                    <EmptyState
+                      icon={SearchX}
+                      title="No run matches"
+                      action={{
+                        label: "Clear search and filters",
+                        onClick: () => {
+                          setQuery("");
+                          setSet("");
+                          props.onKindChange("");
+                        },
+                      }}
+                    >
+                      Nothing saved fits {words.length ? `"${query}"` : "this filter"}
+                      {words.length && (kind || set) ? " with this filter" : ""}.
+                    </EmptyState>
+                  )}
                 </td>
               </tr>
             )}

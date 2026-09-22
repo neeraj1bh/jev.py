@@ -1,4 +1,4 @@
-import type { Backend, Dataset, Item, Request, Response, SavedRun, Side } from "./types";
+import type { Backend, Dataset, Item, KeyInfo, Request, Response, SavedRun, Side } from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -54,8 +54,10 @@ export async function fetchRun(name: string) {
 export const sampleItem = (dataset: string, fresh = false) =>
   postOrThrow<Item>("/v1/sample", { dataset, fresh });
 export const loadModel = (backend: string) => postOrThrow<unknown>("/v1/load", { backend });
+/** `backend` is a backend id such as remote:deepseek, or a key name such as HF_TOKEN. */
 export const saveKey = (backend: string, key: string, save: boolean) =>
   postOrThrow<unknown>("/v1/key", { backend, key, save });
+export const fetchKeys = () => getJson<KeyInfo[]>("/v1/keys");
 
 export async function readout(
   body: Request & { backend: string } & Record<string, unknown>,

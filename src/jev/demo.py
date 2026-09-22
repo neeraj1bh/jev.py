@@ -84,6 +84,61 @@ DATASETS = {
         "clinc/clinc_oos", "plus", "test", {"message": "text"},
         "What does the user want? (oos = none of these)", "intent", None,
     ),
+    "Tweet sentiment": (
+        "cardiffnlp/tweet_eval", "sentiment", "test", {"tweet": "text"},
+        "What is the sentiment of this tweet?", "label", None,
+    ),
+    "Tweet hate": (
+        "cardiffnlp/tweet_eval", "hate", "test", {"tweet": "text"},
+        "Is this tweet hateful towards immigrants or women?", "label", "hate",
+    ),
+    "Tweet irony": (
+        "cardiffnlp/tweet_eval", "irony", "test", {"tweet": "text"},
+        "Is this tweet ironic?", "label", "irony",
+    ),
+    "Tweet offensive": (
+        "cardiffnlp/tweet_eval", "offensive", "test", {"tweet": "text"},
+        "Is this tweet offensive?", "label", "offensive",
+    ),
+    "ANLI round 3": (
+        "facebook/anli", "plain_text", "test_r3", {"premise": "premise", "hypothesis": "hypothesis"},
+        "How does the hypothesis relate to the premise?", "label", None,
+    ),
+    "MultiNLI mismatched": (
+        "nyu-mll/multi_nli", "default", "validation_mismatched",
+        {"premise": "premise", "hypothesis": "hypothesis"},
+        "How does the hypothesis relate to the premise?", "label", None,
+    ),
+    "ContractNLI": (
+        "kiddothe2b/contract-nli", "contractnli_a", "test",
+        {"contract clause": "premise", "hypothesis": "hypothesis"},
+        "Does the clause entail, contradict or not mention the hypothesis?", "label", None,
+    ),
+    "MultiRC": (
+        "aps/super_glue", "multirc", "validation",
+        {"paragraph": "paragraph", "question": "question", "answer": "answer"},
+        "Is this answer to the question correct?", "label", "True",
+    ),
+    "ToxicChat": (
+        "lmsys/toxic-chat", "toxicchat0124", "test", {"user message": "user_input"},
+        "Is this message to a chatbot toxic?", "toxicity", 1,
+    ),
+    "SMS spam": (
+        "ucirvine/sms_spam", "plain_text", "train", {"sms": "sms"},
+        "Is this text message spam?", "label", "spam",
+    ),
+    "IMDB": (
+        "stanfordnlp/imdb", "plain_text", "test", {"review": "text"},
+        "Is this movie review positive?", "label", "pos",
+    ),
+    "DBpedia-14": (
+        "fancyzhx/dbpedia_14", "dbpedia_14", "test", {"title": "title", "article": "content"},
+        "What kind of thing is this article about?", "label", None,
+    ),
+    "LEDGAR": (
+        "coastalcph/lex_glue", "ledgar", "test", {"contract provision": "text"},
+        "Which kind of contract provision is this?", "label", None,
+    ),
 }  # fmt: skip
 
 
@@ -118,7 +173,87 @@ MC = {  # benchmarks whose options differ per question: (Hub dataset, config, sp
         "Which answer is true?",
         lambda r: (r["mc1_targets"]["choices"], r["mc1_targets"]["labels"].index(1)),
     ),
+    "CommonsenseQA": (
+        "tau/commonsense_qa", "default", "validation",
+        lambda r: {"question": r["question"]},
+        "Which answer is the most sensible?",
+        lambda r: (r["choices"]["text"], r["choices"]["label"].index(r["answerKey"])),
+    ),
+    "OpenBookQA": (
+        "allenai/openbookqa", "main", "test",
+        lambda r: {"question": r["question_stem"]},
+        "Which answer is correct?",
+        lambda r: (r["choices"]["text"], r["choices"]["label"].index(r["answerKey"])),
+    ),
+    "WinoGrande": (
+        "allenai/winogrande", "winogrande_debiased", "validation",
+        lambda r: {"sentence": r["sentence"]},
+        "Who or what does the blank (_) refer to?",
+        lambda r: ([r["option1"], r["option2"]], int(r["answer"]) - 1),
+    ),
+    "MedQA": (
+        "GBaker/MedQA-USMLE-4-options", "default", "test",
+        lambda r: {"question": r["question"]},
+        "Which answer is correct?",
+        lambda r: (list(r["options"].values()), list(r["options"]).index(r["answer_idx"])),
+    ),
+    "PubMedQA": (
+        "qiaojin/PubMedQA", "pqa_labeled", "train",
+        lambda r: {"abstract": " ".join(r["context"]["contexts"]), "question": r["question"]},
+        "Given the abstract, what is the answer to the question?",
+        lambda r: (["yes", "no", "maybe"], ["yes", "no", "maybe"].index(r["final_decision"])),
+    ),
+    "Arena votes": (
+        "lmarena-ai/arena-human-preference-55k", "default", "train",
+        lambda r: {
+            "prompt": _joined(r["prompt"]),
+            "response A": _joined(r["response_a"]),
+            "response B": _joined(r["response_b"]),
+        },
+        "Which response did the person who asked prefer?",
+        lambda r: (
+            ["A is better", "B is better", "a tie"],
+            [r["winner_model_a"], r["winner_model_b"], r["winner_tie"]].index(1),
+        ),
+    ),
+    "RewardBench": (
+        "allenai/reward-bench", "default", "filtered",
+        lambda r: {"prompt": r["prompt"], **_pair(r["id"], r["chosen"], r["rejected"])},
+        "Which response is better?",
+        lambda r: (["A is better", "B is better"], 0 if int(r["id"]) % 2 == 0 else 1),
+    ),
+    "GPQA Diamond": (  # gated: accept its terms on the Hub and put HF_TOKEN in .env
+        "Idavidrein/gpqa", "gpqa_diamond", "train",
+        lambda r: {"question": r["Question"]},
+        "Which answer is correct?",
+        lambda r: _shuffled(
+            r["Question"], r["Correct Answer"], [r[f"Incorrect Answer {k}"] for k in (1, 2, 3)]
+        ),
+    ),
 }  # fmt: skip
+
+
+def _joined(value):
+    """Arena turns are stored as a JSON list of strings."""
+    try:
+        return "\n\n".join(x or "" for x in json.loads(value))
+    except (TypeError, ValueError):
+        return value
+
+
+def _pair(item_id, chosen, rejected):
+    """RewardBench always lists the better response first; alternate by id so A is not always right."""
+    a, b = (chosen, rejected) if int(item_id) % 2 == 0 else (rejected, chosen)
+    return {"response A": a, "response B": b}
+
+
+def _shuffled(question, right, wrong):
+    """GPQA keeps the right answer first; a fixed per-question order keeps every run comparable."""
+    options = [right, *wrong]
+    random.Random(question).shuffle(options)
+    return options, options.index(right)
+
+
 ABOUT = {  # one line per set, shown when hovering it in the page
     "SST-2 sentiment": "Is this movie-review sentence positive?",
     "RTE entailment": "Does sentence A entail sentence B?",
@@ -134,7 +269,45 @@ ABOUT = {  # one line per set, shown when hovering it in the page
     "ARC-Challenge": "Grade-school science question that simple methods get wrong",
     "HellaSwag": "Which ending continues the scene most plausibly?",
     "TruthfulQA": "Which answer is true, where a common misconception is also offered?",
+    "Tweet sentiment": "Tweet: negative, neutral or positive?",
+    "Tweet hate": "Is this tweet hate speech against immigrants or women?",
+    "Tweet irony": "Is this tweet ironic?",
+    "Tweet offensive": "Is this tweet offensive?",
+    "ANLI round 3": "Adversarial NLI, written to fool strong models: entailment, neutral or contradiction?",
+    "MultiNLI mismatched": "NLI on genres unseen in training: entailment, neutral or contradiction?",
+    "ContractNLI": "An NDA clause against a hypothesis: entailed, contradicted or not mentioned?",
+    "MultiRC": "A paragraph, a question and a candidate answer: is the answer correct?",
+    "ToxicChat": "A real user message to a chatbot: toxic or not, labelled by people?",
+    "SMS spam": "Is this text message spam?",
+    "IMDB": "Is this full movie review positive?",
+    "DBpedia-14": "Wikipedia article: which of 14 kinds of thing?",
+    "LEDGAR": "Contract provision: which of 100 provision types?",
+    "CommonsenseQA": "Everyday-knowledge question, five choices",
+    "OpenBookQA": "Elementary science question needing a fact plus common sense",
+    "WinoGrande": "Who does the pronoun gap refer to? Two choices",
+    "MedQA": "US medical licensing exam question, four choices",
+    "PubMedQA": "A research abstract and a question: yes, no or maybe?",
+    "Arena votes": "Two chatbot answers to one prompt: which did the person prefer, or a tie?",
+    "RewardBench": "A prompt and two responses: which is better? Labels from a curated benchmark",
+    "GPQA Diamond": "Graduate-level science question written to resist search (needs HF_TOKEN)",
 }
+GROUPS = {  # menu headings, in order; every set belongs to one
+    "Sentiment and tone": [
+        "SST-2 sentiment", "IMDB", "Tweet sentiment", "Tweet emotion", "Tweet irony",
+    ],
+    "Meaning and reading": [
+        "RTE entailment", "SNLI", "MultiNLI mismatched", "ANLI round 3", "BoolQ", "MultiRC",
+        "WinoGrande",
+    ],
+    "Intent and topic": ["Banking77", "CLINC150", "AG News topic", "DBpedia-14"],
+    "Knowledge and exams": [
+        "MMLU", "MMLU-Pro", "ARC-Challenge", "OpenBookQA", "CommonsenseQA", "HellaSwag",
+        "TruthfulQA", "MedQA", "PubMedQA", "GPQA Diamond",
+    ],
+    "Safety and spam": ["ToxicChat", "Tweet hate", "Tweet offensive", "SMS spam"],
+    "Which answer is better": ["Arena votes", "RewardBench"],
+    "Contracts and business": ["ContractNLI", "LEDGAR", "TypeSafe cases"],
+}  # fmt: skip
 OPTIONS = {
     "MMLU": 4,
     "MMLU-Pro": 10,
@@ -146,6 +319,20 @@ OPTIONS = {
     "Tweet emotion": 4,
     "Banking77": 77,
     "CLINC150": 151,
+    "Tweet sentiment": 3,
+    "ANLI round 3": 3,
+    "MultiNLI mismatched": 3,
+    "ContractNLI": 3,
+    "DBpedia-14": 14,
+    "LEDGAR": 100,
+    "CommonsenseQA": 5,
+    "OpenBookQA": 4,
+    "WinoGrande": 2,
+    "MedQA": 4,
+    "PubMedQA": 3,
+    "Arena votes": 3,
+    "RewardBench": 2,
+    "GPQA Diamond": 4,
 }  # the rest are yes/no
 LETTER = {
     "deepseek",
@@ -175,21 +362,41 @@ def deal(name, n, fresh):
     return DECKS[name].pop()
 
 
+def rows_page(hub, config, split, offset):
+    """One page of 100 rows; HF_TOKEN, when set, opens sets that need a Hub login."""
+    token = env("HF_TOKEN")
+    req = urllib.request.Request(
+        ROWS.format(hub, config, split, offset),
+        headers={"authorization": f"Bearer {token}"} if token else {},
+    )
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403) or (e.code == 404 and token):  # the Hub hides gated sets as 404
+                raise ValueError(
+                    f"{hub} is behind a login: accept its terms at https://huggingface.co/datasets/{hub}"
+                    + ("" if token else ", then add a Hugging Face token under Keys")
+                ) from e
+            if e.code != 429 or attempt == 3:
+                raise
+            time.sleep(float(e.headers.get("retry-after") or 5 * (attempt + 1)))  # the Hub rate-limits
+
+
 def download(name, hub, config, split):
     """300 rows of a set (three random pages), fetched once into DATA."""
     path = dataset_path(name)
     if not os.path.exists(path):
         PROGRESS[name] = [0, 3, "pages"]
         try:
-            with urllib.request.urlopen(ROWS.format(hub, config, split, 0), timeout=30) as r:
-                first = json.load(r)
+            first = rows_page(hub, config, split, 0)
             total, rows = first["num_rows_total"], first["rows"]
             starts = range(100, max(101, total - 100), 100)
             picked = random.sample(starts, min(2, len(starts)))
             PROGRESS[name] = [1, 1 + len(picked), "pages"]
             for o in picked:
-                with urllib.request.urlopen(ROWS.format(hub, config, split, o), timeout=30) as r:
-                    rows += json.load(r)["rows"]
+                rows += rows_page(hub, config, split, o)["rows"]
                 PROGRESS[name][0] += 1
         finally:
             PROGRESS.pop(name, None)
@@ -592,13 +799,65 @@ def get(bid):
         return LOADED[bid]
 
 
-def set_key(bid, key, save):
+# Everything the Keys view lists: .env name -> (label, what it unlocks, where to get it)
+KEYS = {
+    "TYPESAFE_API_KEY": ("TypeSafe (Jev)", "Jev itself", "https://typesafe.ai"),
+    "DEEPSEEK_API_KEY": ("DeepSeek", "the direct DeepSeek API", "https://platform.deepseek.com"),
+    "MOONSHOT_API_KEY": ("Kimi", "the direct Kimi API", "https://platform.moonshot.ai"),
+    "OPENAI_API_KEY": ("OpenAI", "the direct OpenAI API", "https://platform.openai.com"),
+    "OPENROUTER_API_KEY": ("OpenRouter", "every OpenRouter model", "https://openrouter.ai/keys"),
+    "AI_GATEWAY_API_KEY": ("Vercel AI Gateway", "Jev through Vercel", "https://vercel.com/ai-gateway"),
+    "HF_TOKEN": (
+        "Hugging Face",
+        "sets behind a login, such as GPQA",
+        "https://huggingface.co/settings/tokens",
+    ),
+    "LLAMACPP_URL": ("llama.cpp server", "a llama-server address instead of the default", ""),
+}
+HF_WHOAMI = "https://huggingface.co/api/whoami-v2"
+
+
+def keys():
+    """Which keys are set; never their values."""
+    backend = {v[0]: "remote:" + b for b, v in BACKENDS.items() if v[0]}
+    return [
+        {"var": var, "label": label, "unlocks": unlocks, "url": url, "set": bool(env(var)),
+         "backend": backend.get(var)}
+        for var, (label, unlocks, url) in KEYS.items()
+    ]  # fmt: skip
+
+
+def check_key(name, key):
+    """One tiny request that fails if the key or address is wrong."""
+    if name == "HF_TOKEN":
+        request = urllib.request.Request(HF_WHOAMI, headers={"authorization": "Bearer " + key})
+        urllib.request.urlopen(request, timeout=15).close()
+    elif name == "LLAMACPP_URL":
+        with urllib.request.urlopen(key.split("/v1/")[0] + "/health", timeout=5) as r:
+            if json.loads(r.read()).get("status") != "ok":
+                raise ValueError("that address answered, but not as a llama-server")
+    elif name == "remote:openrouter":  # its key endpoint checks the key alone, whatever a model can do
+        request = urllib.request.Request(OPENROUTER_KEY_URL, headers={"Authorization": "Bearer " + key})
+        urllib.request.urlopen(request, timeout=15).close()
+    else:
+        get(name).ask({"text": "hello"}, {"q": {"type": "noul", "instructions": "Is this a greeting?"}})
+
+
+def set_key(name, key, save):
     """Use a key typed into the page: test it with one tiny request, then keep it for this
-    session and, if asked, write it to .env (git-ignored). A rejected key changes nothing."""
-    var = BACKENDS[bid.split(":", 1)[1]][0]
+    session and, if asked, write it to .env (git-ignored). A rejected key changes nothing.
+    `name` is a backend id such as remote:deepseek, or a KEYS name such as HF_TOKEN."""
+    bid = (
+        name if name.startswith("remote:") else next((k["backend"] for k in keys() if k["var"] == name), None)
+    )
+    if bid is None and name not in KEYS:
+        raise ValueError(f"unknown key {name}")
+    var = BACKENDS[bid.split(":", 1)[1]][0] if bid else name
     old = os.environ.get(var)
     os.environ[var] = key
     LOADED.pop(bid, None)
+    if var == "LLAMACPP_URL":
+        LOADED.pop("remote:llamacpp", None)
 
     def undo():
         if old is None:
@@ -608,11 +867,7 @@ def set_key(bid, key, save):
         LOADED.pop(bid, None)
 
     try:
-        if bid == "remote:openrouter":  # its key endpoint checks the key alone, whatever a model can do
-            request = urllib.request.Request(OPENROUTER_KEY_URL, headers={"Authorization": "Bearer " + key})
-            urllib.request.urlopen(request, timeout=15).close()
-        else:
-            get(bid).ask({"text": "hello"}, {"q": {"type": "noul", "instructions": "Is this a greeting?"}})
+        check_key(bid or var, key)
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):  # only these say the key is wrong; anything else is the model or the route
             undo()
@@ -625,6 +880,8 @@ def set_key(bid, key, save):
         lines = open(path).read().splitlines() if os.path.exists(path) else []
         at = next((i for i, x in enumerate(lines) if x.partition("=")[0].strip() == var), None)
         if at is None:
+            label, unlocks, url = KEYS.get(var, (var, "", ""))
+            lines.append(f"# {label}: {unlocks}" + (f" — {url}" if url else ""))
             lines.append(f"{var}={key}")
         else:
             lines[at] = f"{var}={key}"
@@ -710,15 +967,26 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 return self._send(200, json.dumps(run_rows(name)).encode())
             if self.path.endswith("/progress"):
                 return self._send(200, json.dumps(progress()).encode())
+            if self.path.endswith("/keys"):
+                return self._send(200, json.dumps(keys()).encode())
             if self.path.endswith("/datasets"):
                 sets = [
-                    {"name": n, "options": OPTIONS.get(n, 2), "local": os.path.exists(dataset_path(n))}
+                    {
+                        "name": n,
+                        "options": OPTIONS.get(n, 2),
+                        "yes_no": n in DATASETS and DATASETS[n][6] is not None,
+                        "local": os.path.exists(dataset_path(n)),
+                    }
                     for n in [*DATASETS, *MC]
                 ]
                 ts = os.path.isdir(os.path.join(ROOT, "results", "typesafe"))
                 sets.append({"name": "TypeSafe cases", "options": None, "local": ts})
+                group = {n: g for g, names in GROUPS.items() for n in names}
+                order = [n for names in GROUPS.values() for n in names]
                 for x in sets:
                     x["about"] = ABOUT[x["name"]]
+                    x["group"] = group[x["name"]]
+                sets.sort(key=lambda x: order.index(x["name"]))
                 return self._send(200, json.dumps(sets).encode())
             path = urllib.parse.urlparse(self.path).path
             file = os.path.normpath(os.path.join(WEB, path.lstrip("/")))
@@ -734,7 +1002,15 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 html = f.read().replace("{{model}}", model_id)
             self._send(200, html.encode(), "text/html; charset=utf-8")
 
+        def from_elsewhere(self):
+            """A request another website's page sent: it could spend your keys or replace them."""
+            origin = self.headers.get("origin")
+            host = urllib.parse.urlparse(origin).hostname if origin else None
+            return origin is not None and host not in ("localhost", "127.0.0.1", "[::1]", "::1")
+
         def do_POST(self):
+            if self.from_elsewhere():
+                return self._send(403, b'{"error": {"message": "requests from other sites are refused"}}')
             body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
             try:
                 if self.path.endswith("/sample"):
@@ -791,7 +1067,10 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 bid = body.get("backend") or model_id
                 msg = str(e)
                 gateway_model = bid.startswith("openrouter:")
-                if isinstance(e, NoProbabilities) and gateway_model:
+                rejected = isinstance(e, urllib.error.HTTPError) and e.code in (401, 403)
+                if self.path.endswith("/key") and rejected:
+                    msg = f"That key was rejected (HTTP {e.code}). Nothing was saved."
+                elif isinstance(e, NoProbabilities) and gateway_model:
                     CHECKED[bid] = False  # it drops out of the list on the next refresh
                     model = bid.split("/")[-1]
                     msg = f"{model} answered without probabilities, so it cannot be read this way."

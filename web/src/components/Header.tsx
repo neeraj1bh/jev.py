@@ -1,6 +1,7 @@
 import {
   Columns3,
   History,
+  KeyRound,
   type LucideIcon,
   Monitor,
   Moon,
@@ -41,9 +42,16 @@ interface HeaderProps {
   onModeChange: (mode: Mode) => void;
   preference: ThemePreference;
   onPreferenceChange: (preference: ThemePreference) => void;
+  onOpenKeys: () => void;
 }
 
-export function Header({ mode, onModeChange, preference, onPreferenceChange }: HeaderProps) {
+export function Header({
+  mode,
+  onModeChange,
+  preference,
+  onPreferenceChange,
+  onOpenKeys,
+}: HeaderProps) {
   return (
     <>
       <header className="flex items-center gap-3">
@@ -53,6 +61,16 @@ export function Header({ mode, onModeChange, preference, onPreferenceChange }: H
         <p className="m-0 ml-1.5 min-w-0 flex-1 text-sm text-dim max-[860px]:hidden">
           {LEDE[mode]}
         </p>
+        <Tip content="Keys and tokens">
+          <button
+            type="button"
+            aria-label="Keys and tokens"
+            onClick={onOpenKeys}
+            className="grid size-8 place-items-center rounded-full border border-rule bg-transparent text-dim transition-colors hover:border-dim hover:text-ink"
+          >
+            <Icon icon={KeyRound} size={14} />
+          </button>
+        </Tip>
         <div className="inline-flex rounded-full border border-rule p-0.5">
           {THEMES.map((theme) => (
             <Tip key={theme.preference} content={theme.name}>

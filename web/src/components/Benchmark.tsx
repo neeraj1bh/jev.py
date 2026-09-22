@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check, Trophy } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -22,6 +22,7 @@ import {
 } from "../styles";
 import type { Backend, Dataset, RunKind, SavedRun } from "../types";
 import { DatasetMenu } from "./DatasetMenu";
+import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
 import { Dropdown } from "./Menu";
 import { ModelMenu } from "./ModelMenu";
@@ -312,8 +313,10 @@ export function Benchmark({ backends, datasets, runs, backendLabel, onSetUp }: B
             <tbody>
               {table.length === 0 && (
                 <tr>
-                  <td colSpan={5} className={tableCell}>
-                    No saved run on this set yet.
+                  <td colSpan={5}>
+                    <EmptyState icon={Trophy} title="Nothing to rank yet">
+                      Run a batch on this set and every model in it is ranked here, best first.
+                    </EmptyState>
                   </td>
                 </tr>
               )}

@@ -31,8 +31,22 @@ export interface Backend {
 export interface Dataset {
   name: string;
   options: number | null;
+  /** A yes/no question, rather than a pick between two named options. */
+  yes_no?: boolean;
   local: boolean;
   about?: string;
+  /** The menu heading it sits under, e.g. "Knowledge and exams". */
+  group?: string;
+}
+
+/** One entry of the Keys view: whether it is set, never its value. */
+export interface KeyInfo {
+  var: string;
+  label: string;
+  unlocks: string;
+  url: string;
+  set: boolean;
+  backend?: string | null;
 }
 
 export type Answer =
