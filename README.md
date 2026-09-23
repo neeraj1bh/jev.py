@@ -206,7 +206,7 @@ uv run jev-bench export                           # every item with its text, in
 ```
 
 Run each model separately, then open the runs together in Past runs. The models to run are in
-`benchmarks/core-v1-models.json`, with the GGUF to load for each llama.cpp one. Before the list is final, two strong models check every label
+`benchmarks/core-v1-models.json`: six hosted models first, the rest under `optional`, with the GGUF to load for each llama.cpp one. Before the list is final, two strong models check every label
 and people settle where they disagree. After that v1 never changes; new items make a v2.
 
 ## Demo

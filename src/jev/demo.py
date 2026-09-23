@@ -1069,7 +1069,8 @@ def presets():
         return []
     with open(path) as f:
         frozen = json.load(f)
-    return [{"name": "Core v1 models", "dataset": "Core v1", "models": [m["id"] for m in frozen["models"]]}]
+    lists = {"Core v1 models": frozen["models"], "Core v1 optional": frozen.get("optional", [])}
+    return [{"name": n, "dataset": "Core v1", "models": [m["id"] for m in ms]} for n, ms in lists.items()]
 
 
 def keys():
