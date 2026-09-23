@@ -55,7 +55,8 @@ HOSTED = {
 DATA = os.path.join(ROOT, "data")  # dataset rows fetched for the demo, git-ignored
 ADDED_PATH = os.path.join(DATA, "added-models.json")  # Hugging Face models added in the page: id -> GB
 LOGS = os.path.join(ROOT, "results", "logs", "demo")  # one .jsonl per batch, git-ignored
-ROWS = "https://datasets-server.huggingface.co/rows?dataset={}&config={}&split={}&offset={}&length=100"
+ROWS = "https://datasets-server.huggingface.co/rows?dataset={}&config={}&split={}&offset={}&length={}"
+POOL, POOL_RUNS = 300, 20  # rows of a set kept on disk, and how many places in the split they come from
 # name: (Hub dataset, config, split, state fields, question, label field, the label meaning yes)
 DATASETS = {
     "SST-2 sentiment": (
@@ -202,7 +203,7 @@ MC = {  # benchmarks whose options differ per question: (Hub dataset, config, sp
         "truthfulqa/truthful_qa", "multiple_choice", "validation",
         lambda r: {"question": r["question"]},
         "Which answer is true?",
-        lambda r: (r["mc1_targets"]["choices"], r["mc1_targets"]["labels"].index(1)),
+        lambda r: _shuffled(r["question"], *_true_and_false(r["mc1_targets"])),
     ),
     "CommonsenseQA": (
         "tau/commonsense_qa", "default", "validation",
@@ -315,8 +316,15 @@ def _bbh_options(text, target):
     return [line[4:] for line in lines], letters.index(target[1])
 
 
+def _true_and_false(targets):
+    """TruthfulQA's single-answer choices, split into the one true answer and the rest."""
+    pairs = list(zip(targets["choices"], targets["labels"], strict=True))
+    return next(c for c, true in pairs if true), [c for c, true in pairs if not true]
+
+
 def _shuffled(question, right, wrong):
-    """GPQA keeps the right answer first; a fixed per-question order keeps every run comparable."""
+    """GPQA and TruthfulQA list the right answer first; a fixed per-question order keeps every run
+    comparable."""
     options = [right, *wrong]
     random.Random(question).shuffle(options)
     return options, options.index(right)
@@ -467,11 +475,11 @@ def deal(name, n, fresh):
     return DECKS[name].pop()
 
 
-def rows_page(hub, config, split, offset):
-    """One page of 100 rows; HF_TOKEN, when set, opens sets that need a Hub login."""
+def rows_page(hub, config, split, offset, length=100):
+    """One page of up to 100 rows; HF_TOKEN, when set, opens sets that need a Hub login."""
     token = env("HF_TOKEN")
     req = urllib.request.Request(
-        ROWS.format(hub, config, split, offset),
+        ROWS.format(hub, config, split, offset, length),
         headers={"authorization": f"Bearer {token}"} if token else {},
     )
     for attempt in range(4):
@@ -490,18 +498,25 @@ def rows_page(hub, config, split, offset):
 
 
 def download(name, hub, config, split):
-    """300 rows of a set (three random pages), fetched once into DATA."""
+    """About 300 rows of a set, fetched once into DATA: a short run of rows from each of 20 equal
+    stretches of the split. Some splits are sorted by label (DBpedia-14 holds 5,000 rows of each
+    of its 14 in order), so a few long pages would hold only a few labels."""
     path = dataset_path(name)
     if not os.path.exists(path):
-        PROGRESS[name] = [0, 3, "pages"]
+        size = POOL // POOL_RUNS
+        PROGRESS[name] = [0, POOL_RUNS, "pages"]
         try:
-            first = rows_page(hub, config, split, 0)
+            first = rows_page(hub, config, split, 0, size)
             total, rows = first["num_rows_total"], first["rows"]
-            starts = range(100, max(101, total - 100), 100)
-            picked = random.sample(starts, min(2, len(starts)))
-            PROGRESS[name] = [1, 1 + len(picked), "pages"]
-            for o in picked:
-                rows += rows_page(hub, config, split, o)["rows"]
+            if total <= POOL:
+                starts = range(len(rows), total, 100)
+                size = 100
+            else:
+                stretch = total / POOL_RUNS
+                starts = [int(k * stretch + random.random() * (stretch - size)) for k in range(1, POOL_RUNS)]
+            PROGRESS[name] = [1, 1 + len(starts), "pages"]
+            for start in starts:
+                rows += rows_page(hub, config, split, start, size)["rows"]
                 PROGRESS[name][0] += 1
         finally:
             PROGRESS.pop(name, None)
@@ -566,7 +581,7 @@ def row_item(name, page, r):
 
 def sample(name, fresh=False, wide=False):
     """One random labelled item as a request, plus its truth. The first call per dataset
-    downloads 300 rows (three random pages) into DATA; later calls deal from them."""
+    downloads about 300 rows spread over the set into DATA; later calls deal from them."""
     if name in CORE:
         from jev import bench  # bench imports this module
 
