@@ -1,10 +1,15 @@
 import type { ReactNode } from "react";
 
 import { useElapsed } from "../hooks/useElapsed";
-import { cn } from "../styles";
+import { cn, inset, shell } from "../styles";
 import type { PanelState } from "../types";
+import { type IconGlyph, IconTile } from "./Icon";
 import { InfoTip } from "./InfoTip";
 import type { Place } from "./RaceClocks";
+
+/** A side's tile fills while it runs and turns green when it finished first. */
+export const liveTone = (state: PanelState) =>
+  state.status === "running" ? "ink" : state.fastest ? "good" : "idle";
 
 export function Clock({
   state,
@@ -54,6 +59,7 @@ export function PlaceBadge({
 
 interface PanelProps {
   title: ReactNode;
+  icon?: IconGlyph;
   subtitle: string;
   info?: ReactNode;
   state: PanelState;
@@ -61,11 +67,12 @@ interface PanelProps {
   children: ReactNode;
 }
 
-export function Panel({ title, subtitle, info, state, place, children }: PanelProps) {
+export function Panel({ title, icon, subtitle, info, state, place, children }: PanelProps) {
   return (
-    <section className="flex min-h-[260px] min-w-0 flex-col rounded-lg border border-rule bg-panel px-5 py-[18px]">
-      <h2 className="m-0 text-sm font-semibold text-ink">
+    <section className={cn(shell, "flex min-h-[260px] min-w-0 flex-col")}>
+      <h2 className="m-0 px-3.5 pt-2 pb-2.5 text-sm font-semibold text-ink">
         <span className="inline-flex items-center gap-1">
+          {icon && <IconTile icon={icon} tone={liveTone(state)} className="mr-1" />}
           {title}
           {info && <InfoTip>{info}</InfoTip>}
         </span>
@@ -73,10 +80,14 @@ export function Panel({ title, subtitle, info, state, place, children }: PanelPr
           {subtitle}
         </small>
       </h2>
-      <Clock state={state} />
-      <PlaceBadge place={place} />
-      {children}
-      <div className="mt-auto pt-3.5 text-[13px] text-dim">{state.footer}</div>
+      <div className={cn(inset, "flex flex-1 flex-col px-5 pt-1 pb-[18px]")}>
+        <Clock state={state} />
+        <PlaceBadge place={place} />
+        {children}
+        <div className="mt-auto border-0 border-t border-dashed border-rule pt-3 text-[13px] text-dim">
+          {state.footer}
+        </div>
+      </div>
     </section>
   );
 }

@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 
 import { blockingBackend } from "../backends";
+import { setIcon } from "../icons";
 import type { Backend, Dataset } from "../types";
 import { Dropdown, MenuHeading, MenuItem } from "./Menu";
 import { Skeleton } from "./Skeleton";
@@ -37,6 +38,7 @@ export function DatasetMenu({
     <Dropdown
       compact
       active={!!value}
+      icon={setIcon(datasets.find((set) => set.name === value)?.group)}
       open={open}
       onOpenChange={onOpenChange}
       button={value || "Choose a set"}
@@ -56,6 +58,7 @@ export function DatasetMenu({
             {heading && <MenuHeading>{heading}</MenuHeading>}
             <MenuItem
               label={set.name}
+              icon={setIcon(set.group)}
               title={blocker ? `${blocker.label} reads ${blocker.max} options at most` : set.about}
               selected={set.name === value}
               disabled={!!blocker}

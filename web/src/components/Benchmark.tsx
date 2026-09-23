@@ -1,4 +1,4 @@
-import { Check, Trophy } from "lucide-react";
+import { Check, Gauge, Stack, Trophy } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { fetchPresets, type Preset } from "../api";
 import {
@@ -10,23 +10,16 @@ import {
   statusText,
 } from "../backends";
 import { percent } from "../scoring";
-import {
-  cn,
-  labelText,
-  monoDim,
-  numberInput,
-  panelBox,
-  solidButton,
-  tableCell,
-  tableHead,
-} from "../styles";
+import { cn, labelText, numberInput, rankChip, solidButton, tableCell, tableHead } from "../styles";
 import type { Backend, Dataset, RunKind, SavedRun } from "../types";
 import { DatasetMenu } from "./DatasetMenu";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
 import { Dropdown } from "./Menu";
 import { type LocalModelActions, ModelMenu } from "./ModelMenu";
+import { PickedModels } from "./ModelsPicker";
 import { type KindFilter, RunFilter } from "./RunFilter";
+import { Surface } from "./Surface";
 
 const FREE = "free";
 const TOP_MAKERS = 6; // the rest are one click away in the model menu, under their maker
@@ -156,7 +149,6 @@ export function Benchmark(props: BenchmarkProps) {
       sum + (onMachine(backend) ? 0 : (itemsDollars(backend, items, chosenSet) ?? 0)),
     0,
   );
-  const names = chosen.map((backend) => backend.label);
   const unpricedNote = unpriced.length
     ? `; ${unpriced.map((backend) => backend.label).join(", ")} ${unpriced.length === 1 ? "has no listed price here and is" : "have no listed price here and are"} not counted`
     : "";
@@ -178,32 +170,25 @@ export function Benchmark(props: BenchmarkProps) {
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3.5">
-      <section className={panelBox}>
-        <h2 className="m-0 text-sm font-semibold text-ink">
-          Benchmark{" "}
-          <span className={cn(labelText, "font-normal")}>
-            many models, one set · the cost is shown before anything runs
-          </span>
-        </h2>
+      <Surface
+        icon={Gauge}
+        title={
+          <>
+            Benchmark{" "}
+            <span className={cn(labelText, "font-normal")}>
+              many models, one set · the cost is shown before anything runs
+            </span>
+          </>
+        }
+      >
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <Dropdown
             open={menu === "models"}
             onOpenChange={menuHandler("models")}
-            buttonClassName="max-w-[min(560px,80vw)]"
+            icon={picked.length ? undefined : Stack}
+            buttonClassName={cn("max-w-[min(560px,80vw)]", picked.length > 0 && "pl-1")}
             menuClassName="w-[360px]"
-            button={
-              picked.length ? (
-                <>
-                  {picked.length} models
-                  <span className="truncate text-[12.5px] text-dim">
-                    {names.slice(0, 2).join(", ")}
-                    {names.length > 2 && ` +${names.length - 2}`}
-                  </span>
-                </>
-              ) : (
-                "Pick models"
-              )
-            }
+            button={<PickedModels picked={chosen} />}
           >
             <ModelMenu
               backends={backends}
@@ -300,16 +285,19 @@ export function Benchmark(props: BenchmarkProps) {
         <span className={cn(labelText, "ml-3")}>
           nothing is sent until you press Run batch there
         </span>
-      </section>
+      </Surface>
 
-      <section className={panelBox}>
-        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="m-0 text-sm font-semibold text-ink">
+      <Surface
+        icon={Trophy}
+        title={
+          <>
             Leaderboard{" "}
             <span className={cn(labelText, "font-normal")}>
               from Past runs · each model's largest run on the set
             </span>
-          </h2>
+          </>
+        }
+        aside={
           <RunFilter
             runs={runs}
             kind={boardKind}
@@ -326,7 +314,8 @@ export function Benchmark(props: BenchmarkProps) {
             open={menu === "board"}
             onOpenChange={menuHandler("board")}
           />
-        </div>
+        }
+      >
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[13px]">
             <thead>
@@ -350,7 +339,9 @@ export function Benchmark(props: BenchmarkProps) {
               )}
               {table.map((standing, k) => (
                 <tr key={standing.name}>
-                  <td className={cn(tableCell, monoDim)}>{k + 1}</td>
+                  <td className={tableCell}>
+                    <span className={rankChip(k + 1)}>{k + 1}</span>
+                  </td>
                   <td className={tableCell}>{standing.name}</td>
                   <td
                     className={cn(
@@ -372,7 +363,7 @@ export function Benchmark(props: BenchmarkProps) {
             </tbody>
           </table>
         </div>
-      </section>
+      </Surface>
     </div>
   );
 }

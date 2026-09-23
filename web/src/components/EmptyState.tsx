@@ -1,11 +1,10 @@
-import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-
 import { chipButton } from "../styles";
+import type { IconGlyph } from "./Icon";
 import { Icon } from "./Icon";
 
 interface EmptyStateProps {
-  icon: LucideIcon;
+  icon: IconGlyph;
   title: string;
   children: ReactNode;
   action?: { label: string; onClick: () => void };

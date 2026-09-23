@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { changeFolders, type FolderState, fetchFolders } from "../api";

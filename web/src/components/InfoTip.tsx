@@ -1,5 +1,5 @@
+import { Info } from "@phosphor-icons/react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { Info } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Icon } from "./Icon";

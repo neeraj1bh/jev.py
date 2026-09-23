@@ -1,11 +1,41 @@
+import { Stack } from "@phosphor-icons/react";
+
 import { isOffline, statusText } from "../backends";
+import { backendIcon } from "../icons";
+import { cn } from "../styles";
 import type { Backend } from "../types";
+import { IconTile } from "./Icon";
 import { Dropdown } from "./Menu";
 import { type LocalModelActions, ModelMenu } from "./ModelMenu";
 import type { MenuState } from "./ModelPicker";
 import { Skeleton } from "./Skeleton";
 
 export const MAX_COMPARE = 6;
+
+/** A multi-select's trigger: the picked models' tiles stacked like avatars, the count, the names. */
+export function PickedModels({ picked }: { picked: Backend[] }) {
+  if (!picked.length) return <>Pick models</>;
+  const names = picked.map((backend) => backend.label);
+  return (
+    <>
+      <span className="flex self-center -space-x-1.5">
+        {picked.slice(0, 3).map((backend) => (
+          <IconTile
+            key={backend.id}
+            icon={backendIcon(backend)}
+            tone="ink"
+            className="ring-2 ring-panel"
+          />
+        ))}
+      </span>
+      {picked.length} models
+      <span className="truncate text-[12.5px] text-dim">
+        {names.slice(0, 2).join(", ")}
+        {names.length > 2 && ` +${names.length - 2}`}
+      </span>
+    </>
+  );
+}
 
 interface ModelsPickerProps extends MenuState {
   backends: Backend[];
@@ -23,27 +53,20 @@ export function ModelsPicker({
   open,
   onOpenChange,
 }: ModelsPickerProps) {
-  const names = selected.map((id) => backends.find((backend) => backend.id === id)?.label ?? id);
+  const picked = selected.flatMap((id) => backends.filter((backend) => backend.id === id));
   const chosen = (backend: Backend) => selected.includes(backend.id);
   return (
     <Dropdown
       open={open}
       onOpenChange={onOpenChange}
-      buttonClassName="max-w-[min(560px,60vw)]"
+      icon={selected.length ? undefined : Stack}
+      buttonClassName={cn("max-w-[min(560px,60vw)]", selected.length > 0 && "pl-1")}
       menuClassName="w-[360px]"
       button={
         backends.length === 0 ? (
           <Skeleton className="my-1 w-44" />
-        ) : selected.length === 0 ? (
-          "Pick models"
         ) : (
-          <>
-            {selected.length} models
-            <span className="truncate text-[12.5px] text-dim">
-              {names.slice(0, 2).join(", ")}
-              {names.length > 2 && ` +${names.length - 2}`}
-            </span>
-          </>
+          <PickedModels picked={picked} />
         )
       }
     >

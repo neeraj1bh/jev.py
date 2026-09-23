@@ -1,3 +1,4 @@
+import { ChartBar, PencilSimpleLine } from "@phosphor-icons/react";
 import { panelSubtitle } from "../backends";
 import type { PanelState, Question } from "../types";
 import { Answers } from "./Answers";
@@ -76,6 +77,7 @@ export function GenerateView({
           <Panel
             key={panel.key}
             title={savedName ?? panel.title}
+            icon={k === 0 ? PencilSimpleLine : ChartBar}
             subtitle={
               savedName
                 ? panelSubtitle(savedName)

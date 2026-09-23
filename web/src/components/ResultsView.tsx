@@ -1,4 +1,4 @@
-import { ArrowLeft, Play, Square } from "lucide-react";
+import { ArrowLeft, Play, Stop } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 
 import { FIT, FIT_MS, type ReplaySpeed } from "../hooks/useBatchReplay";
@@ -8,6 +8,7 @@ import type { Row } from "../types";
 import { BatchTable } from "./BatchTable";
 import { Icon } from "./Icon";
 import { Scoreboard } from "./Scoreboard";
+import { SegmentPill, segmentTrack } from "./Segment";
 import { Summary } from "./Summary";
 import { Tip } from "./Tip";
 
@@ -83,7 +84,7 @@ export function ResultsView(props: ResultsViewProps) {
         ) : (
           <div className="flex items-center gap-2">
             <span className={cn(labelText, "hidden sm:inline")}>Speed</span>
-            <div className="inline-flex rounded-full border border-rule p-0.5">
+            <div className={segmentTrack}>
               {SPEEDS.map((speed) => (
                 <Tip
                   key={speed}
@@ -99,13 +100,14 @@ export function ResultsView(props: ResultsViewProps) {
                     disabled={props.replaying}
                     onClick={() => props.onSpeedChange(speed)}
                     className={cn(
-                      "rounded-full border-0 px-2.5 py-[3px] font-mono text-xs transition-colors",
-                      props.speed === speed
-                        ? "bg-lift text-ink"
-                        : "bg-transparent text-dim hover:text-ink",
+                      "relative rounded-full border-0 bg-transparent px-2.5 py-[3px] font-mono text-xs whitespace-nowrap transition-colors",
+                      props.speed === speed ? "text-ink" : "text-dim hover:text-ink",
                     )}
                   >
-                    {speed === FIT ? `${FIT_MS / 1000} s` : `${speed}×`}
+                    {props.speed === speed && <SegmentPill group="speed" />}
+                    <span className="relative">
+                      {speed === FIT ? `${FIT_MS / 1000} s` : `${speed}×`}
+                    </span>
                   </button>
                 </Tip>
               ))}
@@ -115,7 +117,7 @@ export function ResultsView(props: ResultsViewProps) {
               className={cn(chipButton(props.replaying), "inline-flex items-center gap-1.5")}
               onClick={props.replaying ? props.onStopReplay : props.onReplay}
             >
-              <Icon icon={props.replaying ? Square : Play} size={14} />
+              <Icon icon={props.replaying ? Stop : Play} size={14} />
               {props.replaying ? "Stop replay" : "Replay batch"}
             </button>
           </div>
@@ -134,6 +136,7 @@ export function ResultsView(props: ResultsViewProps) {
         file={props.file}
         selected={props.selected}
         follow={props.follow}
+        live={props.running || props.replaying}
         onOpen={props.running || props.replaying ? () => undefined : props.onOpenRow}
       />
     </section>

@@ -1,4 +1,4 @@
-import { ArrowUp, FileCog, Folder } from "lucide-react";
+import { ArrowUp, FileMagnifyingGlass, Folder } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { browse, type Listing } from "../api";
@@ -90,7 +90,7 @@ export function FolderPicker({ pick, onPick, onCancel, problem, onSearch }: Fold
         {listing?.files.map((file) => (
           <li key={file.path}>
             <button type="button" className={row} onClick={() => onPick(file.path)}>
-              <Icon icon={FileCog} size={14} className="shrink-0 text-dim" />
+              <Icon icon={FileMagnifyingGlass} size={14} className="shrink-0 text-dim" />
               <span className="min-w-0 flex-1 truncate">{file.name}</span>
               <span className="text-xs text-dim">use this</span>
             </button>

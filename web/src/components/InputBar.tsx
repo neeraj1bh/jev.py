@@ -1,8 +1,11 @@
+import { ArrowRight, ChatText, PencilSimple, Queue, Stack, Stop } from "@phosphor-icons/react";
 import { EXAMPLE_NAMES, EXAMPLES, type ExampleName } from "../examples";
 import { chipButton, cn, numberInput } from "../styles";
 import type { Backend, Dataset } from "../types";
 import { DatasetMenu } from "./DatasetMenu";
+import { Icon } from "./Icon";
 import { Dropdown, MenuHeading, MenuItem } from "./Menu";
+import { SegmentPill, segmentTrack } from "./Segment";
 
 export type InputSource = "examples" | "dataset";
 
@@ -36,19 +39,20 @@ export function InputBar(props: InputBarProps) {
   const allLabel = remaining === null ? "All" : remaining ? `All ${remaining}` : "All done";
 
   return (
-    <div className="mt-3.5 flex flex-wrap items-center gap-1.5 border-t border-rule pt-3.5">
-      <div className="mr-2.5 inline-flex rounded-full border border-rule p-0.5">
+    <div className="mt-3.5 flex flex-wrap items-center gap-1.5 border-0 border-t border-dashed border-rule pt-3.5">
+      <div className={cn(segmentTrack, "mr-2.5")}>
         {(["examples", "dataset"] as const).map((option) => (
           <button
             key={option}
             type="button"
             onClick={() => props.onSourceChange(option)}
             className={cn(
-              "rounded-full border-0 px-3 py-[3px] text-[13px]",
-              source === option ? "bg-lift text-ink" : "bg-transparent text-dim",
+              "relative rounded-full border-0 bg-transparent px-3 py-[3px] text-[13px] transition-colors",
+              source === option ? "text-ink" : "text-dim hover:text-ink",
             )}
           >
-            {option === "examples" ? "Examples" : "Dataset"}
+            {source === option && <SegmentPill group="source" />}
+            <span className="relative">{option === "examples" ? "Examples" : "Dataset"}</span>
           </button>
         ))}
       </div>
@@ -57,6 +61,7 @@ export function InputBar(props: InputBarProps) {
         <Dropdown
           compact
           active={!!props.example}
+          icon={ChatText}
           open={props.exampleMenuOpen}
           onOpenChange={props.onExampleMenuOpenChange}
           button={props.example || "Choose an example"}
@@ -66,6 +71,7 @@ export function InputBar(props: InputBarProps) {
             <MenuItem
               key={name}
               label={name}
+              icon={ChatText}
               detail={`${Object.keys(EXAMPLES[name].questions).length} questions`}
               selected={name === props.example}
               onSelect={() => props.onExampleChange(name)}
@@ -92,6 +98,7 @@ export function InputBar(props: InputBarProps) {
                 disabled={busy}
                 onClick={props.onNextItem}
               >
+                <Icon icon={ArrowRight} size={12} />
                 Next item
               </button>
               <input
@@ -109,6 +116,7 @@ export function InputBar(props: InputBarProps) {
                 disabled={busy || setExhausted}
                 onClick={() => props.onRunBatch(false)}
               >
+                <Icon icon={Queue} size={12} />
                 Run batch
               </button>
               <button
@@ -117,10 +125,12 @@ export function InputBar(props: InputBarProps) {
                 disabled={busy || setExhausted}
                 onClick={() => props.onRunBatch(true)}
               >
+                <Icon icon={Stack} size={12} />
                 {allLabel}
               </button>
               {props.batchRunning && (
                 <button type="button" className={chipButton()} onClick={props.onStop}>
+                  <Icon icon={Stop} size={12} />
                   Stop
                 </button>
               )}
@@ -130,6 +140,7 @@ export function InputBar(props: InputBarProps) {
       )}
 
       <button type="button" className={cn(chipButton(), "ml-auto")} onClick={props.onEdit}>
+        <Icon icon={PencilSimple} size={12} />
         Edit input
       </button>
     </div>

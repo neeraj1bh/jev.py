@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Trash } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { clearKey, fetchKeys } from "../api";
@@ -87,7 +87,7 @@ export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
                   }}
                   onBlur={() => setClearing("")}
                 >
-                  <Icon icon={Trash2} size={14} />
+                  <Icon icon={Trash} size={14} />
                 </button>
               )}
               <button

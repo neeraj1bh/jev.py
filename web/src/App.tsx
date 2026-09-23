@@ -1,4 +1,5 @@
-import { Columns3 } from "lucide-react";
+import { ArrowCounterClockwise, CircleNotch, Columns, Play } from "@phosphor-icons/react";
+import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -21,6 +22,7 @@ import { EditDialog } from "./components/EditDialog";
 import { EmptyState } from "./components/EmptyState";
 import { GenerateReplay } from "./components/GenerateReplay";
 import { Header } from "./components/Header";
+import { Icon } from "./components/Icon";
 import { InputBar, type InputSource } from "./components/InputBar";
 import { ItemDialog } from "./components/ItemDialog";
 import { KeyDialog } from "./components/KeyDialog";
@@ -45,7 +47,7 @@ import { useTheme } from "./hooks/useTheme";
 import { useToast } from "./hooks/useToast";
 import { now, runBatchLoop, runEach, timedGenerate, timedReadout } from "./runner";
 import { readoutFooter, writtenAnswers } from "./scoring";
-import { cn, ghostButton, labelText, panelBox, solidButton } from "./styles";
+import { cn, ghostButton, inset, labelText, shell, solidButton } from "./styles";
 import type {
   Backend,
   Item,
@@ -1125,103 +1127,124 @@ export default function App() {
           />
         ) : (
           <>
-            <div className="rounded-lg border border-rule bg-panel px-4 py-3.5">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-                  {isCompare ? (
-                    <>
-                      <ModelsPicker
+            <div className={shell}>
+              <div className={cn(inset, "px-4 py-3.5")}>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+                    {isCompare ? (
+                      <>
+                        <ModelsPicker
+                          backends={backendList}
+                          selected={compareModels}
+                          onToggle={toggleCompareModel}
+                          local={localActions("compare")}
+                          open={openMenu === "models"}
+                          onOpenChange={menuHandler("models")}
+                        />
+                        {compareModels.length > 0 && (
+                          <button
+                            type="button"
+                            className="border-0 bg-transparent px-1.5 py-1 text-[13px] text-dim hover:text-ink"
+                            onClick={() => {
+                              setCompareModels([]);
+                              clearBatch();
+                              resetPanels(0);
+                            }}
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <ModelPicker
                         backends={backendList}
-                        selected={compareModels}
-                        onToggle={toggleCompareModel}
-                        local={localActions("compare")}
-                        open={openMenu === "models"}
-                        onOpenChange={menuHandler("models")}
+                        value={generateModel}
+                        onPick={pickGenerateModel}
+                        local={localActions("generate")}
+                        open={openMenu === "model"}
+                        onOpenChange={menuHandler("model")}
                       />
-                      {compareModels.length > 0 && (
-                        <button
-                          type="button"
-                          className="border-0 bg-transparent px-1.5 py-1 text-[13px] text-dim hover:text-ink"
-                          onClick={() => {
-                            setCompareModels([]);
-                            clearBatch();
-                            resetPanels(0);
-                          }}
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <ModelPicker
-                      backends={backendList}
-                      value={generateModel}
-                      onPick={pickGenerateModel}
-                      local={localActions("generate")}
-                      open={openMenu === "model"}
-                      onOpenChange={menuHandler("model")}
-                    />
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className={ghostButton}
-                    disabled={!recording || replaying || busy}
-                    onClick={replay}
-                  >
-                    Replay together
-                  </button>
-                  <Tip content={noModel ? "Pick a model first" : undefined}>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
                     <button
                       type="button"
-                      className={solidButton}
-                      disabled={busy || replaying || noModel}
-                      onClick={onRun}
+                      className={ghostButton}
+                      disabled={!recording || replaying || busy}
+                      onClick={replay}
                     >
-                      Run
+                      <Icon icon={ArrowCounterClockwise} size={14} />
+                      Replay together
                     </button>
-                  </Tip>
+                    <Tip content={noModel ? "Pick a model first" : undefined}>
+                      <button
+                        type="button"
+                        className={cn(solidButton, "min-w-[104px] overflow-hidden")}
+                        disabled={busy || replaying || noModel}
+                        onClick={onRun}
+                      >
+                        {/* The label changes in place, so the button says what it is doing. */}
+                        <AnimatePresence mode="popLayout" initial={false}>
+                          <motion.span
+                            key={busy ? "running" : "run"}
+                            className="inline-flex items-center gap-1.5"
+                            initial={{ y: 12, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: -12, opacity: 0 }}
+                            transition={{ type: "spring", stiffness: 500, damping: 36 }}
+                          >
+                            <Icon
+                              icon={busy ? CircleNotch : Play}
+                              size={14}
+                              className={busy ? "animate-spin" : undefined}
+                            />
+                            {busy ? "Running…" : "Run"}
+                          </motion.span>
+                        </AnimatePresence>
+                      </button>
+                    </Tip>
+                  </div>
                 </div>
-              </div>
-              <InputBar
-                source={source}
-                onSourceChange={chooseSource}
-                example={dataset ? "" : example}
-                onExampleChange={(name) => {
-                  setOpenMenu("");
-                  chooseExample(name);
-                }}
-                exampleMenuOpen={openMenu === "example"}
-                onExampleMenuOpenChange={menuHandler("example")}
-                dataset={dataset}
-                datasets={datasets}
-                onDatasetChange={chooseDataset}
-                pickedBackends={(isCompare ? compareModels : [generateModel]).map(
-                  (id) => backends[id],
+                <InputBar
+                  source={source}
+                  onSourceChange={chooseSource}
+                  example={dataset ? "" : example}
+                  onExampleChange={(name) => {
+                    setOpenMenu("");
+                    chooseExample(name);
+                  }}
+                  exampleMenuOpen={openMenu === "example"}
+                  onExampleMenuOpenChange={menuHandler("example")}
+                  dataset={dataset}
+                  datasets={datasets}
+                  onDatasetChange={chooseDataset}
+                  pickedBackends={(isCompare ? compareModels : [generateModel]).map(
+                    (id) => backends[id],
+                  )}
+                  datasetMenuOpen={openMenu === "dataset"}
+                  onDatasetMenuOpenChange={menuHandler("dataset")}
+                  busy={busy}
+                  remaining={remaining}
+                  batchSize={batchSize}
+                  onBatchSizeChange={setBatchSize}
+                  onNextItem={() => nextItem()}
+                  onRunBatch={runBatch}
+                  batchRunning={batchRunning}
+                  onStop={() => {
+                    stopRequested.current = true;
+                    setBatchRunning(false);
+                  }}
+                  onEdit={() => setEditing(true)}
+                />
+                {item && dataset && (
+                  <p className={cn(labelText, "mt-2.5 mb-0")}>
+                    {dataset} · {item.source} · {questionCount} question
+                    {questionCount > 1 ? "s" : ""}
+                    {item.options ? `, ${item.options} options` : ""}
+                    {batchProgress}
+                  </p>
                 )}
-                datasetMenuOpen={openMenu === "dataset"}
-                onDatasetMenuOpenChange={menuHandler("dataset")}
-                busy={busy}
-                remaining={remaining}
-                batchSize={batchSize}
-                onBatchSizeChange={setBatchSize}
-                onNextItem={() => nextItem()}
-                onRunBatch={runBatch}
-                batchRunning={batchRunning}
-                onStop={() => {
-                  stopRequested.current = true;
-                  setBatchRunning(false);
-                }}
-                onEdit={() => setEditing(true)}
-              />
-              {item && dataset && (
-                <p className={cn(labelText, "mt-2.5 mb-0")}>
-                  {dataset} · {item.source} · {questionCount} question{questionCount > 1 ? "s" : ""}
-                  {item.options ? `, ${item.options} options` : ""}
-                  {batchProgress}
-                </p>
-              )}
+              </div>
             </div>
 
             <p className="mt-[18px] mb-0 min-h-[26px] text-sm text-ink [&_b]:font-semibold [&_b]:text-good">
@@ -1233,15 +1256,17 @@ export default function App() {
                 <RaceClocks names={compareNames} panels={panels} />
               )}
               {isCompare && compareModels.length === 0 ? (
-                <div className={panelBox}>
-                  <EmptyState
-                    icon={Columns3}
-                    title="Pick models to compare"
-                    action={{ label: "Choose models", onClick: () => setOpenMenu("models") }}
-                  >
-                    Compare sends the same questions to every model you pick and lines up their
-                    answers, probabilities and times.
-                  </EmptyState>
+                <div className={shell}>
+                  <div className={cn(inset, "px-5 py-4")}>
+                    <EmptyState
+                      icon={Columns}
+                      title="Pick models to compare"
+                      action={{ label: "Choose models", onClick: () => setOpenMenu("models") }}
+                    >
+                      Compare sends the same questions to every model you pick and lines up their
+                      answers, probabilities and times.
+                    </EmptyState>
+                  </div>
                 </div>
               ) : isCompare ? (
                 <CompareView

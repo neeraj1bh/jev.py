@@ -1,4 +1,5 @@
 import { isOffline, location, pickerSubtitle, statusText, TEXTLESS } from "../backends";
+import { backendIcon } from "../icons";
 import type { Backend } from "../types";
 import { Dropdown } from "./Menu";
 import { type LocalModelActions, ModelMenu } from "./ModelMenu";
@@ -26,6 +27,8 @@ export function ModelPicker(props: ModelPickerProps) {
       open={open}
       onOpenChange={onOpenChange}
       title={location(current)}
+      icon={backendIcon(current)}
+      active={!!current}
       menuClassName="w-[360px]"
       button={
         backends.length === 0 ? (

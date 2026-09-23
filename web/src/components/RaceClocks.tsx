@@ -1,5 +1,8 @@
+import { Timer } from "@phosphor-icons/react";
+import { cn, inset, shell } from "../styles";
 import type { PanelState } from "../types";
-import { Clock, PlaceBadge } from "./Panel";
+import { IconTile } from "./Icon";
+import { Clock, liveTone, PlaceBadge } from "./Panel";
 import { Tip } from "./Tip";
 
 export interface Place {
@@ -30,14 +33,14 @@ export function RaceClocks({ names, panels }: { names: string[]; panels: PanelSt
   return (
     <div className="mb-3.5 grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3.5">
       {panels.map((panel, k) => (
-        <section
-          key={names[k]}
-          className="min-w-0 rounded-lg border border-rule bg-panel px-5 py-3.5"
-        >
+        <section key={names[k]} className={cn(shell, "min-w-0")}>
           <Tip content={names[k]}>
-            <h2 className="m-0 truncate text-sm font-semibold text-ink">{names[k]}</h2>
+            <h2 className="m-0 flex items-center gap-2 px-2 pt-1 pb-2 text-sm font-semibold text-ink">
+              <IconTile icon={Timer} tone={liveTone(panel)} />
+              <span className="truncate">{names[k]}</span>
+            </h2>
           </Tip>
-          <div className="mt-2 flex items-baseline justify-between gap-3">
+          <div className={cn(inset, "flex items-baseline justify-between gap-3 px-5 py-3.5")}>
             <Clock state={panel} className="text-[34px]" />
             <PlaceBadge place={places[k]} className="m-0" />
           </div>

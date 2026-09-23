@@ -1,9 +1,9 @@
-import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { ArrowsInLineVertical, ArrowsOutLineVertical, CaretRight } from "@phosphor-icons/react";
 import { Fragment, useState } from "react";
 
 import { useElapsed } from "../hooks/useElapsed";
 import { answerLabel, matchesLabel } from "../scoring";
-import { cn, labelText, panelBox, tableHead } from "../styles";
+import { cn, inset, labelText, shell, tableHead } from "../styles";
 import type { Answer, PanelState, Question } from "../types";
 import { CheckMark } from "./CheckMark";
 import { Icon } from "./Icon";
@@ -211,117 +211,119 @@ export function CompareTable({
   });
 
   return (
-    <div className={cn(!bare && panelBox, "animate-fade")}>
-      {hasAnswers && (
-        <div className="flex justify-end pb-1">
-          <button
-            type="button"
-            onClick={() => setOpen(allOpen ? [] : questionIds)}
-            className="inline-flex items-center gap-1 rounded-md border-0 bg-transparent px-1.5 py-0.5 text-[13px] text-dim transition-colors hover:text-ink"
+    <div className={cn(!bare && shell, "animate-fade")}>
+      <div className={cn(!bare && inset, !bare && "px-5 py-4")}>
+        {hasAnswers && (
+          <div className="flex justify-end pb-1">
+            <button
+              type="button"
+              onClick={() => setOpen(allOpen ? [] : questionIds)}
+              className="inline-flex items-center gap-1 rounded-md border-0 bg-transparent px-1.5 py-0.5 text-[13px] text-dim transition-colors hover:text-ink"
+            >
+              <Icon icon={allOpen ? ArrowsInLineVertical : ArrowsOutLineVertical} size={14} />
+              {allOpen ? "Hide all options" : "Show all options"}
+            </button>
+          </div>
+        )}
+        <div className="overflow-x-auto">
+          <table
+            className="w-full table-fixed border-collapse text-[13px]"
+            // On narrow screens the table keeps readable columns and scrolls inside its card.
+            style={{ minWidth: (asked ? 288 : 176) + (truth ? 120 : 0) + 150 * names.length }}
           >
-            <Icon icon={allOpen ? ChevronsDownUp : ChevronsUpDown} size={14} />
-            {allOpen ? "Hide all options" : "Show all options"}
-          </button>
-        </div>
-      )}
-      <div className="overflow-x-auto">
-        <table
-          className="w-full table-fixed border-collapse text-[13px]"
-          // On narrow screens the table keeps readable columns and scrolls inside its card.
-          style={{ minWidth: (asked ? 288 : 176) + (truth ? 120 : 0) + 150 * names.length }}
-        >
-          <colgroup>
-            <col className={asked ? "w-72" : "w-44"} />
-            {truth && <col className="w-[20%]" />}
-            {names.map((name) => (
-              <col key={name} />
-            ))}
-          </colgroup>
-          <thead>
-            <tr>
-              <th className={cn(tableHead, "align-bottom")}>Question</th>
-              {truth && <th className={cn(tableHead, "align-bottom")}>Label</th>}
-              {names.map((name, k) => (
-                <ModelHeading key={name} name={name} state={panels[k] ?? idle} />
+            <colgroup>
+              <col className={asked ? "w-72" : "w-44"} />
+              {truth && <col className="w-[20%]" />}
+              {names.map((name) => (
+                <col key={name} />
               ))}
-            </tr>
-          </thead>
-          <tbody className="[&>tr:last-child>td]:border-b-0">
-            {questionIds.map((id) => {
-              const isOpen = open.includes(id);
-              return (
-                <Fragment key={id}>
-                  <tr className="transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md">
-                    <td className={cn(rowCell, "text-ink", isOpen && "border-b-0")}>
-                      {hasAnswers ? (
-                        <button
-                          type="button"
-                          aria-expanded={isOpen}
-                          onClick={() => toggle(id)}
-                          className="inline-flex max-w-full items-start gap-1 rounded-sm border-0 bg-transparent p-0 text-left text-ink"
-                        >
-                          <Icon
-                            icon={ChevronRight}
-                            size={14}
-                            className={cn(
-                              "text-dim transition-transform duration-150",
-                              isOpen && "rotate-90",
-                            )}
-                          />
-                          <span className="min-w-0 break-words">{breakable(id)}</span>
-                        </button>
-                      ) : (
-                        <span className="break-words">{breakable(id)}</span>
+            </colgroup>
+            <thead>
+              <tr>
+                <th className={cn(tableHead, "align-bottom")}>Question</th>
+                {truth && <th className={cn(tableHead, "align-bottom")}>Label</th>}
+                {names.map((name, k) => (
+                  <ModelHeading key={name} name={name} state={panels[k] ?? idle} />
+                ))}
+              </tr>
+            </thead>
+            <tbody className="[&>tr:last-child>td]:border-b-0">
+              {questionIds.map((id) => {
+                const isOpen = open.includes(id);
+                return (
+                  <Fragment key={id}>
+                    <tr className="transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md">
+                      <td className={cn(rowCell, "text-ink", isOpen && "border-b-0")}>
+                        {hasAnswers ? (
+                          <button
+                            type="button"
+                            aria-expanded={isOpen}
+                            onClick={() => toggle(id)}
+                            className="inline-flex max-w-full items-start gap-1 rounded-sm border-0 bg-transparent p-0 text-left text-ink"
+                          >
+                            <Icon
+                              icon={CaretRight}
+                              size={14}
+                              className={cn(
+                                "text-dim transition-transform duration-150",
+                                isOpen && "rotate-90",
+                              )}
+                            />
+                            <span className="min-w-0 break-words">{breakable(id)}</span>
+                          </button>
+                        ) : (
+                          <span className="break-words">{breakable(id)}</span>
+                        )}
+                        {asked?.[id] && <QuestionHint question={asked[id]} />}
+                      </td>
+                      {truth && (
+                        <Tip content={truth[id]}>
+                          <td className={cn(rowCell, "text-dim", isOpen && "border-b-0")}>
+                            <span className="line-clamp-2 break-words">{truth[id] ?? "–"}</span>
+                          </td>
+                        </Tip>
                       )}
-                      {asked?.[id] && <QuestionHint question={asked[id]} />}
-                    </td>
-                    {truth && (
-                      <Tip content={truth[id]}>
-                        <td className={cn(rowCell, "text-dim", isOpen && "border-b-0")}>
-                          <span className="line-clamp-2 break-words">{truth[id] ?? "–"}</span>
-                        </td>
-                      </Tip>
-                    )}
-                    {names.map((name, k) => (
-                      <AnswerCell
-                        key={name}
-                        state={panels[k] ?? idle}
-                        id={id}
-                        truth={truth?.[id]}
-                        written={name.endsWith("· text")}
-                        open={isOpen}
-                      />
-                    ))}
-                  </tr>
-                  {isOpen && (
-                    <tr className="animate-fade motion-reduce:animate-none">
-                      <td className={rowCell} />
-                      {truth && <td className={rowCell} />}
                       {names.map((name, k) => (
-                        <td key={name} className={cn(rowCell, "pt-0 pb-3")}>
-                          <OptionBreakdown
-                            answer={panels[k]?.response?.answers[id]}
-                            written={name.endsWith("· text")}
-                          />
-                        </td>
+                        <AnswerCell
+                          key={name}
+                          state={panels[k] ?? idle}
+                          id={id}
+                          truth={truth?.[id]}
+                          written={name.endsWith("· text")}
+                          open={isOpen}
+                        />
                       ))}
                     </tr>
-                  )}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p className={cn(labelText, "mt-3 mb-0", (bare || !hasResults) && "hidden")}>
-        Green marks the fastest model{truth ? " and answers that match the label" : ""}. The bar is
-        how sure the model was; open a question to see every option.
-      </p>
-      {failures.map((message) => (
-        <p key={message} className="mt-1 mb-0 text-[13px] text-warn">
-          {message}
+                    {isOpen && (
+                      <tr className="animate-fade motion-reduce:animate-none">
+                        <td className={rowCell} />
+                        {truth && <td className={rowCell} />}
+                        {names.map((name, k) => (
+                          <td key={name} className={cn(rowCell, "pt-0 pb-3")}>
+                            <OptionBreakdown
+                              answer={panels[k]?.response?.answers[id]}
+                              written={name.endsWith("· text")}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className={cn(labelText, "mt-3 mb-0", (bare || !hasResults) && "hidden")}>
+          Green marks the fastest model{truth ? " and answers that match the label" : ""}. The bar
+          is how sure the model was; open a question to see every option.
         </p>
-      ))}
+        {failures.map((message) => (
+          <p key={message} className="mt-1 mb-0 text-[13px] text-warn">
+            {message}
+          </p>
+        ))}
+      </div>
     </div>
   );
 }

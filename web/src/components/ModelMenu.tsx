@@ -1,12 +1,23 @@
-import { ChevronRight, Plus, Search, Square, Trash2 } from "lucide-react";
+import {
+  CaretRight,
+  CaretUp,
+  DotsThree,
+  Gift,
+  Globe,
+  ListChecks,
+  MagnifyingGlass,
+  Plus,
+  Stop,
+  Trash,
+} from "@phosphor-icons/react";
 import { Fragment, type ReactNode, useMemo, useState } from "react";
 
 import { dollarText, groupBackends, providerName, runDollars } from "../backends";
+import { backendIcon } from "../icons";
 import { cn } from "../styles";
 import type { Backend } from "../types";
-import { CheckMark } from "./CheckMark";
-import { Icon } from "./Icon";
-import { MenuHeading, MenuHint, MenuItem } from "./Menu";
+import { Icon, IconTile } from "./Icon";
+import { Kbd, MenuAction, MenuHeading, MenuHint, MenuItem } from "./Menu";
 
 const MAX_MATCHES = 40;
 
@@ -107,9 +118,9 @@ export function ModelMenu(props: ModelMenuProps) {
             aria-label={`Stop ${backend.label}`}
             title="Stop it and free its memory"
             onClick={() => onStop(backend)}
-            className="rounded-md border-0 bg-transparent p-1.5 text-dim transition-colors hover:bg-lift hover:text-ink"
+            className="rounded-lg border-0 bg-transparent p-1.5 text-dim transition-colors hover:bg-lift hover:text-ink"
           >
-            <Icon icon={Square} size={14} />
+            <Icon icon={Stop} size={14} />
           </button>
         </div>
       );
@@ -123,9 +134,9 @@ export function ModelMenu(props: ModelMenuProps) {
           aria-label={`Delete ${backend.label} from this machine`}
           title={`Delete ${backend.label} from this machine`}
           onClick={() => onDelete(backend)}
-          className="rounded-md border-0 bg-transparent p-1.5 text-dim transition-colors hover:bg-lift hover:text-warn"
+          className="rounded-lg border-0 bg-transparent p-1.5 text-dim transition-colors hover:bg-lift hover:text-warn"
         >
-          <Icon icon={Trash2} size={14} />
+          <Icon icon={Trash} size={14} />
         </button>
       </div>
     );
@@ -140,16 +151,9 @@ export function ModelMenu(props: ModelMenuProps) {
         selected={chosen}
         disabled={isDisabled(backend)}
         onSelect={() => onSelect(backend.id)}
-        label={
-          showChecks ? (
-            <>
-              <i className="inline-block w-[18px] text-good">{chosen && <CheckMark ok />}</i>
-              {backend.label}
-            </>
-          ) : (
-            backend.label
-          )
-        }
+        multi={showChecks}
+        icon={backendIcon(backend)}
+        label={backend.label}
         // A long name is cut short in the menu; the tooltip then shows it whole.
         title={
           inGateway ? runCost(backend).title : backend.label.length > 28 ? backend.label : undefined
@@ -175,8 +179,8 @@ export function ModelMenu(props: ModelMenuProps) {
 
   return (
     <>
-      <label className="mx-1 mb-1 flex items-center gap-2 rounded-md border border-rule bg-paper px-2.5 py-1.5 text-dim focus-within:border-dim">
-        <Icon icon={Search} size={14} />
+      <label className="-mx-1.5 -mt-1.5 mb-1 flex items-center gap-2.5 border-0 border-b border-rule px-3.5 py-2.5 text-dim">
+        <Icon icon={MagnifyingGlass} size={14} />
         <input
           type="search"
           value={query}
@@ -185,6 +189,7 @@ export function ModelMenu(props: ModelMenuProps) {
           aria-label="Search models"
           className="w-full border-0 bg-transparent p-0 text-sm text-ink outline-none placeholder:text-dim"
         />
+        <Kbd>esc</Kbd>
       </label>
       {props.hint && <MenuHint>{props.hint}</MenuHint>}
 
@@ -207,16 +212,11 @@ export function ModelMenu(props: ModelMenuProps) {
               {lists.map((list) => (
                 <MenuItem
                   key={list.name}
+                  multi
+                  icon={ListChecks}
                   selected={list.on}
                   onSelect={list.onToggle}
-                  label={
-                    <>
-                      <i className="inline-block w-[18px] text-good">
-                        {list.on && <CheckMark ok />}
-                      </i>
-                      {list.name}
-                    </>
-                  }
+                  label={list.name}
                   detail={`${list.count} models`}
                 />
               ))}
@@ -227,14 +227,10 @@ export function ModelMenu(props: ModelMenuProps) {
               <MenuHeading>{heading}</MenuHeading>
               {members.map((member) => item(member))}
               {group === "local" && onAddModel && (
-                <button
-                  type="button"
-                  onClick={onAddModel}
-                  className="flex w-full items-center gap-1.5 rounded-md border-0 bg-transparent px-2.5 py-1.5 text-left text-sm text-dim transition-colors hover:bg-lift hover:text-ink"
-                >
-                  <Icon icon={Plus} size={14} />
+                <MenuAction onClick={onAddModel}>
+                  <IconTile icon={Plus} />
                   Add a model
-                </button>
+                </MenuAction>
               )}
             </Fragment>
           ))}
@@ -247,27 +243,25 @@ export function ModelMenu(props: ModelMenuProps) {
                   const isOpen = expanded.includes(provider);
                   return (
                     <Fragment key={provider}>
-                      <button
-                        type="button"
-                        aria-expanded={isOpen}
-                        onClick={() => toggleProvider(provider)}
-                        className="flex w-full items-center gap-1.5 rounded-md border-0 bg-transparent px-2.5 py-1.5 text-left text-sm text-ink transition-colors hover:bg-lift"
-                      >
+                      <MenuAction expanded={isOpen} onClick={() => toggleProvider(provider)}>
+                        <IconTile icon={provider === FREE ? Gift : Globe} />
+                        <span className="text-ink">
+                          {provider === FREE ? "Free to run" : providerName(provider)}
+                        </span>
+                        <span className="ml-auto font-mono text-[11px] text-dim tabular-nums">
+                          {models.length}
+                        </span>
                         <Icon
-                          icon={ChevronRight}
-                          size={14}
+                          icon={CaretRight}
+                          size={12}
                           className={cn(
                             "text-dim transition-transform duration-150",
                             isOpen && "rotate-90",
                           )}
                         />
-                        {provider === FREE ? "Free to run" : providerName(provider)}
-                        <span className="ml-auto text-xs text-dim tabular-nums">
-                          {models.length}
-                        </span>
-                      </button>
+                      </MenuAction>
                       {isOpen && (
-                        <div className="ml-4 flex flex-col gap-0.5">
+                        <div className="ml-3 flex flex-col gap-px border-0 border-l border-dashed border-rule pl-1.5">
                           {models.map((model) => item(model, provider !== FREE))}
                         </div>
                       )}
@@ -276,15 +270,12 @@ export function ModelMenu(props: ModelMenuProps) {
                 },
               )}
               {providers.length > TOP_PROVIDERS && (
-                <button
-                  type="button"
-                  onClick={() => setAllProviders(!allProviders)}
-                  className="w-full rounded-md border-0 bg-transparent px-2.5 py-1.5 text-left text-[13px] text-dim transition-colors hover:bg-lift hover:text-ink"
-                >
+                <MenuAction onClick={() => setAllProviders(!allProviders)}>
+                  <IconTile icon={allProviders ? CaretUp : DotsThree} />
                   {allProviders
                     ? "Fewer makers"
                     : `${providers.length - TOP_PROVIDERS} more makers`}
-                </button>
+                </MenuAction>
               )}
             </>
           )}

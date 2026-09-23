@@ -1,31 +1,31 @@
 import {
-  Columns3,
-  History,
-  KeyRound,
-  type LucideIcon,
+  ArrowsSplit,
+  ClockCounterClockwise,
+  Columns,
+  Key,
   Monitor,
   Moon,
-  Split,
-  Square,
+  Stop,
   Sun,
   Trophy,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import { motion } from "motion/react";
 
 import type { ThemePreference } from "../hooks/useTheme";
 import { cn } from "../styles";
 import type { Mode } from "../types";
-import { Icon } from "./Icon";
+import { Icon, type IconGlyph } from "./Icon";
+import { SegmentPill, segmentTrack } from "./Segment";
 import { Tip } from "./Tip";
 
-const TABS: { mode: Mode; name: string; icon: LucideIcon }[] = [
-  { mode: "compare", name: "Compare", icon: Columns3 },
-  { mode: "generate", name: "Generate vs readout", icon: Split },
+const TABS: { mode: Mode; name: string; icon: IconGlyph }[] = [
+  { mode: "compare", name: "Compare", icon: Columns },
+  { mode: "generate", name: "Generate vs readout", icon: ArrowsSplit },
   { mode: "benchmark", name: "Benchmark", icon: Trophy },
-  { mode: "past", name: "Past runs", icon: History },
+  { mode: "past", name: "Past runs", icon: ClockCounterClockwise },
 ];
 
-const THEMES: { preference: ThemePreference; name: string; icon: LucideIcon }[] = [
+const THEMES: { preference: ThemePreference; name: string; icon: IconGlyph }[] = [
   { preference: "light", name: "Light", icon: Sun },
   { preference: "dark", name: "Dark", icon: Moon },
   { preference: "system", name: "Device", icon: Monitor },
@@ -78,7 +78,7 @@ export function Header({
                 ? running.labels[0]
                 : `${running.labels.length} models running`}
             </span>
-            <Icon icon={Square} size={14} />
+            <Icon icon={Stop} size={14} />
           </button>
         )}
         <Tip content="Keys and tokens">
@@ -88,10 +88,10 @@ export function Header({
             onClick={onOpenKeys}
             className="grid size-8 place-items-center rounded-full border border-rule bg-transparent text-dim transition-colors hover:border-dim hover:text-ink"
           >
-            <Icon icon={KeyRound} size={14} />
+            <Icon icon={Key} size={14} />
           </button>
         </Tip>
-        <div className="inline-flex rounded-full border border-rule p-0.5">
+        <div className={segmentTrack}>
           {THEMES.map((theme) => (
             <Tip key={theme.preference} content={theme.name}>
               <button
@@ -100,13 +100,12 @@ export function Header({
                 aria-label={`${theme.name} theme`}
                 onClick={() => onPreferenceChange(theme.preference)}
                 className={cn(
-                  "grid size-7 place-items-center rounded-full border-0 transition-colors",
-                  preference === theme.preference
-                    ? "bg-lift text-ink"
-                    : "bg-transparent text-dim hover:text-ink",
+                  "relative grid size-7 place-items-center rounded-full border-0 bg-transparent transition-colors",
+                  preference === theme.preference ? "text-ink" : "text-dim hover:text-ink",
                 )}
               >
-                <Icon icon={theme.icon} size={14} />
+                {preference === theme.preference && <SegmentPill group="theme" />}
+                <Icon icon={theme.icon} size={14} className="relative" />
               </button>
             </Tip>
           ))}

@@ -1,13 +1,21 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, History, Search, SearchX } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowsDownUp,
+  ArrowUp,
+  ClockCounterClockwise,
+  MagnifyingGlass,
+  MagnifyingGlassMinus,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { usePersistentState } from "../hooks/usePersistentState";
-import { chipButton, cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
+import { chipButton, cn, labelText, monoDim, tableCell, tableHead } from "../styles";
 import type { RunKind, SavedRun } from "../types";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
 import { type KindFilter, RunFilter } from "./RunFilter";
 import { Skeleton } from "./Skeleton";
+import { Surface } from "./Surface";
 import { Tip } from "./Tip";
 
 export type { KindFilter } from "./RunFilter";
@@ -141,7 +149,7 @@ export function PastRuns(props: PastRunsProps) {
         >
           {label}
           <Icon
-            icon={active ? (sort.descending ? ArrowDown : ArrowUp) : ArrowUpDown}
+            icon={active ? (sort.descending ? ArrowDown : ArrowUp) : ArrowsDownUp}
             size={14}
             className={cn(!active && "opacity-40 transition-opacity group-hover:opacity-100")}
           />
@@ -155,14 +163,18 @@ export function PastRuns(props: PastRunsProps) {
   const first = (page - 1) * PAGE_SIZE + 1;
 
   return (
-    <div className={cn(panelBox, "flex flex-col")}>
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="m-0 text-sm font-semibold text-ink">
+    <Surface
+      icon={ClockCounterClockwise}
+      bodyClassName="flex flex-col"
+      title={
+        <>
           Past runs{" "}
           <span className={cn(labelText, "font-normal")}>
             saved in results/logs/demo · opening one sends no requests
           </span>
-        </h2>
+        </>
+      }
+      aside={
         <div className="flex flex-wrap items-center gap-2">
           {picked.length > 0 && (
             <>
@@ -180,7 +192,7 @@ export function PastRuns(props: PastRunsProps) {
             </>
           )}
           <label className="flex items-center gap-2 rounded-md border border-rule bg-paper px-2.5 py-1.5 text-dim focus-within:border-dim">
-            <Icon icon={Search} size={14} />
+            <Icon icon={MagnifyingGlass} size={14} />
             <input
               type="search"
               value={query}
@@ -208,7 +220,8 @@ export function PastRuns(props: PastRunsProps) {
             onOpenChange={props.onMenuOpenChange}
           />
         </div>
-      </div>
+      }
+    >
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-[13px]">
           <thead>
@@ -237,13 +250,13 @@ export function PastRuns(props: PastRunsProps) {
               <tr>
                 <td colSpan={5}>
                   {runs.length === 0 ? (
-                    <EmptyState icon={History} title="No runs yet">
+                    <EmptyState icon={ClockCounterClockwise} title="No runs yet">
                       Every batch you run in Compare, Generate vs readout or Benchmark is saved
                       here, and reopens without sending a request.
                     </EmptyState>
                   ) : (
                     <EmptyState
-                      icon={SearchX}
+                      icon={MagnifyingGlassMinus}
                       title="No run matches"
                       action={{
                         label: "Clear search and filters",
@@ -376,6 +389,6 @@ export function PastRuns(props: PastRunsProps) {
           </button>
         </span>
       </div>
-    </div>
+    </Surface>
   );
 }

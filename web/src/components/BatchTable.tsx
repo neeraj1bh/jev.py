@@ -1,10 +1,13 @@
+import { ArrowDown, Rows } from "@phosphor-icons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { type ReactElement, useEffect, useRef } from "react";
+import { type ReactElement, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { answerLabel, inputSnippet, matchesLabel, scoreResponse } from "../scoring";
-import { cn, labelText, monoDim, panelBox, tableCell, tableHead } from "../styles";
+import { cn, labelText, monoDim, tableCell, tableHead } from "../styles";
 import type { Response, Row } from "../types";
 import { CheckMark } from "./CheckMark";
+import { Icon } from "./Icon";
+import { Surface } from "./Surface";
 import { Tip } from "./Tip";
 
 /** One model's answer to one item; with many columns the time moves into the tooltip. */
@@ -70,12 +73,32 @@ interface BatchTableProps {
   file: { text: string; path: string };
   selected: number | null;
   follow: boolean;
+  /** Rows are still arriving, from a run or a replay: the table reads like a log and keeps up. */
+  live: boolean;
   onOpen: (index: number) => void;
 }
 
 const ROW_PX = 35; // every row is one line and pinned to this height, so the scroll never corrects itself
 const NEW_ROWS = 6; // only the rows that just arrived rise in, not every row scrolled back into view
 const STRIP_AFTER = 6; // more models than this get one square each instead of a column each
+
+/** Green when every model got the item right, orange when any missed or failed, grey unlabelled. */
+function RowDot({ row }: { row: Row }) {
+  const scores = row.sides.map((side) => scoreResponse(side.response, row.item.truth));
+  const labelled = scores.some(([, total]) => total > 0);
+  const missed = row.sides.some((side, k) => {
+    const [correct, total] = scores[k] ?? [0, 0];
+    return side.response.error || correct < total;
+  });
+  return (
+    <span
+      className={cn(
+        "mr-2 inline-block size-[5px] rounded-full align-middle",
+        missed ? "bg-warn" : labelled ? "bg-good" : "bg-dim",
+      )}
+    />
+  );
+}
 
 /** Every model's result on one item as a row of squares, in the ranked order, details on hover. */
 function StripCell({ row, columns }: { row: Row; columns: string[] }) {
@@ -121,6 +144,7 @@ export function BatchTable({
   file,
   selected,
   follow,
+  live,
   onOpen,
 }: BatchTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -144,120 +168,149 @@ export function BatchTable({
   const virtualRef = useRef(virtual);
   virtualRef.current = virtual;
   useEffect(() => {
-    if (selected === null || !follow) return;
-    // While rows arrive the table glides to its end, so a stream of updates reads as one motion;
-    // an item opened by hand is centred.
+    if (selected === null || !follow || live) return;
+    virtualRef.current.scrollToIndex(selected, { align: "center" });
+  }, [selected, follow, live]);
+
+  // While rows arrive the table sticks to its newest row, as a terminal does, unless the reader
+  // has scrolled up to look at something. The jump is instant: a smooth scroll restarted for
+  // every row never catches up at replay speeds.
+  const [pinned, setPinned] = useState(true);
+  const onScroll = () => {
     const box = scrollRef.current;
-    if (selected === rows.length - 1 && box)
-      box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
-    else virtualRef.current.scrollToIndex(selected, { align: "center" });
-  }, [selected, follow, rows.length]);
+    if (box) setPinned(box.scrollHeight - box.clientHeight - box.scrollTop < ROW_PX * 2);
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new row is what moves the table
+  useLayoutEffect(() => {
+    const box = scrollRef.current;
+    if (live && pinned && box) box.scrollTop = box.scrollHeight;
+  }, [live, pinned, rows.length]);
+  // Pinning again is enough: the layout effect above takes the table to its newest row.
+  const toLatest = () => setPinned(true);
 
   return (
-    <div className={cn(panelBox, "mt-3.5")}>
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="m-0 text-sm font-semibold text-ink">
+    <Surface
+      icon={Rows}
+      className="mt-3.5"
+      title={
+        <>
           Batch results <span className="font-normal text-dim">{note}</span>
-        </h2>
+        </>
+      }
+      aside={
         <Tip content={file.path}>
           <span className={labelText}>{file.text}</span>
         </Tip>
-      </div>
-      <div ref={scrollRef} className="max-h-[460px] overflow-auto">
-        <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px]">
-          <colgroup>
-            <col className="w-14" />
-            <col className={strip ? "w-[32%]" : columns.length > 3 ? "w-[26%]" : "w-[38%]"} />
-            {labelled && <col className={strip ? "w-44" : "w-28"} />}
-            {strip ? <col /> : columns.map((column) => <col key={column} />)}
-          </colgroup>
-          <thead>
-            <tr>
-              <th className={tableHead}>#</th>
-              <th className={tableHead}>Input</th>
-              {labelled && <th className={tableHead}>Label</th>}
-              {strip ? (
-                <th className={tableHead}>
-                  {columns.length} models <span className="font-normal">· best first</span>
-                </th>
-              ) : (
-                columns.map((column) => (
-                  <Tip key={column} content={column}>
-                    <th className={cn(tableHead, "truncate")}>{column}</th>
-                  </Tip>
-                ))
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {padTop > 0 && (
+      }
+    >
+      <div className="relative">
+        <div ref={scrollRef} onScroll={onScroll} className="max-h-[460px] overflow-auto">
+          <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px]">
+            <colgroup>
+              <col className="w-14" />
+              <col className={strip ? "w-[32%]" : columns.length > 3 ? "w-[26%]" : "w-[38%]"} />
+              {labelled && <col className={strip ? "w-44" : "w-28"} />}
+              {strip ? <col /> : columns.map((column) => <col key={column} />)}
+            </colgroup>
+            <thead>
               <tr>
-                <td colSpan={span} style={{ height: padTop, padding: 0 }} />
+                <th className={tableHead}>#</th>
+                <th className={tableHead}>Input</th>
+                {labelled && <th className={tableHead}>Label</th>}
+                {strip ? (
+                  <th className={tableHead}>
+                    {columns.length} models <span className="font-normal">· best first</span>
+                  </th>
+                ) : (
+                  columns.map((column) => (
+                    <Tip key={column} content={column}>
+                      <th className={cn(tableHead, "truncate")}>{column}</th>
+                    </Tip>
+                  ))
+                )}
               </tr>
-            )}
-            {drawn.map(({ index }) => {
-              const row = rows[index];
-              if (!row) return null;
-              const questionCount = Object.keys(row.item.truth).length;
-              const input = inputSnippet(row.item.state);
-              return (
-                <tr
-                  key={index}
-                  data-index={index}
-                  style={{ height: ROW_PX }}
-                  onClick={() => onOpen(index)}
-                  className={cn(
-                    "cursor-pointer transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md",
-                    selected === index && "bg-lift",
-                    row.isNew &&
-                      index >= rows.length - NEW_ROWS &&
-                      "animate-rise motion-reduce:animate-none",
-                  )}
-                >
-                  <td className={tableCell}>
-                    <span className={monoDim}>{index + 1}</span>
-                  </td>
-                  <Tip content={input}>
-                    <td className={cn(tableCell, "max-w-none text-ink")}>{input}</td>
-                  </Tip>
-                  {labelled && (
-                    <td className={tableCell}>
-                      {questionCount > 1 ? (
-                        <span className={monoDim}>{questionCount} questions</span>
-                      ) : (
-                        Object.values(row.item.truth)[0]
-                      )}
-                    </td>
-                  )}
-                  {strip ? (
-                    <StripCell row={row} columns={columns} />
-                  ) : (
-                    columns.map((column, k) => {
-                      const side = row.sides[k];
-                      return (
-                        side && (
-                          <ResultCell
-                            key={column}
-                            response={side.response}
-                            truth={row.item.truth}
-                            ms={side.ms}
-                            compact={columns.length > 4}
-                          />
-                        )
-                      );
-                    })
-                  )}
+            </thead>
+            <tbody>
+              {padTop > 0 && (
+                <tr>
+                  <td colSpan={span} style={{ height: padTop, padding: 0 }} />
                 </tr>
-              );
-            })}
-            {padBottom > 0 && (
-              <tr>
-                <td colSpan={span} style={{ height: padBottom, padding: 0 }} />
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+              {drawn.map(({ index }) => {
+                const row = rows[index];
+                if (!row) return null;
+                const questionCount = Object.keys(row.item.truth).length;
+                const input = inputSnippet(row.item.state);
+                return (
+                  <tr
+                    key={index}
+                    data-index={index}
+                    style={{ height: ROW_PX }}
+                    onClick={() => onOpen(index)}
+                    className={cn(
+                      "cursor-pointer transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md",
+                      selected === index && "bg-lift",
+                      row.isNew &&
+                        index >= rows.length - NEW_ROWS &&
+                        "animate-rise motion-reduce:animate-none",
+                    )}
+                  >
+                    <td className={tableCell}>
+                      <RowDot row={row} />
+                      <span className={monoDim}>{index + 1}</span>
+                    </td>
+                    <Tip content={input}>
+                      <td className={cn(tableCell, "max-w-none text-ink")}>{input}</td>
+                    </Tip>
+                    {labelled && (
+                      <td className={tableCell}>
+                        {questionCount > 1 ? (
+                          <span className={monoDim}>{questionCount} questions</span>
+                        ) : (
+                          Object.values(row.item.truth)[0]
+                        )}
+                      </td>
+                    )}
+                    {strip ? (
+                      <StripCell row={row} columns={columns} />
+                    ) : (
+                      columns.map((column, k) => {
+                        const side = row.sides[k];
+                        return (
+                          side && (
+                            <ResultCell
+                              key={column}
+                              response={side.response}
+                              truth={row.item.truth}
+                              ms={side.ms}
+                              compact={columns.length > 4}
+                            />
+                          )
+                        );
+                      })
+                    )}
+                  </tr>
+                );
+              })}
+              {padBottom > 0 && (
+                <tr>
+                  <td colSpan={span} style={{ height: padBottom, padding: 0 }} />
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {live && !pinned && (
+          <button
+            type="button"
+            onClick={toLatest}
+            className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 animate-pop items-center gap-1.5 rounded-full border-0 bg-ink px-3 py-1.5 text-xs font-medium text-paper shadow-(--surface-shadow)"
+          >
+            <Icon icon={ArrowDown} size={12} />
+            Jump to latest
+          </button>
+        )}
       </div>
-    </div>
+    </Surface>
   );
 }

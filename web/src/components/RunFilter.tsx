@@ -1,3 +1,5 @@
+import { ArrowsSplit, Columns, Database, FunnelSimple, Stack } from "@phosphor-icons/react";
+
 import type { RunKind, SavedRun } from "../types";
 import { Dropdown, MenuHeading, MenuItem } from "./Menu";
 
@@ -51,6 +53,8 @@ export function RunFilter({
       open={open}
       onOpenChange={onOpenChange}
       button={label}
+      icon={FunnelSimple}
+      active={!!(kind || set)}
       menuClassName="right-0 left-auto w-72"
     >
       <MenuHeading>Kind</MenuHeading>
@@ -58,6 +62,7 @@ export function RunFilter({
         <MenuItem
           key={option || "all"}
           label={KIND_LABELS[option]}
+          icon={option === "cmp" ? Columns : option === "gen" ? ArrowsSplit : Stack}
           detail={runCount(
             runs.filter((run) => ofSet(run) && (!option || run.mode === option)).length,
           )}
@@ -69,6 +74,7 @@ export function RunFilter({
       {allSets && (
         <MenuItem
           label="All sets"
+          icon={Stack}
           detail={runCount(runs.filter(ofKind).length)}
           selected={!set}
           onSelect={() => onSetChange("")}
@@ -78,6 +84,7 @@ export function RunFilter({
         <MenuItem
           key={name}
           label={name}
+          icon={Database}
           detail={runCount(count)}
           selected={name === set}
           disabled={count === 0}
