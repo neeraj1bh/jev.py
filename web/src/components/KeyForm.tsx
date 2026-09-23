@@ -1,7 +1,9 @@
+import { CircleNotch, Globe, LockSimple } from "@phosphor-icons/react";
 import { type FormEvent, useState } from "react";
 
 import { ApiError, saveKey } from "../api";
-import { cn, ghostButton, labelText } from "../styles";
+import { cn, ghostButton, solidButton } from "../styles";
+import { Icon } from "./Icon";
 
 interface KeyFormProps {
   /** A backend id (remote:deepseek) or a key name (HF_TOKEN), as the server takes it. */
@@ -38,38 +40,53 @@ export function KeyForm({ target, label, hint, secret = true, onCancel, onSaved 
 
   return (
     <form onSubmit={submit}>
-      <label htmlFor={id} className={cn(labelText, "mb-1.5 block")}>
+      <label htmlFor={id} className="mb-1.5 block text-xs text-dim">
         {hint}
       </label>
-      <input
-        id={id}
-        type={secret ? "password" : "url"}
-        autoComplete="off"
-        spellCheck={false}
-        required
-        aria-label={label}
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        className="w-full rounded-md border border-rule bg-paper px-2.5 py-2 font-mono text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-dim"
-      />
-      <label className="mt-3 flex items-center gap-2 text-[13.5px] text-dim">
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-xl bg-panel px-3 py-2 shadow-[0_1px_2px_var(--color-shadow)] ring-1 transition-shadow focus-within:ring-dim",
+          error ? "ring-warn" : "ring-rule",
+        )}
+      >
+        <Icon icon={secret ? LockSimple : Globe} size={14} className="text-dim" />
         <input
-          type="checkbox"
-          checked={saveToEnv}
-          onChange={(event) => setSaveToEnv(event.target.checked)}
-        />{" "}
-        Also save to .env (git-ignored)
-      </label>
-      {error && <p className="mt-3 mb-0 text-[13.5px] text-warn">{error}</p>}
-      <div className="mt-4 flex justify-end gap-2">
-        <button type="button" className={ghostButton} onClick={onCancel}>
+          id={id}
+          type={secret ? "password" : "url"}
+          autoComplete="off"
+          spellCheck={false}
+          required
+          aria-label={label}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          className="min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-[13px] text-ink outline-none placeholder:text-dim"
+          placeholder={secret ? undefined : "http://localhost:8081/v1/chat/completions"}
+        />
+      </div>
+      {error && <p className="mt-2 mb-0 text-[13px] text-warn">{error}</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <label className="mr-auto flex cursor-pointer items-center gap-2 text-[13px] text-dim">
+          <input
+            type="checkbox"
+            checked={saveToEnv}
+            onChange={(event) => setSaveToEnv(event.target.checked)}
+            className="size-3.5 accent-(--color-ink)"
+          />
+          Also save to <span className="font-mono">.env</span>
+        </label>
+        <button
+          type="button"
+          className={cn(ghostButton, "px-3 py-1.5 text-[13px]")}
+          onClick={onCancel}
+        >
           Cancel
         </button>
         <button
           type="submit"
           disabled={checking}
-          className="rounded-md border border-ink bg-ink px-4 py-2 font-semibold text-paper"
+          className={cn(solidButton, "px-3.5 py-1.5 text-[13px]")}
         >
+          {checking && <Icon icon={CircleNotch} size={12} className="animate-spin" />}
           {checking ? "Checking…" : "Check and use"}
         </button>
       </div>

@@ -1,18 +1,131 @@
-import { Trash } from "@phosphor-icons/react";
+import {
+  ArrowSquareOut,
+  Cloud,
+  Globe,
+  HardDrives,
+  Key,
+  type Icon as PhosphorIcon,
+  Smiley,
+  Sparkle,
+  Triangle,
+  X,
+} from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { clearKey, fetchKeys } from "../api";
-import { cn, ghostButton } from "../styles";
+import { chipButton, cn } from "../styles";
 import type { KeyInfo } from "../types";
-import { Icon } from "./Icon";
+import { Reveal } from "./CompareTable";
+import { Icon, IconTile } from "./Icon";
 import { KeyForm } from "./KeyForm";
-import { Modal } from "./Modal";
+import { DialogFrame, Modal, RoundButton } from "./Modal";
 import { Skeleton } from "./Skeleton";
 
 /** Settings that are addresses or paths, typed in the open rather than as secrets. */
 const HINTS: Record<string, string> = {
   LLAMACPP_URL: "The llama-server address, e.g. http://localhost:8081/v1/chat/completions",
 };
+
+/** What each key reaches, at a glance: the real Jev, a hosted API, a gateway, a server. */
+const ICONS: Record<string, PhosphorIcon> = {
+  TYPESAFE_API_KEY: Sparkle,
+  OPENROUTER_API_KEY: Globe,
+  AI_GATEWAY_API_KEY: Triangle,
+  HF_TOKEN: Smiley,
+  LLAMACPP_URL: HardDrives,
+};
+
+const quiet =
+  "rounded-full border-0 bg-transparent px-2.5 py-1 text-xs text-dim transition-colors hover:bg-lift hover:text-ink";
+
+interface KeyRowProps {
+  info: KeyInfo;
+  editing: boolean;
+  armed: boolean;
+  onEdit: () => void;
+  onArm: (armed: boolean) => void;
+  onRemove: () => void;
+  onSaved: () => void;
+}
+
+function KeyRow({ info, editing, armed, onEdit, onArm, onRemove, onSaved }: KeyRowProps) {
+  return (
+    <li className="group border-0 border-b border-dashed border-rule last:border-b-0">
+      <div className="flex items-center gap-3 px-1 py-2.5" title={info.unlocks}>
+        <IconTile icon={ICONS[info.var] ?? Cloud} tone={info.set ? "ink" : "idle"} large />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2 text-sm font-medium text-ink">
+            <span className="truncate">{info.label}</span>
+            {info.set && (
+              <span className="inline-flex flex-none items-center gap-1 text-[11px] font-normal text-good">
+                <span className="size-1.5 rounded-full bg-good" />
+                <span className="max-[600px]:sr-only">connected</span>
+              </span>
+            )}
+          </span>
+          <span className="block truncate font-mono text-[11px] text-dim">{info.var}</span>
+        </span>
+        {editing ? null : info.set ? (
+          <span
+            className={cn(
+              "flex items-center gap-0.5 transition-opacity",
+              armed
+                ? "opacity-100"
+                : "opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-[600px]:opacity-100",
+            )}
+          >
+            <button type="button" className={quiet} onClick={onEdit}>
+              Replace
+            </button>
+            <button
+              type="button"
+              aria-label={`Remove the ${info.label} key`}
+              className={cn(
+                quiet,
+                armed ? "bg-warn/10 text-warn hover:text-warn" : "hover:text-warn",
+              )}
+              onClick={() => (armed ? onRemove() : onArm(true))}
+              onBlur={() => onArm(false)}
+            >
+              {armed ? "Click again to remove" : "Remove"}
+            </button>
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5">
+            {info.url && (
+              <a
+                href={info.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-dim no-underline transition-colors hover:text-ink"
+              >
+                Get a key
+                <Icon icon={ArrowSquareOut} size={11} />
+              </a>
+            )}
+            <button type="button" className={chipButton(true)} onClick={onEdit}>
+              Add
+            </button>
+          </span>
+        )}
+      </div>
+      <Reveal open={editing}>
+        {/* Kept mounted so it closes smoothly; the key resets it, dropping a cancelled value. */}
+        <div className="pb-3.5 pl-11 max-[600px]:pl-1">
+          <KeyForm
+            key={editing ? "open" : "closed"}
+            target={info.backend ?? info.var}
+            label={info.label}
+            hint={HINTS[info.var] ?? `Paste your ${info.label} key`}
+            secret={!(info.var in HINTS)}
+            onCancel={onEdit}
+            onSaved={onSaved}
+          />
+        </div>
+      </Reveal>
+    </li>
+  );
+}
 
 interface KeysDialogProps {
   open: boolean;
@@ -25,98 +138,89 @@ interface KeysDialogProps {
 export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
   const [keys, setKeys] = useState<KeyInfo[] | null>(null);
   const [editing, setEditing] = useState("");
-  const [clearing, setClearing] = useState("");
+  const [armed, setArmed] = useState("");
 
   useEffect(() => {
     if (open) fetchKeys().then(setKeys);
   }, [open]);
 
+  const refresh = () => {
+    fetchKeys().then(setKeys);
+    onChanged();
+  };
+  const row = (info: KeyInfo) => (
+    <KeyRow
+      key={info.var}
+      info={info}
+      editing={editing === info.var}
+      armed={armed === info.var}
+      onEdit={() => setEditing(editing === info.var ? "" : info.var)}
+      onArm={(on) => setArmed(on ? info.var : "")}
+      onRemove={async () => {
+        await clearKey(info.backend ?? info.var);
+        setArmed("");
+        refresh();
+      }}
+      onSaved={() => {
+        setEditing("");
+        refresh();
+      }}
+    />
+  );
+  const set = keys?.filter((info) => info.set) ?? [];
+  const unset = keys?.filter((info) => !info.set) ?? [];
+  const heading = "mt-1 mb-0.5 px-1 text-[10.5px] font-medium tracking-[0.08em] text-dim uppercase";
+
   return (
-    <Modal open={open} onClose={onClose} className="w-[min(600px,calc(100vw-32px))] px-6 py-5">
-      <h2 className="mt-0 mb-1 text-[15px] font-semibold">Keys and tokens</h2>
-      <p className="mt-0 mb-3 text-xs text-dim">
-        Kept on this machine. Each is checked with one small request first.
-      </p>
-      <ul className="m-0 list-none p-0">
-        {keys === null &&
-          ["a", "b", "c", "d"].map((k) => (
-            <li key={k} className="border-b border-rule py-2.5 last:border-b-0">
-              <Skeleton className="w-48" />
-            </li>
-          ))}
-        {keys?.map((key) => (
-          <li key={key.var} className="border-b border-rule py-2.5 last:border-b-0">
-            <div className="flex items-center gap-3">
-              <span
-                role="img"
-                aria-label={key.set ? "set" : "not set"}
-                className={cn("size-1.5 shrink-0 rounded-full", key.set ? "bg-good" : "bg-rule")}
-              />
-              <span className="min-w-0 flex-1" title={key.unlocks}>
-                <span className="block text-sm text-ink">{key.label}</span>
-                <span className="block font-mono text-[11.5px] text-dim">{key.var}</span>
-              </span>
-              {!key.set && key.url && (
-                <a
-                  href={key.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-dim underline-offset-2 hover:text-ink hover:underline"
-                >
-                  Get a key
-                </a>
-              )}
-              {key.set && (
-                <button
-                  type="button"
-                  aria-label={`Remove the ${key.label} key`}
-                  title={clearing === key.var ? "Click again to remove it from .env" : "Remove"}
-                  className={cn(
-                    "rounded-md border-0 bg-transparent p-1.5 transition-colors hover:bg-lift",
-                    clearing === key.var ? "text-warn" : "text-dim hover:text-warn",
-                  )}
-                  onClick={async () => {
-                    if (clearing !== key.var) {
-                      setClearing(key.var);
-                      return;
-                    }
-                    await clearKey(key.backend ?? key.var);
-                    setClearing("");
-                    fetchKeys().then(setKeys);
-                    onChanged();
-                  }}
-                  onBlur={() => setClearing("")}
-                >
-                  <Icon icon={Trash} size={14} />
-                </button>
-              )}
-              <button
-                type="button"
-                className={cn(ghostButton, "w-20 px-0 py-1 text-xs")}
-                onClick={() => setEditing(editing === key.var ? "" : key.var)}
-              >
-                {key.set ? "Replace" : "Add"}
-              </button>
-            </div>
-            {editing === key.var && (
-              <div className="mt-3">
-                <KeyForm
-                  target={key.backend ?? key.var}
-                  label={key.label}
-                  hint={HINTS[key.var] ?? `Paste your ${key.label} key`}
-                  secret={!(key.var in HINTS)}
-                  onCancel={() => setEditing("")}
-                  onSaved={() => {
-                    setEditing("");
-                    fetchKeys().then(setKeys);
-                    onChanged();
-                  }}
-                />
-              </div>
+    <Modal
+      open={open}
+      onClose={onClose}
+      className="max-h-[calc(92vh-16px)] w-[min(620px,calc(100vw-32px))] bg-lift p-1.5 open:flex open:animate-pop open:flex-col"
+    >
+      <DialogFrame
+        icon={Key}
+        title="Keys and tokens"
+        badge={keys ? `${set.length} / ${keys.length} set` : undefined}
+        subtitle="Kept on this machine; each is checked with one small request before it is used"
+        actions={
+          <RoundButton label="Close" onClick={onClose}>
+            <Icon icon={X} size={14} />
+          </RoundButton>
+        }
+        bodyClassName="px-4 py-3"
+        footer={
+          <span>
+            A key saved to <span className="font-mono">.env</span> stays on this machine; git
+            ignores the file.
+          </span>
+        }
+      >
+        {keys === null ? (
+          <ul className="m-0 list-none p-0">
+            {["a", "b", "c", "d"].map((k) => (
+              <li key={k} className="flex items-center gap-3 px-1 py-3">
+                <Skeleton className="size-7 rounded-lg" />
+                <Skeleton className="w-48" />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <>
+            {set.length > 0 && (
+              <>
+                <h3 className={heading}>Connected</h3>
+                <ul className="m-0 list-none p-0">{set.map(row)}</ul>
+              </>
             )}
-          </li>
-        ))}
-      </ul>
+            {unset.length > 0 && (
+              <>
+                <h3 className={cn(heading, set.length > 0 && "mt-4")}>Not set</h3>
+                <ul className="m-0 list-none p-0">{unset.map(row)}</ul>
+              </>
+            )}
+          </>
+        )}
+      </DialogFrame>
     </Modal>
   );
 }
