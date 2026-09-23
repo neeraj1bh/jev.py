@@ -1214,6 +1214,76 @@ def generate(jev, state, questions):
     yield from streamer
 
 
+# Shown instead of the page while web/dist is missing or older than web/src. It polls and reloads
+# by itself, so building in another terminal is the only step. Plain HTML: the built fonts and
+# styles are exactly what may be missing.
+BUILD_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jev.py · build the page</title>
+<style>
+:root{--paper:#fbfbfa;--shell:#f0f1f3;--panel:#fff;--ink:#1a1c1f;--dim:#6b7079;--rule:#e4e5e7;
+--warn:#b4531a}
+@media (prefers-color-scheme:dark){:root{--paper:#101214;--shell:#21252b;--panel:#171a1e;
+--ink:#e8eaed;--dim:#8b929c;--rule:#262a30;--warn:#f0a15b}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--paper);color:var(--ink);
+font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.shell{width:min(460px,100%);background:var(--shell);border-radius:22px;padding:6px;
+box-shadow:0 0 0 1px rgb(41 41 41/.04),0 12px 24px -12px rgb(0 0 0/.18)}
+header{display:flex;align-items:center;gap:8px;padding:8px 10px 10px}
+.tile{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;
+background:var(--ink);color:var(--paper)}
+h1{margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.dot{margin-left:auto;position:relative;width:8px;height:8px}
+.dot i{position:absolute;inset:0;border-radius:50%;background:var(--warn)}
+.dot i:first-child{animation:ping 1.2s cubic-bezier(0,0,.2,1) infinite;opacity:.7}
+@keyframes ping{75%,to{transform:scale(2.2);opacity:0}}
+.inset{background:var(--panel);border-radius:16px;padding:16px 18px}
+p{margin:0 0 12px;color:var(--dim);font-size:13.5px}
+.label{font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
+color:var(--dim);margin-bottom:6px}
+.cmd{display:flex;align-items:center;gap:8px;background:var(--shell);border-radius:10px;
+padding:8px 8px 8px 12px}
+code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;
+font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace}
+button{border:0;border-radius:999px;background:var(--ink);color:var(--paper);
+font:500 12px system-ui,sans-serif;padding:6px 12px;cursor:pointer}
+footer{display:flex;align-items:center;gap:8px;padding:10px 10px 4px;font-size:11.5px;
+color:var(--dim)}
+@media (prefers-reduced-motion:reduce){.dot i:first-child{animation:none}}
+</style></head><body>
+<main class="shell">
+<header>
+<span class="tile"><svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+<path d="M213.85,125.46l-112,120a8,8,0,0,1-13.69-7l14.66-73.33L45.19,143.49a8,8,0,0,1-3-13
+l112-120a8,8,0,0,1,13.69,7L153.18,90.9l57.63,21.61a8,8,0,0,1,3,12.95Z"/></svg></span>
+<h1>The page needs a build</h1><span class="dot" title="waiting for the build"><i></i><i></i></span></header>
+<section class="inset">
+<p>The page __STATE__. Build it once in another terminal; this tab reloads by itself when it is ready.</p>
+<div class="label">Run</div>
+<div class="cmd"><code id="cmd">cd web &amp;&amp; pnpm install &amp;&amp; pnpm build</code>
+<button id="copy" type="button">Copy</button></div>
+</section>
+<footer>Waiting for the build · checks every 2 s</footer>
+</main>
+<script>
+document.getElementById("copy").onclick = async (e) => {
+  try {
+    await navigator.clipboard.writeText(document.getElementById("cmd").textContent);
+    e.target.textContent = "Copied";
+  } catch {
+    e.target.textContent = "Select and copy";
+  }
+};
+setInterval(async () => {
+  try { if ((await fetch(location.href, { cache: "no-store" })).ok) location.reload(); } catch {}
+}, 2000);
+</script>
+</body></html>
+"""
+
+
 def page_is_stale(index):
     """True when the page's source changed after the last build, as after a git pull."""
     source = os.path.join(ROOT, "web")
@@ -1319,8 +1389,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     if os.path.exists(index)
                     else "is not built yet"
                 )
-                hint = f"The page {state}. Run: cd web && pnpm install && pnpm build, then reload.\n"
-                return self._send(503, hint.encode(), "text/plain; charset=utf-8")
+                page = BUILD_PAGE.replace("__STATE__", state)
+                return self._send(503, page.encode(), "text/html; charset=utf-8")
             with open(index, encoding="utf-8") as f:
                 html = f.read().replace("{{model}}", model_id)
             self._send(200, html.encode(), "text/html; charset=utf-8")
