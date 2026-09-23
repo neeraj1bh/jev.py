@@ -1,14 +1,15 @@
-import { useMemo } from "react";
+import { CaretLeft, CaretRight, Rows, TextAlignLeft, X } from "@phosphor-icons/react";
+import { motion, useReducedMotion } from "motion/react";
+import { useMemo, useState } from "react";
 
-import { fastestIndexes, rankColumns } from "../scoring";
-import { cn, labelText } from "../styles";
+import { fastestIndexes, inputSnippet, rankColumns, scoreResponse } from "../scoring";
+import { cn } from "../styles";
 import type { PanelState, Row, Side } from "../types";
-import { CompareTable, ModelRowsTable } from "./CompareTable";
-import { Modal } from "./Modal";
+import { CompareTable, ModelRowsTable, Reveal } from "./CompareTable";
+import { Icon, IconTile } from "./Icon";
+import { Kbd } from "./Menu";
+import { DialogFrame, Modal, RoundButton } from "./Modal";
 import { Tip } from "./Tip";
-
-const iconButton =
-  "grid size-8 place-items-center rounded-md border border-rule bg-transparent p-0 text-lg leading-none text-dim transition-colors hover:enabled:border-dim hover:enabled:text-ink";
 
 const asPanel = (side: Side, fastest: boolean): PanelState => ({
   status: "done",
@@ -17,6 +18,45 @@ const asPanel = (side: Side, fastest: boolean): PanelState => ({
   response: side.response.error ? undefined : side.response,
   footer: side.response.error?.message ?? "",
 });
+
+/** The item's input, one line until opened. */
+function InputCard({ state }: { state: unknown }) {
+  const [open, setOpen] = useState(false);
+  const text = typeof state === "string" ? state : JSON.stringify(state, null, 2);
+  return (
+    <div className="rounded-xl bg-lift/60 ring-1 ring-rule">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-2.5 rounded-xl border-0 bg-transparent px-3 py-2 text-left"
+      >
+        <IconTile icon={TextAlignLeft} />
+        <span className="text-[10.5px] font-medium tracking-[0.08em] text-dim uppercase">
+          Input
+        </span>
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-[13px] text-ink transition-opacity",
+            open && "opacity-0",
+          )}
+        >
+          {inputSnippet(state)}
+        </span>
+        <Icon
+          icon={CaretRight}
+          size={12}
+          className={cn("text-dim transition-transform duration-150", open && "rotate-90")}
+        />
+      </button>
+      <Reveal open={open}>
+        <pre className="mx-3 mb-3 max-h-[220px] min-h-0 overflow-auto border-0 bg-panel">
+          {text}
+        </pre>
+      </Reveal>
+    </div>
+  );
+}
 
 interface ItemDialogProps {
   open: boolean;
@@ -31,6 +71,7 @@ interface ItemDialogProps {
 
 export function ItemDialog(props: ItemDialogProps) {
   const { open, index, direction, rows, columns, dataset, onClose, onNavigate } = props;
+  const reduce = useReducedMotion();
   // The same winner-first order as the summary and the table behind it.
   const order = useMemo(() => rankColumns(rows, columns.length), [rows, columns.length]);
   const row = rows[index];
@@ -40,8 +81,16 @@ export function ItemDialog(props: ItemDialogProps) {
   const names = order.map((k) => columns[k] ?? "");
   const truth = Object.keys(item.truth).length > 0 ? item.truth : undefined;
   const fastest = fastestIndexes(sides.map((side) => side.ms));
+  const panels = sides.map((side, k) => asPanel(side, fastest.includes(k)));
   const isFirst = index === 0;
   const isLast = index === rows.length - 1;
+  const right = truth
+    ? sides.filter((side) => {
+        const [correct, total] = scoreResponse(side.response, item.truth);
+        return total > 0 && correct === total;
+      }).length
+    : null;
+  const shift = direction === "forward" ? 6 : direction === "back" ? -6 : 0;
 
   return (
     <Modal
@@ -50,96 +99,101 @@ export function ItemDialog(props: ItemDialogProps) {
       holdFocus
       step={index}
       onKeyDown={(event) => {
-        if ((event.target as HTMLElement).closest("summary, pre")) return;
+        if ((event.target as HTMLElement).closest("pre")) return;
         if (event.key === "ArrowLeft" && !isFirst) onNavigate(index - 1);
         else if (event.key === "ArrowRight" && !isLast) onNavigate(index + 1);
       }}
-      className="mx-auto h-auto max-h-[calc(92vh-16px)] w-[min(1440px,calc(100vw-32px))] px-[26px] pt-[22px] pb-3.5 [inset:5vh_0_auto] backdrop:animate-fade focus:outline-none open:flex open:animate-pop open:flex-col motion-reduce:animate-none"
+      className="mx-auto h-auto max-h-[calc(92vh-16px)] w-[min(1280px,calc(100vw-32px))] bg-lift p-1.5 [inset:5vh_0_auto] backdrop:animate-fade focus:outline-none open:flex open:animate-pop open:flex-col motion-reduce:animate-none"
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h2 className="m-0 text-base font-semibold tabular-nums">
-            Item {index + 1} of {rows.length}
-          </h2>
+      <DialogFrame
+        icon={Rows}
+        title={`Item ${(index + 1).toLocaleString()}`}
+        badge={`${(index + 1).toLocaleString()} / ${rows.length.toLocaleString()}`}
+        subtitle={
           <Tip content={item.source}>
-            <p className={cn(labelText, "mt-1 mb-0 truncate")}>
+            <span>
               {dataset} · {item.source}
-            </p>
+            </span>
           </Tip>
-        </div>
-        <div className="flex flex-none gap-1.5">
-          <Tip content="Previous (←)">
-            <button
-              type="button"
-              className={iconButton}
-              aria-label="Previous item"
-              disabled={isFirst}
-              onClick={() => onNavigate(index - 1)}
-            >
-              ‹
-            </button>
-          </Tip>
-          <Tip content="Next (→)">
-            <button
-              type="button"
-              className={iconButton}
-              aria-label="Next item"
-              disabled={isLast}
-              onClick={() => onNavigate(index + 1)}
-            >
-              ›
-            </button>
-          </Tip>
-          <Tip content="Close (Esc)">
-            <button type="button" className={iconButton} aria-label="Close" onClick={onClose}>
-              ×
-            </button>
-          </Tip>
-        </div>
-      </div>
-
-      <details className="mt-3.5 text-dim">
-        <summary className={cn(labelText, "w-fit cursor-pointer")}>Input</summary>
-        <pre className="mt-2 max-h-[180px] min-h-0 overflow-auto">
-          {typeof item.state === "string" ? item.state : JSON.stringify(item.state, null, 2)}
-        </pre>
-      </details>
-
-      <div
-        key={index}
-        className={cn(
-          "mt-4 min-h-0 flex-[0_1_auto] overflow-y-auto border-t border-rule pt-1",
-          direction === "forward" && "animate-from-r motion-reduce:animate-none",
-          direction === "back" && "animate-from-l motion-reduce:animate-none",
-        )}
+        }
+        actions={
+          <>
+            <Tip content="Previous (←)">
+              <RoundButton
+                label="Previous item"
+                disabled={isFirst}
+                onClick={() => onNavigate(index - 1)}
+              >
+                <Icon icon={CaretLeft} size={14} />
+              </RoundButton>
+            </Tip>
+            <Tip content="Next (→)">
+              <RoundButton
+                label="Next item"
+                disabled={isLast}
+                onClick={() => onNavigate(index + 1)}
+              >
+                <Icon icon={CaretRight} size={14} />
+              </RoundButton>
+            </Tip>
+            <span className="mx-1 h-5 w-px bg-rule" />
+            <Tip content="Close (Esc)">
+              <RoundButton label="Close" onClick={onClose}>
+                <Icon icon={X} size={14} />
+              </RoundButton>
+            </Tip>
+          </>
+        }
+        bodyClassName="px-4 pt-3.5 pb-2"
+        footer={
+          <>
+            <Kbd>←</Kbd>
+            <Kbd>→</Kbd>
+            <span className="mr-2">Previous / next</span>
+            <Kbd>esc</Kbd>
+            <span>Close</span>
+            <span className="ml-auto">
+              {right !== null && (
+                <>
+                  <span
+                    className={cn("font-medium", right === sides.length ? "text-good" : "text-ink")}
+                  >
+                    {right} of {sides.length}
+                  </span>{" "}
+                  models right ·{" "}
+                </>
+              )}
+              click a {names.length > 4 ? "model" : "question"} for every option
+            </span>
+          </>
+        }
       >
-        {names.length > 4 ? (
-          <ModelRowsTable
-            names={names}
-            panels={sides.map((side, k) => asPanel(side, fastest.includes(k)))}
-            questionIds={Object.keys(item.questions)}
-            truth={truth}
-          />
-        ) : (
-          <CompareTable
-            key={index}
-            bare
-            names={names}
-            panels={sides.map((side, k) => asPanel(side, fastest.includes(k)))}
-            questionIds={Object.keys(item.questions)}
-            truth={truth}
-          />
-        )}
-      </div>
-
-      <div className={cn(labelText, "mt-2 flex justify-between gap-3 border-t border-rule pt-3")}>
-        <span>
-          <kbd>←</kbd> <kbd>→</kbd> previous / next
-        </span>
-        <span>
-          <kbd>Esc</kbd> close
-        </span>
-      </div>
+        <InputCard state={item.state} />
+        <motion.div
+          key={index}
+          initial={reduce ? false : { opacity: 0, x: shift }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.14, ease: "easeOut" }}
+          className="mt-3"
+        >
+          {names.length > 4 ? (
+            <ModelRowsTable
+              names={names}
+              panels={panels}
+              questionIds={Object.keys(item.questions)}
+              truth={truth}
+            />
+          ) : (
+            <CompareTable
+              bare
+              names={names}
+              panels={panels}
+              questionIds={Object.keys(item.questions)}
+              truth={truth}
+            />
+          )}
+        </motion.div>
+      </DialogFrame>
     </Modal>
   );
 }

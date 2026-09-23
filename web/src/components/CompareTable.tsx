@@ -1,11 +1,11 @@
 import { ArrowsInLineVertical, ArrowsOutLineVertical, CaretRight } from "@phosphor-icons/react";
-import { Fragment, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { Fragment, type ReactNode, useState } from "react";
 
 import { useElapsed } from "../hooks/useElapsed";
 import { answerLabel, matchesLabel } from "../scoring";
-import { cn, inset, labelText, shell, tableHead } from "../styles";
+import { chipButton, cn, inset, labelText, rankChip, shell, tableHead } from "../styles";
 import type { Answer, PanelState, Question } from "../types";
-import { CheckMark } from "./CheckMark";
 import { Icon } from "./Icon";
 import { Skeleton } from "./Skeleton";
 import { Tip } from "./Tip";
@@ -15,6 +15,125 @@ function confidence(answer: Answer) {
   if (answer.type === "noul") return answerLabel(answer) === "yes" ? answer.noul : 1 - answer.noul;
   if (answer.type === "choice") return answer.probabilities[answer.choice] ?? null;
   return null;
+}
+
+/** Opens and closes its content by height, quickly, so a row never jumps open. */
+export function Reveal({ open, children }: { open: boolean; children: ReactNode }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      initial={false}
+      animate={{ height: open ? "auto" : 0, opacity: open ? 1 : 0 }}
+      transition={reduce ? { duration: 0 } : { duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
+      className="overflow-hidden"
+      aria-hidden={!open}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/** The answer as a chip, green when it matches the label and orange when it does not. */
+function AnswerChip({
+  answer,
+  truth,
+  written,
+}: {
+  answer: Answer;
+  truth?: string;
+  written: boolean;
+}) {
+  const label = answerLabel(answer);
+  const shown = answer.type === "score" ? answer.score.toFixed(2) : label;
+  const correct = truth === undefined ? null : matchesLabel(label, truth);
+  const sure = written ? null : confidence(answer);
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <Tip content={shown}>
+        <span
+          className={cn(
+            "min-w-0 truncate rounded-md px-1.5 py-0.5 text-[12.5px] font-medium",
+            correct === null
+              ? "bg-panel text-ink ring-1 ring-rule"
+              : correct
+                ? "bg-good/12 text-good"
+                : "bg-warn/12 text-warn",
+          )}
+        >
+          {shown}
+        </span>
+      </Tip>
+      {sure !== null && (
+        <span
+          className={cn(
+            "flex-none font-mono text-[11.5px] tabular-nums",
+            sure < 0.6 ? "text-warn" : "text-dim",
+          )}
+        >
+          {sure.toFixed(2)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Every option with its probability, the chosen one first and coloured; the rest fade. */
+function Distribution({
+  answer,
+  truth,
+  written,
+}: {
+  answer?: Answer;
+  truth?: string;
+  written: boolean;
+}) {
+  if (!answer) return <span className="text-xs text-dim">No answer</span>;
+  if (written) return <span className="text-xs text-dim">Written, no probabilities</span>;
+  const probabilities =
+    answer.type === "noul"
+      ? { yes: answer.noul, no: 1 - answer.noul }
+      : (answer.probabilities ?? {});
+  const ranked = Object.entries(probabilities).sort((a, b) => b[1] - a[1]);
+  const shown = ranked.slice(0, 6);
+  const best = answerLabel(answer);
+  const right = truth === undefined ? null : matchesLabel(best, truth);
+  return (
+    <div className="max-w-[340px] space-y-1">
+      {shown.map(([option, probability]) => {
+        const chosen = option === best;
+        const isLabel = truth !== undefined && matchesLabel(option, truth);
+        return (
+          <div
+            key={option}
+            className={cn(
+              "grid grid-cols-[minmax(0,112px)_minmax(40px,1fr)_36px] items-center gap-2.5 font-mono text-[11.5px]",
+              chosen ? "text-ink" : "text-dim",
+            )}
+          >
+            <Tip content={option}>
+              <span className={cn("truncate", chosen && "font-semibold")}>
+                {answer.type === "score" ? `level ${option}` : option}
+                {isLabel && !chosen && <span className="ml-1.5 text-good">label</span>}
+              </span>
+            </Tip>
+            <span className="h-1.5 overflow-hidden rounded-full bg-bar">
+              <span
+                className={cn(
+                  "block h-full rounded-full",
+                  !chosen ? "bg-dim/50" : right === false ? "bg-warn" : "bg-good",
+                )}
+                style={{ width: `${Math.max(probability * 100, probability > 0 ? 2 : 0)}%` }}
+              />
+            </span>
+            <span className="text-right tabular-nums">{probability.toFixed(2)}</span>
+          </div>
+        );
+      })}
+      {ranked.length > shown.length && (
+        <div className="text-[11.5px] text-dim">+ {ranked.length - shown.length} more options</div>
+      )}
+    </div>
+  );
 }
 
 function ModelHeading({ name, state }: { name: string; state: PanelState }) {
@@ -31,7 +150,7 @@ function ModelHeading({ name, state }: { name: string; state: PanelState }) {
           state.fastest ? "text-good" : "text-dim",
         )}
       >
-        {state.status === "idle" ? "\u00a0" : `${ms} ms`}
+        {state.status === "idle" ? " " : `${ms} ms`}
       </span>
       {written && (
         <span className="ml-2 text-xs font-normal text-dim">written, no probabilities</span>
@@ -45,109 +164,34 @@ function AnswerCell({
   id,
   truth,
   written,
-  open = false,
 }: {
   state: PanelState;
   id: string;
   truth?: string;
-  /** A written answer has no probabilities to show. */
   written: boolean;
-  /** Its options are listed right below, so the bar here would only repeat the first of them. */
-  open?: boolean;
 }) {
-  const cell = cn("border-b border-rule px-2 py-2 align-top", open && "border-b-0");
   if (state.status === "running" && !state.response) {
     return (
-      <td className={cell}>
+      <td className={rowCell}>
         <span className="flex items-center gap-3">
           <Skeleton className="w-14" />
-          <Skeleton className="ml-auto h-1 w-12" />
+          <Skeleton className="h-1 w-8" />
         </span>
       </td>
     );
   }
-  if (state.status === "idle") return <td className={cell} />;
+  if (state.status === "idle") return <td className={rowCell} />;
   const answer = state.response?.answers[id];
   if (!answer) {
     const failed = state.status === "done" && !state.response;
     return (
-      <td className={cn(cell, failed ? "text-warn" : "text-dim")}>{failed ? "failed" : "–"}</td>
+      <td className={cn(rowCell, failed ? "text-warn" : "text-dim")}>{failed ? "failed" : "–"}</td>
     );
   }
-  const label = answerLabel(answer);
-  const shown = answer.type === "score" ? answer.score.toFixed(2) : label;
-  const probability = written || open ? null : confidence(answer);
-  const correct = truth === undefined ? null : matchesLabel(label, truth);
   return (
-    <td className={cell}>
-      <span className="flex items-start gap-3">
-        <Tip content={shown}>
-          <span
-            className={cn(
-              "line-clamp-2 min-w-0 flex-1 font-medium break-words",
-              correct === null ? "text-ink" : correct ? "text-good" : "text-warn",
-            )}
-          >
-            {shown} {correct !== null && <CheckMark ok={correct} />}
-          </span>
-        </Tip>
-        {probability !== null && (
-          <span className="mt-[3px] ml-auto flex flex-none items-center gap-2">
-            <span className="hidden h-1 w-12 overflow-hidden rounded-full bg-bar sm:block">
-              <span
-                className="block h-full rounded-full bg-ink/70"
-                style={{ width: `${probability * 100}%` }}
-              />
-            </span>
-            <span className="font-mono text-xs text-dim tabular-nums">
-              {probability.toFixed(2)}
-            </span>
-          </span>
-        )}
-      </span>
+    <td className={rowCell}>
+      <AnswerChip answer={answer} truth={truth} written={written} />
     </td>
-  );
-}
-
-function OptionBreakdown({ answer, written }: { answer?: Answer; written: boolean }) {
-  if (!answer) return <span className="text-dim">–</span>;
-  if (written) return null;
-  const probabilities =
-    answer.type === "noul"
-      ? { yes: answer.noul, no: 1 - answer.noul }
-      : (answer.probabilities ?? {});
-  const ranked = Object.entries(probabilities).sort((a, b) => b[1] - a[1]);
-  const shown = ranked.slice(0, 6);
-  const best = answerLabel(answer);
-  return (
-    <div className="space-y-1 font-mono text-xs">
-      {shown.map(([option, probability]) => (
-        <div
-          key={option}
-          className={cn(
-            "grid grid-cols-[minmax(0,1fr)_48px_36px] items-center gap-2",
-            option === best ? "text-ink" : "text-dim",
-          )}
-        >
-          <Tip content={option}>
-            <span className="truncate">{answer.type === "score" ? `level ${option}` : option}</span>
-          </Tip>
-          <span className="h-1 overflow-hidden rounded-full bg-bar">
-            <span
-              className={cn(
-                "block h-full rounded-full",
-                option === best ? "bg-ink/70" : "bg-dim/60",
-              )}
-              style={{ width: `${probability * 100}%` }}
-            />
-          </span>
-          <span className="text-right tabular-nums">{probability.toFixed(2)}</span>
-        </div>
-      ))}
-      {ranked.length > shown.length && (
-        <div className="text-dim">+ {ranked.length - shown.length} more options</div>
-      )}
-    </div>
   );
 }
 
@@ -184,9 +228,25 @@ function QuestionHint({ question }: { question: Question }) {
   );
 }
 /** snake_case names wrap after an underscore instead of spilling into the next column. */
-const breakable = (name: string) => name.replaceAll("_", "_\u200b");
+const breakable = (name: string) => name.replaceAll("_", "_​");
 
-const rowCell = "border-b border-rule px-2 py-2 align-top";
+const rowCell = "border-0 border-b border-rule px-2 py-2.5 align-middle";
+// The row under an open row: no rule until it opens, so a closed one takes no room.
+const detailCell = (open: boolean) =>
+  cn("px-2 py-0 align-top", open ? "border-0 border-b border-rule" : "border-0");
+
+/** The caret that opens a row, on a small tile. */
+function Caret({ open }: { open: boolean }) {
+  return (
+    <span className="grid size-5 flex-none place-items-center rounded-md bg-lift text-dim">
+      <Icon
+        icon={CaretRight}
+        size={11}
+        className={cn("transition-transform duration-150", open && "rotate-90")}
+      />
+    </span>
+  );
+}
 
 /** One column per model and one row per question; a row opens to show every option's probability. */
 export function CompareTable({
@@ -214,13 +274,13 @@ export function CompareTable({
     <div className={cn(!bare && shell, "animate-fade")}>
       <div className={cn(!bare && inset, !bare && "px-5 py-4")}>
         {hasAnswers && (
-          <div className="flex justify-end pb-1">
+          <div className="flex justify-end pb-1.5">
             <button
               type="button"
               onClick={() => setOpen(allOpen ? [] : questionIds)}
-              className="inline-flex items-center gap-1 rounded-md border-0 bg-transparent px-1.5 py-0.5 text-[13px] text-dim transition-colors hover:text-ink"
+              className={cn(chipButton(), "text-[12.5px]")}
             >
-              <Icon icon={allOpen ? ArrowsInLineVertical : ArrowsOutLineVertical} size={14} />
+              <Icon icon={allOpen ? ArrowsInLineVertical : ArrowsOutLineVertical} size={12} />
               {allOpen ? "Hide all options" : "Show all options"}
             </button>
           </div>
@@ -247,38 +307,41 @@ export function CompareTable({
                 ))}
               </tr>
             </thead>
-            <tbody className="[&>tr:last-child>td]:border-b-0">
+            <tbody>
               {questionIds.map((id) => {
                 const isOpen = open.includes(id);
                 return (
                   <Fragment key={id}>
-                    <tr className="transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md">
-                      <td className={cn(rowCell, "text-ink", isOpen && "border-b-0")}>
+                    <tr
+                      className={cn(
+                        "transition-colors [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg",
+                        hasAnswers && "cursor-pointer hover:bg-lift",
+                        isOpen && "[&>td]:border-b-transparent",
+                      )}
+                      onClick={hasAnswers ? () => toggle(id) : undefined}
+                    >
+                      <td className={cn(rowCell, "text-ink")}>
                         {hasAnswers ? (
                           <button
                             type="button"
                             aria-expanded={isOpen}
-                            onClick={() => toggle(id)}
-                            className="inline-flex max-w-full items-start gap-1 rounded-sm border-0 bg-transparent p-0 text-left text-ink"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggle(id);
+                            }}
+                            className="inline-flex max-w-full items-center gap-2 rounded-sm border-0 bg-transparent p-0 text-left font-medium text-ink"
                           >
-                            <Icon
-                              icon={CaretRight}
-                              size={14}
-                              className={cn(
-                                "text-dim transition-transform duration-150",
-                                isOpen && "rotate-90",
-                              )}
-                            />
+                            <Caret open={isOpen} />
                             <span className="min-w-0 break-words">{breakable(id)}</span>
                           </button>
                         ) : (
-                          <span className="break-words">{breakable(id)}</span>
+                          <span className="font-medium break-words">{breakable(id)}</span>
                         )}
                         {asked?.[id] && <QuestionHint question={asked[id]} />}
                       </td>
                       {truth && (
                         <Tip content={truth[id]}>
-                          <td className={cn(rowCell, "text-dim", isOpen && "border-b-0")}>
+                          <td className={cn(rowCell, "text-dim")}>
                             <span className="line-clamp-2 break-words">{truth[id] ?? "–"}</span>
                           </td>
                         </Tip>
@@ -290,20 +353,24 @@ export function CompareTable({
                           id={id}
                           truth={truth?.[id]}
                           written={name.endsWith("· text")}
-                          open={isOpen}
                         />
                       ))}
                     </tr>
-                    {isOpen && (
-                      <tr className="animate-fade motion-reduce:animate-none">
-                        <td className={rowCell} />
-                        {truth && <td className={rowCell} />}
+                    {hasAnswers && (
+                      <tr>
+                        <td className={detailCell(isOpen)} />
+                        {truth && <td className={detailCell(isOpen)} />}
                         {names.map((name, k) => (
-                          <td key={name} className={cn(rowCell, "pt-0 pb-3")}>
-                            <OptionBreakdown
-                              answer={panels[k]?.response?.answers[id]}
-                              written={name.endsWith("· text")}
-                            />
+                          <td key={name} className={detailCell(isOpen)}>
+                            <Reveal open={isOpen}>
+                              <div className="pt-1 pb-3">
+                                <Distribution
+                                  answer={panels[k]?.response?.answers[id]}
+                                  truth={truth?.[id]}
+                                  written={name.endsWith("· text")}
+                                />
+                              </div>
+                            </Reveal>
                           </td>
                         ))}
                       </tr>
@@ -315,8 +382,8 @@ export function CompareTable({
           </table>
         </div>
         <p className={cn(labelText, "mt-3 mb-0", (bare || !hasResults) && "hidden")}>
-          Green marks the fastest model{truth ? " and answers that match the label" : ""}. The bar
-          is how sure the model was; open a question to see every option.
+          Green marks the fastest model{truth ? " and answers that match the label" : ""}; the
+          number is how sure the model was. Open a question to see every option.
         </p>
         {failures.map((message) => (
           <p key={message} className="mt-1 mb-0 text-[13px] text-warn">
@@ -328,68 +395,139 @@ export function CompareTable({
   );
 }
 
-/** Many models on one item: a row per model and a column per question, so nothing is squeezed. */
+/** Many models on one item: a row per model and a column per question; a row opens to show
+ * every option that model weighed. */
 export function ModelRowsTable({
   names,
   panels,
   questionIds,
   truth,
 }: Omit<CompareTableProps, "bare">) {
+  const [open, setOpen] = useState<string[]>([]);
+  const toggle = (name: string) =>
+    setOpen((current) =>
+      current.includes(name) ? current.filter((x) => x !== name) : [...current, name],
+    );
+  const slowest = Math.max(1, ...panels.map((panel) => panel.ms ?? 0));
+  const span = 2 + questionIds.length;
   return (
     <div className="overflow-x-auto">
       <table
         className="w-full border-collapse text-[13px]"
-        style={{ minWidth: 300 + 190 * questionIds.length }}
+        style={{ minWidth: 360 + 170 * questionIds.length }}
       >
         <thead>
           <tr>
-            <th className={cn(tableHead, "sticky left-0 z-[2] align-bottom")}>Model</th>
-            <th className={cn(tableHead, "text-right align-bottom")}>Time</th>
+            <th className={cn(tableHead, "sticky left-0 z-[2] w-px align-bottom")}>Model</th>
+            <th className={cn(tableHead, "w-px align-bottom")}>Time</th>
             {questionIds.map((id) => (
               <th key={id} className={cn(tableHead, "align-bottom")}>
                 <span className="block break-words text-ink">{breakable(id)}</span>
                 {truth?.[id] !== undefined && (
-                  <span className="block truncate text-xs font-normal">label: {truth[id]}</span>
+                  <span className="mt-0.5 flex items-center gap-1.5 text-[11px] font-normal">
+                    <span className="tracking-[0.08em] uppercase">label</span>
+                    <span className="truncate font-medium text-good">{truth[id]}</span>
+                  </span>
                 )}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="[&>tr:last-child>td]:border-b-0">
+        <tbody>
           {names.map((name, k) => {
             const state = panels[k] ?? idle;
+            const isOpen = open.includes(name);
+            const written = name.endsWith("· text");
             return (
-              <tr key={name} className="transition-colors hover:bg-lift">
-                <td
+              <Fragment key={name}>
+                <tr
+                  onClick={() => toggle(name)}
                   className={cn(
-                    rowCell,
-                    "sticky left-0 z-[1] bg-panel font-semibold whitespace-nowrap text-ink",
+                    "group cursor-pointer transition-colors hover:bg-lift [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg",
+                    isOpen && "[&>td]:border-b-transparent",
                   )}
                 >
-                  <span className="mr-2.5 inline-block w-5 font-mono text-xs font-normal text-dim">
-                    {k + 1}
-                  </span>
-                  {name}
-                </td>
-                <td
-                  className={cn(
-                    rowCell,
-                    "text-right font-mono text-xs tabular-nums",
-                    state.fastest ? "text-good" : "text-dim",
-                  )}
-                >
-                  {state.ms === undefined ? "–" : `${state.ms.toLocaleString()} ms`}
-                </td>
-                {questionIds.map((id) => (
-                  <AnswerCell
-                    key={id}
-                    state={state}
-                    id={id}
-                    truth={truth?.[id]}
-                    written={name.endsWith("· text")}
-                  />
-                ))}
-              </tr>
+                  <td
+                    className={cn(
+                      rowCell,
+                      "sticky left-0 z-[1] bg-panel transition-colors group-hover:bg-lift",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        toggle(name);
+                      }}
+                      className="flex items-center gap-2.5 border-0 bg-transparent p-0 text-left font-semibold whitespace-nowrap text-ink"
+                    >
+                      <span className={rankChip(k + 1)}>{k + 1}</span>
+                      {name}
+                      <Caret open={isOpen} />
+                    </button>
+                  </td>
+                  <td className={rowCell}>
+                    {state.ms === undefined ? (
+                      <span className="text-dim">–</span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <span className="h-1.5 w-20 flex-none overflow-hidden rounded-full bg-bar">
+                          <span
+                            className={cn(
+                              "block h-full rounded-full",
+                              state.fastest ? "bg-good" : "bg-dim/60",
+                            )}
+                            style={{ width: `${(state.ms / slowest) * 100}%` }}
+                          />
+                        </span>
+                        <span
+                          className={cn(
+                            "font-mono text-xs whitespace-nowrap tabular-nums",
+                            state.fastest ? "text-good" : "text-dim",
+                          )}
+                        >
+                          {state.ms.toLocaleString()} ms
+                        </span>
+                      </span>
+                    )}
+                  </td>
+                  {questionIds.map((id) => (
+                    <AnswerCell
+                      key={id}
+                      state={state}
+                      id={id}
+                      truth={truth?.[id]}
+                      written={written}
+                    />
+                  ))}
+                </tr>
+                <tr>
+                  <td colSpan={span} className={detailCell(isOpen)}>
+                    <Reveal open={isOpen}>
+                      <div
+                        className="grid gap-x-6 gap-y-3 pt-1 pb-3.5 pl-8"
+                        style={{
+                          gridTemplateColumns: `repeat(${Math.min(questionIds.length, 4)}, minmax(0, 1fr))`,
+                        }}
+                      >
+                        {questionIds.map((id) => (
+                          <div key={id} className="min-w-0">
+                            <div className="mb-1.5 text-[10.5px] font-medium tracking-[0.08em] text-dim uppercase">
+                              {breakable(id)}
+                            </div>
+                            <Distribution
+                              answer={state.response?.answers[id]}
+                              truth={truth?.[id]}
+                              written={written}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </Reveal>
+                  </td>
+                </tr>
+              </Fragment>
             );
           })}
         </tbody>
