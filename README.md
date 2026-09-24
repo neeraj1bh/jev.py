@@ -40,19 +40,17 @@ uv run jev serve Qwen/Qwen2.5-7B-Instruct    # any chat model on the Hub
 uv run jev request.json                      # one request from a file
 ```
 
-Needs [uv](https://docs.astral.sh/uv/). It uses CUDA, Apple MPS or the CPU, whichever is there,
-in bf16 where the hardware has it.
+Needs [uv](https://docs.astral.sh/uv/). On Linux and Windows it installs the CPU build of PyTorch
+(an AMD GPU is used through llama.cpp, below); on a Mac, the standard build, which uses the Apple
+GPU. It runs in bf16 where the hardware has it.
 
-On Linux without an NVIDIA GPU, skip the 2.5 GB of CUDA libraries and install once:
+With an NVIDIA GPU, install the CUDA build once (uv picks the one that matches the driver) and keep
+uv from switching it back; `jev` and `prod` print this when they see an NVIDIA GPU with the CPU build:
 
 ```sh
-uv venv
-uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-uv pip install transformers && uv pip install -e . --no-deps
-uv run --no-sync jev          # --no-sync goes before the command, or uv installs CUDA again
+uv pip install torch --torch-backend auto
+uv run --no-sync jev          # --no-sync goes before the command; plain uv run restores the CPU build
 ```
-
-On that setup, write `uv run --no-sync` wherever this README says `uv run`.
 
 Requests and responses follow the [TypeSafe System One API](https://docs.typesafe.ai/api), so a
 client written for it only needs a base URL change.
@@ -221,15 +219,20 @@ and people settle where they disagree. After that v1 never changes; new items ma
 
 ## Demo
 
+Needs [uv](https://docs.astral.sh/uv/getting-started/installation/) and
+[Node.js](https://nodejs.org) 20.19+ with pnpm, npm or bun. After cloning, one command installs the
+Python and page packages on first use and starts it:
+
 ```sh
-cd web && pnpm install && pnpm build && cd ..   # Node 20.19+ and pnpm; again after a pull
-uv run prod                                      # http://localhost:8080
+uv run prod        # the built page and the server: http://localhost:8080
+uv run dev         # for working on the code: the page reloads on edits, the server restarts
 ```
 
 The server answers this machine only; `JEV_HOST=0.0.0.0 uv run prod` shares it on the local network.
 
-If the page's source changed since the last build, as after a pull, the server says so and shows
-the build command instead of an old page. Models already on this machine are listed on their own;
+`prod` builds the page first when it is missing or older than its source, as after a pull; without
+Node the server still starts and the page shows the build command. `dev` serves the page on port
+3000, or the next free one, and Ctrl-C stops both. Models already on this machine are listed on their own;
 others can be added from the model menu. Downloads can be stopped and resume where they stopped.
 Details, and llama.cpp: [docs/local-models.md](docs/local-models.md).
 
@@ -304,7 +307,7 @@ running it on macOS, Linux, Windows and WSL: [docs/local-models.md](docs/local-m
 ```sh
 uvx ruff format . && uvx ruff check .
 cd web && pnpm check               # Biome, the type check and the build
-cd web && pnpm dev                 # the page on :3000, reloading as you edit; keep uv run prod running
+uv run dev                         # the server and the page, reloading as you edit
 ```
 
 | path | what |

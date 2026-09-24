@@ -9,13 +9,13 @@ repo redistributes nothing and anyone can rebuild the same items from the Hub. S
 questions have more than 26 options form a separate "wide" part: letter-reading backends cannot
 answer them, and keeping them apart keeps the main comparison paired across every model.
 
-    uv run --no-sync jev-bench freeze                        # add sets not in benchmarks/core-v1.json yet
-    uv run --no-sync jev-bench run remote:deepseek           # one model; letter readers skip wide
-    uv run --no-sync jev-bench run Qwen/Qwen2.5-1.5B-Instruct  # local models answer every item
-    uv run --no-sync jev-bench export                        # every item as text, for reviewers
-    uv run --no-sync jev-bench tokens                        # input tokens per item, for cost estimates
-    uv run --no-sync jev-bench score <run.jsonl> ...         # Core v1 scores of saved runs, by track
-    uv run --no-sync jev-bench check                         # offline self-checks of the readout
+    uv run jev-bench freeze                        # add sets not in benchmarks/core-v1.json yet
+    uv run jev-bench run remote:deepseek           # one model; letter readers skip wide
+    uv run jev-bench run Qwen/Qwen2.5-1.5B-Instruct  # local models answer every item
+    uv run jev-bench export                        # every item as text, for reviewers
+    uv run jev-bench tokens                        # input tokens per item, for cost estimates
+    uv run jev-bench score <run.jsonl> ...         # Core v1 scores of saved runs, by track
+    uv run jev-bench check                         # offline self-checks of the readout
 
 Each run is saved like a demo batch, so Past runs lists it and can compare runs side by side.
 """

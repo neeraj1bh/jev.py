@@ -1,6 +1,6 @@
 """Core v1 scores from saved runs, by the scoring contract fixed before any scored run.
 
-    uv run --no-sync jev-bench score results/logs/demo/<run>.jsonl [<run>.jsonl ...]
+    uv run jev-bench score results/logs/demo/<run>.jsonl [<run>.jsonl ...]
 
 Each set's track, group and provenance come from benchmarks/core-v1.json. The headline averages
 the headline sets equally within each group, then the groups equally; RewardBench counts as the

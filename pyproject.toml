@@ -10,10 +10,21 @@ dependencies = ["torch>=2.4", "transformers>=4.45", "httpx>=0.27"]
 [project.scripts]
 jev = "jev.core:cli"
 prod = "jev.demo:cli"
+dev = "jev.dev:main"
 jev-bench = "jev.bench:cli"
 jev-eval = "jev.eval:cli"
 jev-readout = "jev.readout:cli"
 jev-remote = "jev.remote:cli"
+
+[tool.uv.sources]
+# CPU PyTorch on Linux and Windows: an AMD GPU is reached through llama.cpp, and the default wheel
+# pulls gigabytes of CUDA libraries. macOS keeps the standard wheel, which uses the Apple GPU.
+torch = [{ index = "pytorch-cpu", marker = "sys_platform != 'darwin'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]

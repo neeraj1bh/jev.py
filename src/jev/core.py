@@ -21,6 +21,7 @@ import copy
 import json
 import math
 import os
+import shutil
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -265,8 +266,21 @@ def demo(model_id=DEFAULT_MODEL, jev=None):
     )
 
 
+def gpu_hint():
+    """How to use an NVIDIA GPU that the installed CPU build of PyTorch cannot reach, else ""."""
+    if torch.cuda.is_available() or not shutil.which("nvidia-smi"):
+        return ""
+    return (
+        "An NVIDIA GPU is here, but PyTorch is the CPU build. To use the GPU, run once\n"
+        "  uv pip install torch --torch-backend auto\n"
+        "then start commands with uv run --no-sync (plain uv run puts the CPU build back)."
+    )
+
+
 def cli():
     args = sys.argv[1:]
+    if hint := gpu_hint():
+        print(hint)
     if args and args[0] == "serve":
         serve(*(a for a in args[1:2]), **({"port": int(args[2])} if len(args) > 2 else {}))
     elif args and args[0].endswith(".json"):

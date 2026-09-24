@@ -20,6 +20,7 @@ import mimetypes
 import os
 import random
 import signal
+import subprocess
 import sys
 import time
 import urllib.error
@@ -33,7 +34,8 @@ from huggingface_hub.constants import HF_HUB_CACHE
 from transformers import TextIteratorStreamer
 
 from jev import cache, downloads, folders, hub, llamaserver
-from jev.core import DEFAULT_MODEL, ROOT, SYSTEM, Jev, _options, _text
+from jev.core import DEFAULT_MODEL, ROOT, SYSTEM, Jev, _options, _text, gpu_hint
+from jev.dev import NO_NODE, page_tools
 from jev.eval import typesafe_rows
 from jev.remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env
 
@@ -1710,6 +1712,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
             sys.stderr.write(f"{self.command} {self.path} {a[1] if len(a) > 1 else ''}\n")
 
     print(f"open http://localhost:{port}  ({DEVICE}; models in {HF_HUB_CACHE} or {MODELS})")
+    if hint := gpu_hint():
+        print(hint)
     Thread(target=runs, daemon=True).start()  # summarise the saved runs before Past runs is opened
     # `kill` ends the server like Ctrl+C does, so exit handlers run and stop llama-server.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
@@ -1723,8 +1727,28 @@ def main(model_id=DEFAULT_MODEL, port=8080):
         server.server_close()
 
 
-def cli():
+def build_page():
+    """Builds the page when it is missing or older than its source, as after a pull. Without Node
+    the server still starts and the page says how to build it."""
+    index = os.path.join(WEB, "index.html")
+    if os.path.exists(index) and not page_is_stale(index):
+        return
+    try:
+        tools = page_tools()
+        if not tools:
+            print(NO_NODE)
+            return
+        subprocess.run([*tools[0], "build"], cwd=os.path.dirname(WEB), check=True)
+    except (OSError, subprocess.CalledProcessError) as e:
+        print(f"the page was not built ({e}); open the server for the steps")
+
+
+def cli(build=True):
     a = sys.argv[1:]
+    if a and a[0].startswith("-"):  # e.g. `uv run prod --no-sync`, where uv passes the flag on
+        raise SystemExit(f"prod takes a model and a port, not {a[0]}; uv's own flags go before prod")
+    if build:
+        build_page()
     main(*a[:1], **({"port": int(a[1])} if len(a) > 1 else {}))
 
 
