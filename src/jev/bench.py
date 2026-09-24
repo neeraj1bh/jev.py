@@ -82,6 +82,15 @@ LANGUAGES = ("Global-MMLU-Lite Hindi", "Global-MMLU-Lite Chinese")  # ask the En
 # The Chinese rows of this subject hold its questions shuffled among its sample_ids (checked
 # 2026-09-24: none of its 10 match the English options), so it cannot be asked in all three.
 UNMATCHED_SUBJECTS = {"high_school_world_history"}
+# TypeSafe questions review found unanswerable from their step (a needed fact is missing, or the
+# rubric allows two answers); each step keeps its other questions
+TYPESAFE_OMIT = {
+    ("agent_trace_observability/trace_e2ab80ce644dc6a4d4ea02cfcffcccee", "safety_1"): ["within_grant"],
+    ("invoice_processing/ap_00074", "semantic"): ["line_3_scope", "line_3_completion"],
+    ("invoice_processing/ap_00246", "semantic"): ["price_basis", "billed_above_basis"],
+    ("customer_service/retention-sarcastic-sure-whatever/t0", "triage"): ["desired_outcome"],
+    ("customer_service/billing-overdraft-no-food/t1", "money"): ["refund_reason"],
+}
 FIRST = ("Jailbreak attempts", "Global-MMLU-Lite English")  # picked before the sets that depend on them
 AUXILIARY = {  # reported beside the headline, not in it
     "IMDB", "AG News topic", "DBpedia-14", "Arena votes", "MuSR murder mysteries",
@@ -174,6 +183,18 @@ def fingerprint(item, prompt_version=PROMPT_VERSION):
     prompt version counts too: a new prompt asks the same item differently."""
     text = json.dumps([item["state"], item["questions"], item["truth"], prompt_version], ensure_ascii=False)
     return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+def typesafe_step(case, node, doc, qs, truth, omit=()):
+    """One TypeSafe step as Core v1 asks it, without its omitted questions."""
+    unknown = set(omit) - set(qs)
+    if unknown:
+        raise ValueError(f"TypeSafe {case} {node} has no question {', '.join(sorted(unknown))}")
+    item = demo.typesafe_item(case, node, doc, qs, truth)
+    return item | {
+        "questions": {k: v for k, v in item["questions"].items() if k not in omit},
+        "truth": {k: v for k, v in item["truth"].items() if k not in omit},
+    }
 
 
 def answer_group(name, item):
@@ -495,16 +516,20 @@ def freeze():
             ),
         }
         print(f"{name}: {len(picked)} items", flush=True)
-    steps = [
-        {"case": case, "node": node, "sha": fingerprint(demo.typesafe_item(case, node, doc, qs, truth))}
-        for case, node, doc, qs, truth in demo.typesafe_rows()
-    ]
+    steps = []
+    for case, node, doc, qs, truth in demo.typesafe_rows():
+        omit = TYPESAFE_OMIT.get((case, node), [])
+        sha = fingerprint(typesafe_step(case, node, doc, qs, truth, omit))
+        steps.append({"case": case, "node": node, "sha": sha} | ({"omit": omit} if omit else {}))
+    if missing := set(TYPESAFE_OMIT) - {(s["case"], s["node"]) for s in steps}:
+        raise ValueError(f"TypeSafe has no step {sorted(missing)}")
     os.makedirs(os.path.dirname(PATH), exist_ok=True)
     with open(PATH, "w") as f:
         json.dump(
             {
                 "name": NAME,
-                "status": "picked from the decided question list; Review 2 next, then frozen (see README)",
+                "status": "Review 2's replacements and omissions applied; the changed questions await "
+                "their review (see README)",
                 "frozen": time.strftime("%Y-%m-%d"),
                 "prompt_version": PROMPT_VERSION,
                 "per_set": PER_SET,
@@ -658,7 +683,7 @@ def load(part="main"):
             (case, node): (case, node, doc, qs, truth) for case, node, doc, qs, truth in demo.typesafe_rows()
         }
         for pointer in frozen["typesafe"]:
-            item = demo.typesafe_item(*steps[(pointer["case"], pointer["node"])])
+            item = typesafe_step(*steps[(pointer["case"], pointer["node"])], pointer.get("omit", ()))
             if fingerprint(item) != pointer["sha"]:
                 raise ValueError(
                     f"TypeSafe {pointer['case']} {pointer['node']} changed since {frozen['frozen']}"

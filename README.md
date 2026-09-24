@@ -184,9 +184,13 @@ latency figure. DeepSeek is V4.1-Flash, hosted.
 ### Core v1, the frozen benchmark
 
 `benchmarks/core-v1.json` fixes one set of items for every model. It was picked on 2026-09-24
-from a decided list of sets and questions, and is final once reviewers have checked every item.
-- **Items:** 48 public sets and every TypeSafe step: 2,630 items and 2,939 questions (1,021
-  yes/no, 1,841 pick one, 77 score). A set gives 50 items, or one per label or subject where it
+from a decided list of sets and questions, and reviewers then read every question. An item they
+found broken (a wrong key, two right options, missing context, a translation that changed the
+question) gave way to the next item its set's seeded rule picks, with the same label and stratum;
+each set lists what it replaced under `replaced`, and seven TypeSafe questions are left out of their
+steps (`omit`). The changed questions await their own review before v1 is final.
+- **Items:** 48 public sets and every TypeSafe step: 2,630 items and 2,932 questions (1,019
+  yes/no, 1,836 pick one, 77 score). A set gives 50 items, or one per label or subject where it
   has more (MMLU 57, Banking77 77, CLINC150 151, LEDGAR 100).
 - **Balance:** each set's own quotas first (BBQ, RAGTruth, SQuAD v2, jailbreak attempts), then its
   strata (subjects, categories, subsets, genres), then equal counts per label, and the right answer
@@ -214,8 +218,8 @@ uv run jev-bench check                            # offline checks of the letter
 ```
 
 Run each model separately, then open the runs together in Past runs. The models to run are in
-`benchmarks/core-v1-models.json`: six hosted models first, the rest under `optional`, with the GGUF to load for each llama.cpp one. Before the list is final, two strong models check every label
-and people settle where they disagree. After that v1 never changes; new items make a v2.
+`benchmarks/core-v1-models.json`: six hosted models first, the rest under `optional`, with the GGUF to load for each llama.cpp one. Once the changed questions pass their review, v1 never changes;
+new items make a v2.
 
 ## Demo
 
@@ -300,8 +304,18 @@ running it on macOS, Linux, Windows and WSL: [docs/local-models.md](docs/local-m
 - **Hosted latency is not a model's speed.** A letter readout sends one request per question, in
   parallel; provider load moves the times from day to day. Past runs keep the date they were
   recorded.
-- **A few tasks are small.** `writes` has 40 items, and the TypeSafe set has 354 questions from
+- **A few tasks are small.** `writes` has 40 items, and the TypeSafe set has 347 questions from
   20 cases.
+- **A Core v1 set's score is a sample.** Its 50 questions give coverage, not a precise measure: 40
+  right out of 50 is 80%, with a 95% interval of about 67–89% if the questions are independent,
+  and some are not (questions on one passage, the same question in three languages). The grouped
+  headline rests on far more questions; neither ranks two close models reliably.
+- **Core v1 measures judging, not doing.** A model picks or rates answers about material it is
+  given: spotting an unsupported claim is not the same as not making one, and judging an agent's
+  step is not taking it. Labels are balanced by design, which real traffic is not.
+- **Some coverage is narrow.** Languages are English, Hindi and Chinese; the bias set covers race
+  and ethnicity only; Banking77 comes from a pinned copy that the Hub marks deprecated. Core v1
+  does not show a model's overall ability or its reliability in deployment.
 
 ## Development
 

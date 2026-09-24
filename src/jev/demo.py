@@ -163,9 +163,12 @@ DATASETS = {
         "facebook/xnli", "hi", "test", {"premise": "premise", "hypothesis": "hypothesis"},
         "How does the hypothesis relate to the premise?", "label", None,
     ),
-    "LegalBench hearsay": (
+    "LegalBench hearsay": (  # the task's own test, which leaves exclusions and exceptions aside
         "nguha/legalbench", "hearsay", "test", {"evidence": "text"},
-        "Is this evidence hearsay?", "answer", "Yes",
+        "Is this evidence hearsay under this simple test only: a statement (spoken, written, or conduct "
+        "meant to assert something) made out of court and offered to prove that what it asserts is "
+        "true? Ignore the legal exclusions and exceptions, such as a party's own statements.",
+        "answer", "Yes",
     ),
     "LegalBench definitions": (
         "nguha/legalbench", "definition_classification", "test", {"sentence": "text"},
