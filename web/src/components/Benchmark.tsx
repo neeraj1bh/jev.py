@@ -202,12 +202,14 @@ export function Benchmark(props: BenchmarkProps) {
                 name: preset.name,
                 count: pickable(preset).length,
                 on: presetOn(preset),
+                // Lists add to the picks and remove only their own, so several can be on at once.
                 onToggle: () => {
+                  const models = pickable(preset);
                   if (presetOn(preset)) {
-                    setPicked([]);
+                    setPicked(picked.filter((id) => !models.includes(id)));
                     return;
                   }
-                  setPicked(pickable(preset));
+                  setPicked([...picked, ...models.filter((id) => !picked.includes(id))]);
                   setDataset(preset.dataset);
                 },
               }))}

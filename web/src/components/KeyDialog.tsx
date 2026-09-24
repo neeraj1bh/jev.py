@@ -1,18 +1,30 @@
 import { Key, X } from "@phosphor-icons/react";
 
-import type { Backend } from "../types";
 import { Icon } from "./Icon";
 import { KeyForm } from "./KeyForm";
 import { DialogFrame, Modal, RoundButton } from "./Modal";
 
 interface KeyDialogProps {
-  backend: Backend;
+  /** The backend id or setting name the key is saved for. */
+  target: string;
+  label: string;
+  hint: string;
+  subtitle: string;
+  secret?: boolean;
   onCancel: () => void;
-  onSaved: (backendId: string) => void;
+  onSaved: () => void;
 }
 
-/** Asks for a hosted backend's key when a model that needs it is picked. */
-export function KeyDialog({ backend, onCancel, onSaved }: KeyDialogProps) {
+/** Asks for one key: when a model that needs it is picked, or from the list of keys. */
+export function KeyDialog({
+  target,
+  label,
+  hint,
+  subtitle,
+  secret,
+  onCancel,
+  onSaved,
+}: KeyDialogProps) {
   return (
     <Modal
       open
@@ -21,8 +33,8 @@ export function KeyDialog({ backend, onCancel, onSaved }: KeyDialogProps) {
     >
       <DialogFrame
         icon={Key}
-        title={`${backend.label} API key`}
-        subtitle="Needed for this model; checked with one small request first"
+        title={label}
+        subtitle={subtitle}
         actions={
           <RoundButton label="Close" onClick={onCancel}>
             <Icon icon={X} size={14} />
@@ -31,11 +43,12 @@ export function KeyDialog({ backend, onCancel, onSaved }: KeyDialogProps) {
         bodyClassName="px-4 py-3.5"
       >
         <KeyForm
-          target={backend.id}
-          label={`${backend.label} API key`}
-          hint={backend.key ?? "API key"}
+          target={target}
+          label={label}
+          hint={hint}
+          secret={secret}
           onCancel={onCancel}
-          onSaved={() => onSaved(backend.id)}
+          onSaved={onSaved}
         />
       </DialogFrame>
     </Modal>

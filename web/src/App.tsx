@@ -1317,7 +1317,14 @@ export default function App() {
         }}
       />
       {keyBackend && (
-        <KeyDialog backend={keyBackend} onCancel={() => setKeyRequest(null)} onSaved={onKeySaved} />
+        <KeyDialog
+          target={keyBackend.id}
+          label={`${keyBackend.label} API key`}
+          hint={keyBackend.key ?? "API key"}
+          subtitle="Needed for this model; checked with one small request first"
+          onCancel={() => setKeyRequest(null)}
+          onSaved={() => onKeySaved(keyBackend.id)}
+        />
       )}
       <Toast message={toast.message} onClose={toast.hide} />
     </div>

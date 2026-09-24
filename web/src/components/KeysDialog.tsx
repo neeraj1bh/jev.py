@@ -15,9 +15,8 @@ import { useEffect, useState } from "react";
 import { clearKey, fetchKeys } from "../api";
 import { chipButton, cn } from "../styles";
 import type { KeyInfo } from "../types";
-import { Reveal } from "./CompareTable";
 import { Icon, IconTile } from "./Icon";
-import { KeyForm } from "./KeyForm";
+import { KeyDialog } from "./KeyDialog";
 import { DialogFrame, Modal, RoundButton } from "./Modal";
 import { Skeleton } from "./Skeleton";
 
@@ -40,15 +39,13 @@ const quiet =
 
 interface KeyRowProps {
   info: KeyInfo;
-  editing: boolean;
   armed: boolean;
   onEdit: () => void;
   onArm: (armed: boolean) => void;
   onRemove: () => void;
-  onSaved: () => void;
 }
 
-function KeyRow({ info, editing, armed, onEdit, onArm, onRemove, onSaved }: KeyRowProps) {
+function KeyRow({ info, armed, onEdit, onArm, onRemove }: KeyRowProps) {
   return (
     <li className="group border-0 border-b border-dashed border-rule last:border-b-0">
       <div className="flex items-center gap-3 px-1 py-2.5" title={info.unlocks}>
@@ -65,7 +62,7 @@ function KeyRow({ info, editing, armed, onEdit, onArm, onRemove, onSaved }: KeyR
           </span>
           <span className="block truncate font-mono text-[11px] text-dim">{info.var}</span>
         </span>
-        {editing ? null : info.set ? (
+        {info.set ? (
           <span
             className={cn(
               "flex items-center gap-0.5 transition-opacity",
@@ -109,20 +106,6 @@ function KeyRow({ info, editing, armed, onEdit, onArm, onRemove, onSaved }: KeyR
           </span>
         )}
       </div>
-      <Reveal open={editing}>
-        {/* Kept mounted so it closes smoothly; the key resets it, dropping a cancelled value. */}
-        <div className="pb-3.5 pl-11 max-[600px]:pl-1">
-          <KeyForm
-            key={editing ? "open" : "closed"}
-            target={info.backend ?? info.var}
-            label={info.label}
-            hint={HINTS[info.var] ?? `Paste your ${info.label} key`}
-            secret={!(info.var in HINTS)}
-            onCancel={onEdit}
-            onSaved={onSaved}
-          />
-        </div>
-      </Reveal>
     </li>
   );
 }
@@ -152,21 +135,17 @@ export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
     <KeyRow
       key={info.var}
       info={info}
-      editing={editing === info.var}
       armed={armed === info.var}
-      onEdit={() => setEditing(editing === info.var ? "" : info.var)}
+      onEdit={() => setEditing(info.var)}
       onArm={(on) => setArmed(on ? info.var : "")}
       onRemove={async () => {
         await clearKey(info.backend ?? info.var);
         setArmed("");
         refresh();
       }}
-      onSaved={() => {
-        setEditing("");
-        refresh();
-      }}
     />
   );
+  const editingKey = keys?.find((info) => info.var === editing);
   const set = keys?.filter((info) => info.set) ?? [];
   const unset = keys?.filter((info) => !info.set) ?? [];
   const heading = "mt-1 mb-0.5 px-1 text-[10.5px] font-medium tracking-[0.08em] text-dim uppercase";
@@ -221,6 +200,20 @@ export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
           </>
         )}
       </DialogFrame>
+      {editingKey && (
+        <KeyDialog
+          target={editingKey.backend ?? editingKey.var}
+          label={editingKey.label}
+          hint={HINTS[editingKey.var] ?? `Paste your ${editingKey.label} key`}
+          subtitle={editingKey.unlocks}
+          secret={!(editingKey.var in HINTS)}
+          onCancel={() => setEditing("")}
+          onSaved={() => {
+            setEditing("");
+            refresh();
+          }}
+        />
+      )}
     </Modal>
   );
 }
