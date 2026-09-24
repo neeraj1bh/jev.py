@@ -747,12 +747,16 @@ def text_answers(text, questions):
     return out
 
 
-def log_row(body, backend, answers, ms):
-    """One answer of a run, appended to its session's file."""
+def log_row(body, backend, answers, ms, response=None):
+    """One answer of a run, appended to its session's file, with the rest of the reply (usage,
+    invalid answers, an error) when there is one."""
     name = "".join(c if c.isalnum() or c in "._-" else "-" for c in body["log"])[:120]
     os.makedirs(LOGS, exist_ok=True)
-    row = {k: body.get(k) for k in ("dataset", "source", "state", "questions", "truth", "mode", "sides")}
+    keys = ("dataset", "set", "source", "state", "questions", "truth", "mode", "sides", "system")
+    row = {k: body.get(k) for k in keys}
     row |= {"backend": backend, "answers": answers, "ms": ms}
+    if response:
+        row["response"] = {k: v for k, v in response.items() if k != "answers"}
     with LOCK, open(os.path.join(LOGS, name + ".jsonl"), "a") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
@@ -761,7 +765,10 @@ def answer(a):
     """The answer a probability reply amounts to, in the label set's words."""
     if a["type"] == "noul":
         return "yes" if a["noul"] >= 0.5 else "no"
-    return a["choice"] if a["type"] == "choice" else str(round(a["score"]))
+    if a["type"] == "choice":
+        return a["choice"]
+    p = a.get("probabilities")  # a score's answer is its most probable level, not the rounded mean
+    return max(p, key=p.get) if p else str(round(a["score"]))
 
 
 def right(a, truth):
@@ -865,6 +872,45 @@ def llamacpp_url():
 
 OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"
 GATEWAY = {"at": 0.0, "models": []}  # OpenRouter's catalog, refetched every few hours
+VERCEL_MODELS = "https://ai-gateway.vercel.sh/v1/models"
+OPENROUTER_ENDPOINTS = "https://openrouter.ai/api/v1/models/{}/endpoints"
+# Where each direct API's own price is published: Vercel's gateway lists Jev; OpenRouter lists what
+# each provider charges for a model, and the provider's own entry is its API price.
+PRICED_AS = {
+    "typesafe": (VERCEL_MODELS, "typesafe-ai/jev"),
+    "vercel": (VERCEL_MODELS, "typesafe-ai/jev"),
+    "deepseek": (OPENROUTER_ENDPOINTS.format("deepseek/deepseek-v4.1-flash"), "DeepSeek"),
+    "moonshot": (OPENROUTER_ENDPOINTS.format("moonshotai/kimi-k2.6"), "Moonshot AI"),
+    "openai": (OPENROUTER_ENDPOINTS.format("openai/gpt-4o-mini"), "OpenAI"),
+    "openrouter": (OPENROUTER_ENDPOINTS.format("openai/gpt-4o-mini"), "OpenAI"),
+}
+PRICES = {"at": 0.0, "prices": {}}  # backend -> ($ per 1M input, $ per 1M output)
+
+
+def live_prices():
+    """Each direct API's own price, read at most every few hours with no key; a price that cannot
+    be read is left out, so the page shows no estimate rather than a wrong one."""
+    if time.time() - PRICES["at"] > 6 * 3600:
+        pages, prices = {}, {}
+        for backend, (url, name) in PRICED_AS.items():
+            if url not in pages:
+                try:
+                    with urllib.request.urlopen(url, timeout=10) as r:
+                        pages[url] = json.load(r)["data"]
+                except (OSError, ValueError, KeyError):
+                    pages[url] = None
+            data = pages[url]
+            if url == VERCEL_MODELS:
+                entry = next((m["pricing"] for m in data or [] if m["id"] == name), None)
+                keys = ("input", "output")
+            else:
+                entries = data["endpoints"] if data else []
+                entry = next((e["pricing"] for e in entries if e["provider_name"] == name), None)
+                keys = ("prompt", "completion")
+            if entry:
+                prices[backend] = tuple(round(float(entry.get(k) or 0) * 1e6, 3) for k in keys)
+        PRICES.update(at=time.time(), prices=prices)
+    return PRICES["prices"]
 
 
 GATEWAY_CHECKED = os.path.join(DATA, "gateway-checked.json")  # model -> did it return probabilities
@@ -1090,9 +1136,11 @@ def backends(extra):
                 "max": 26,
             }
         )
+    prices = live_prices()
     for b, label in HOSTED.items():
         var = BACKENDS[b][0]
         ready, most = bool(env(var)), 26 if b in LETTER else None
+        price = prices.get(b)
         out.append(
             {
                 "id": "remote:" + b,
@@ -1103,6 +1151,7 @@ def backends(extra):
                 "max": most,
                 "model": BACKENDS[b][2],  # the one model this direct API is pinned to
             }
+            | ({"price": price[0], "price_out": price[1]} if price else {})
         )
     return out
 
@@ -1622,7 +1671,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 res = jev.ask(body["state"], body["questions"])
                 res["latency_ms"] = round((time.time() - t) * 1000)
                 if body.get("log"):  # every run is kept, with its input and label
-                    log_row(body, body.get("backend") or model_id, res["answers"], res["latency_ms"])
+                    log_row(body, body.get("backend") or model_id, res["answers"], res["latency_ms"], res)
                 self._send(200, json.dumps(res).encode())
             except Exception as e:
                 bid = body.get("backend") or model_id
@@ -1649,6 +1698,10 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 elif isinstance(e, urllib.error.URLError):
                     LOADED.pop(bid, None)
                     msg = f"Could not reach {bid.split(':', 1)[-1]}: {e.reason}"
+                if self.path.endswith("/systemone") and body.get(
+                    "log"
+                ):  # a failed item still counts, as wrong
+                    log_row(body, bid, {}, 0, {"answers": {}, "error": msg})
                 self._send(400, json.dumps({"error": {"message": msg}}).encode())
 
         def log_message(self, fmt, *a):

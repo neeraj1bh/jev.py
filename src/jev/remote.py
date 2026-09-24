@@ -47,6 +47,7 @@ BACKENDS = {
     "llamacpp": ("", "http://localhost:8081/v1/chat/completions", "local"),
 }
 LETTER_SYSTEM = "You are a calibrated decision engine. Reply with one letter."
+TOP_LOGPROBS = 20  # alternatives asked for with the answer token
 PROMPT_VERSION = "letter-1"  # bump whenever LETTER_SYSTEM or letter_prompt changes; fingerprints hash it
 # thinking must be off (else the first token is reasoning); each provider's accepted temperature
 EXTRAS = {
@@ -110,13 +111,13 @@ class Remote:
             return self._vercel(state, questions)
         with ThreadPoolExecutor(CONCURRENCY.get(self.backend, 8)) as pool:
             probs = list(pool.map(lambda q: self._one(state, q), questions.values()))
-        answers, invalid, tokens = {}, {}, 0
+        answers, invalid, usage = {}, {}, {}
         for qid, (labels, descs), (p, coverage, top, used) in zip(
             questions, map(_options, questions.values()), probs, strict=True
         ):
-            tokens += used
+            usage[qid] = used
             if p is None:  # no option letter among the top tokens: no answer, scored as wrong
-                invalid[qid] = coverage
+                invalid[qid] = coverage | {"raw": top}
                 continue
             q = questions[qid]
             read = {"coverage": coverage, "raw": top}
@@ -141,7 +142,11 @@ class Remote:
             "model": self.model_id,
             "answers": answers,
             "invalid": invalid,
-            "usage": {"input_tokens": tokens, "output_tokens": 0},
+            "usage": {
+                "input_tokens": total(usage.values(), "prompt_tokens"),
+                "output_tokens": total(usage.values(), "completion_tokens"),
+                "per_question": usage,  # as each provider reported it, cached tokens included
+            },
         }
 
     def _vercel(self, state, questions):
@@ -174,7 +179,7 @@ class Remote:
                 ],
                 "max_tokens": 1,
                 "logprobs": True,
-                "top_logprobs": 20,
+                "top_logprobs": TOP_LOGPROBS,
                 **EXTRAS.get(self.backend, {"temperature": 0}),
             },
             patient=self.patient,
@@ -185,7 +190,14 @@ class Remote:
         top = content[0]["top_logprobs"]
         probs, coverage = letter_probs(top, len(labels))
         raw = [[t["token"], t["logprob"]] for t in top]
-        return probs, coverage, raw, res.get("usage", {}).get("prompt_tokens", 0)
+        return probs, coverage, raw, res.get("usage")
+
+
+def total(usages, field):
+    """One usage field summed over the questions, or None when a provider left it out: unknown,
+    not zero."""
+    values = [(u or {}).get(field) for u in usages]
+    return None if None in values else sum(values)
 
 
 def letter_probs(top, n):

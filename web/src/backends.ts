@@ -101,13 +101,14 @@ const PROVIDER_NAMES: Record<string, string> = {
 
 export const providerName = (slug = "") => PROVIDER_NAMES[slug] ?? slug;
 
-// Measured 2026-09-22 by rendering every letter-readout prompt of the frozen set with the Qwen
-// tokenizer: 4,055 requests, 2.25M input tokens, one output token each. TypeSafe's cases are 1.75M
-// of it, since each question resends its document; the other questions average 135 tokens.
-const RUN_QUESTIONS = 4_055;
-const RUN_INPUT_TOKENS = 2_250_000;
+// Measured 2026-09-24 by rendering every letter-readout prompt of Core v1 with the Qwen tokenizer
+// (benchmarks/core-v1-tokens.json): 2,611 requests, 2,303,109 input tokens, one output token each.
+// TypeSafe's cases are 1.75M of it, since each question resends its document; the other questions
+// average 245 tokens. Other tokenizers will differ; a provider's own usage is the real count.
+const RUN_QUESTIONS = 2_611;
+const RUN_INPUT_TOKENS = 2_303_109;
 // For a set with no measurement: the average one-question item of the frozen set above.
-const ITEM_INPUT_TOKENS = 135;
+const ITEM_INPUT_TOKENS = 245;
 
 const dollars = (backend: Backend, input: number, output: number) => {
   if (backend.free || backend.price === 0) return 0;

@@ -162,25 +162,25 @@ class Jev:
         answers = {}
         for qid, (labels, descs), (a, b) in zip(ids, parsed, spans, strict=True):
             p = torch.softmax(torch.tensor(scores[a:b]), -1).tolist()
-            p = [round(x, 4) for x in p]
+            raw = {"raw": scores[a:b]}  # each option's own log-probability, before normalising
             q = questions[qid]
             if q["type"] == "noul":
-                answers[qid] = {"type": "noul", "noul": p[0]}
+                answers[qid] = {"type": "noul", "noul": p[0]} | raw
             elif q["type"] == "choice":
                 answers[qid] = {
                     "type": "choice",
                     "choice": labels[p.index(max(p))],
                     "probabilities": dict(zip(labels, p, strict=True)),
                     "confidence": _confidence(p),
-                }
+                } | raw
             else:
                 answers[qid] = {
                     "type": "score",
-                    "score": round(sum(i * x for i, x in enumerate(p)), 4),
+                    "score": sum(i * x for i, x in enumerate(p)),
                     "probabilities": dict(zip(labels, p, strict=True)),
                     "legend": dict(zip(labels, descs, strict=True)),
                     "confidence": _confidence(p),
-                }
+                } | raw
         return {
             "model": self.model_id,
             "answers": answers,

@@ -14,6 +14,7 @@ answer them, and keeping them apart keeps the main comparison paired across ever
     uv run --no-sync jev-bench run Qwen/Qwen2.5-1.5B-Instruct  # local models answer every item
     uv run --no-sync jev-bench export                        # every item as text, for reviewers
     uv run --no-sync jev-bench tokens                        # input tokens per item, for cost estimates
+    uv run --no-sync jev-bench score <run.jsonl> ...         # Core v1 scores of saved runs, by track
     uv run --no-sync jev-bench check                         # offline self-checks of the readout
 
 Each run is saved like a demo batch, so Past runs lists it and can compare runs side by side.
@@ -30,7 +31,7 @@ import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
-from jev import demo
+from jev import demo, remote
 from jev.core import ROOT
 from jev.remote import PROMPT_VERSION
 
@@ -563,6 +564,25 @@ def reads_wide(model):
     return kind != "remote" or name.split(":")[0] not in demo.LETTER
 
 
+def system(model, backend):
+    """What answers a run, stored with each of its rows so results say which system produced them."""
+    about = {"id": model, "model": backend.model_id, "device": getattr(backend, "device", None)}
+    if isinstance(backend, remote.Remote) and backend.backend in ("typesafe", "vercel"):
+        return about | {"readout": "the provider's own typed API"}  # no letter prompt is sent
+    if isinstance(backend, remote.Remote):
+        request = remote.EXTRAS.get(backend.backend, {"temperature": 0})
+        return about | {
+            "readout": "letter",
+            "prompt_version": remote.PROMPT_VERSION,
+            "request": request | {"max_tokens": 1, "top_logprobs": remote.TOP_LOGPROBS},
+        }
+    model_dtype = getattr(getattr(backend, "model", None), "dtype", None)
+    return about | {
+        "readout": getattr(backend, "readout", None),
+        "dtype": str(model_dtype) if model_dtype else None,
+    }
+
+
 def run(model):
     items = load("main") + (load("wide") if reads_wide(model) else [])
     backend = demo.get(model)
@@ -570,20 +590,23 @@ def run(model):
     log = f"{stamp}-{NAME}-{model.split(':')[-1].split('/')[-1]}"
     dataset = DATASET
 
+    about = system(model, backend)
+
     def ask(item):
         started = time.time()
         try:
-            answers = backend.ask(item["state"], item["questions"])["answers"]
-        except Exception as e:
+            response = backend.ask(item["state"], item["questions"])
+        except Exception as e:  # still logged: a failed item counts as wrong
             print(f"  {item['source']}: {e}")
-            answers = {}
+            response = {"answers": {}, "error": str(e)}
         ms = round((time.time() - started) * 1000)
         demo.log_row(
-            {"log": log, "dataset": dataset, "sides": [model]}
-            | {k: item[k] for k in ("source", "state", "questions", "truth")},
+            {"log": log, "dataset": dataset, "sides": [model], "system": about}
+            | {k: item[k] for k in ("set", "source", "state", "questions", "truth")},
             model,
-            answers,
+            response["answers"],
             ms,
+            response,
         )
 
     workers = HOSTED_WORKERS if model.startswith(("remote:", "openrouter:")) else 1
@@ -614,7 +637,8 @@ def export():
 
 def tokens():
     """Input tokens per item as a letter-reading API receives them: one request per question, each
-    with the whole state. Measured with a Qwen tokenizer; other tokenizers differ by some percent."""
+    with the whole state. The wide sets, which only Jev and local models answer, are measured as the
+    request Jev receives: the state and questions as JSON. A Qwen tokenizer; others will differ."""
     from transformers import AutoTokenizer
 
     from jev.remote import LETTER_SYSTEM, letter_prompt
@@ -639,6 +663,12 @@ def tokens():
         "tokens": round(sum(total for total, _, _ in per_set.values()) / items),
         "questions": round(sum(q for _, q, _ in per_set.values()) / items, 2),
     }
+    wide = {}
+    for item in load("wide"):
+        body = json.dumps({"state": item["state"], "questions": item["questions"]}, ensure_ascii=False)
+        wide.setdefault(item["set"], []).append(len(tok(body)["input_ids"]))
+    for name, sizes in wide.items():
+        sets[name] = {"tokens": round(sum(sizes) / len(sizes)), "questions": 1.0, "as": "request body"}
     with open(TOKENS_PATH, "w") as f:
         json.dump(
             {"measured": time.strftime("%Y-%m-%d"), "tokenizer": TOKENIZER, "per_item": sets}, f, indent=1
@@ -665,6 +695,9 @@ def check():
     probs, cov = letter_probs(top(A=0.2, B=0.3, _=0.4), 2)
     assert cov["status"] == "complete" and abs(probs[0] - 0.4) < 1e-12 and abs(cov["observed"] - 0.5) < 1e-12
     assert abs(sum(probs) - 1) < 1e-12
+    reported = [{"prompt_tokens": 11, "completion_tokens": 1, "prompt_tokens_details": {"cached_tokens": 5}}]
+    assert remote.total(reported * 2, "prompt_tokens") == 22
+    assert remote.total([*reported, {"prompt_tokens": 9}], "completion_tokens") is None, "unknown, not 0"
     assert json.loads(json.dumps(0.123456789)) == 0.123456789
     item = {
         "state": {"text": "hi"},
@@ -690,7 +723,48 @@ def check():
         raise AssertionError("RAGTruth must stop when its pairs cannot be length-matched")
     except ValueError:
         pass
-    print("OK  letter readout, fingerprint and RAGTruth pairing checks")
+    check_scoring()
+    print("OK  letter readout, fingerprint, RAGTruth pairing and scoring checks")
+
+
+def check_scoring():
+    """The scorer's weighting, probability eligibility and failures, on made-up counts."""
+    from jev import score
+
+    sets = {
+        "A": {"track": "headline", "group": "one"},
+        "B": {"track": "headline", "group": "one"},
+        "C": {"track": "headline", "group": "two"},
+        "RewardBench": {"track": "headline", "group": "three"},
+        "D": {"track": "auxiliary", "group": "two"},
+    }
+    counts = {
+        ("A", None): [1, 1],
+        ("B", None): [0, 1],
+        ("C", None): [1, 2],
+        ("D", None): [5, 5],  # auxiliary: never in the headline
+        ("RewardBench", "Chat"): [1, 1],
+        ("RewardBench", "Safety"): [1, 3],  # families averaged: 2/3, not the pooled 1/2
+    }
+    overall, groups = score.headline(counts, sets)
+    assert groups == {"one": 0.5, "two": 0.5, "three": 2 / 3} and abs(overall - 5 / 9) < 1e-12
+    partial = {"type": "choice", "choice": "x", "probabilities": {"x": 1.0, "y": 0.0}}
+    assert score.distribution(partial | {"coverage": {"status": "partial"}}, ["x", "y"]) is None
+    assert score.distribution(partial, ["x", "y"]) == [1.0, 0.0]
+    assert score.distribution({"type": "noul", "noul": 0.25}, ["yes", "no"]) == [0.25, 0.75]
+    assert score.distribution(None, ["yes", "no"]) is None
+    row = {
+        "set": "A",
+        "source": "a · test row 7",
+        "state": {"text": "hi"},
+        "questions": {"q": {"type": "noul", "instructions": "?"}},
+        "truth": {"q": "yes"},
+        "answers": {},  # no answer: wrong, and no probabilities
+    }
+    (missing,) = score.outcomes(row, {}, {})
+    assert not missing["right"] and missing["p"] is None
+    probs = score.probability_scores([missing | {"p": [0.0, 1.0], "y": 0}, missing])
+    assert probs["complete"] == 1 and probs["clipped"] == 1 and probs["brier"] == 2
 
 
 def cli():
@@ -699,6 +773,10 @@ def cli():
         freeze()
     elif args[:1] == ["export"]:
         export()
+    elif args[:1] == ["score"] and len(args) > 1:
+        from jev.score import score
+
+        score(args[1:])
     elif args[:1] == ["check"]:
         check()
     elif args[:1] == ["tokens"]:

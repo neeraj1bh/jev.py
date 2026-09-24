@@ -1,5 +1,9 @@
 import type { Answer, Question, Response, Row } from "./types";
 
+// A score's answer is its most probable level, not the rounded expected level.
+const likeliestLevel = (probabilities: Record<string, number>) =>
+  Object.entries(probabilities).reduce((best, next) => (next[1] > best[1] ? next : best))[0];
+
 export const answerLabel = (answer: Answer) =>
   answer.type === "noul"
     ? answer.noul >= 0.5
@@ -7,7 +11,9 @@ export const answerLabel = (answer: Answer) =>
       : "no"
     : answer.type === "choice"
       ? answer.choice
-      : String(Math.round(answer.score));
+      : answer.probabilities && Object.keys(answer.probabilities).length
+        ? likeliestLevel(answer.probabilities)
+        : String(Math.round(answer.score));
 
 const asText = (value: unknown) =>
   typeof value === "string"

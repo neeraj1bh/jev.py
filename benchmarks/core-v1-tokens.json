@@ -189,6 +189,21 @@
   "Core v1": {
    "tokens": 1000,
    "questions": 1.13
+  },
+  "Banking77": {
+   "tokens": 664,
+   "questions": 1.0,
+   "as": "request body"
+  },
+  "CLINC150": {
+   "tokens": 996,
+   "questions": 1.0,
+   "as": "request body"
+  },
+  "LEDGAR": {
+   "tokens": 824,
+   "questions": 1.0,
+   "as": "request body"
   }
  }
 }
