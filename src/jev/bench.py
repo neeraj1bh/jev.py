@@ -10,12 +10,14 @@ answer them, and keeping them apart keeps the main comparison paired across ever
     uv run --no-sync jev-bench run Qwen/Qwen2.5-1.5B-Instruct  # local models answer every item
     uv run --no-sync jev-bench export                        # every item as text, for reviewers
     uv run --no-sync jev-bench tokens                        # input tokens per item, for cost estimates
+    uv run --no-sync jev-bench check                         # offline self-checks of the readout
 
 Each run is saved like a demo batch, so Past runs lists it and can compare runs side by side.
 """
 
 import hashlib
 import json
+import math
 import os
 import random
 import sys
@@ -244,12 +246,31 @@ def tokens():
     print(f"{os.path.relpath(TOKENS_PATH, ROOT)}: {DATASET} averages {average} tokens an item")
 
 
+def check():
+    """Offline asserts on the hosted letter readout; no network."""
+    from jev.remote import letter_probs
+
+    def top(**p):
+        return [{"token": t.replace("_", " "), "logprob": math.log(x)} for t, x in p.items()]
+
+    probs, cov = letter_probs(top(A=0.2, _A=0.2, B=0.3), 2)
+    assert cov["status"] == "complete" and abs(probs[0] - 4 / 7) < 1e-12 and abs(probs[1] - 3 / 7) < 1e-12
+    probs, cov = letter_probs(top(A=0.8, hello=0.1), 2)
+    assert cov["status"] == "partial" and cov["missing"] == ["B"] and probs == [1.0, 0.0]
+    probs, cov = letter_probs(top(hello=0.5, the=0.3), 2)
+    assert cov["status"] == "none" and probs is None
+    assert json.loads(json.dumps(0.123456789)) == 0.123456789
+    print("OK  letter readout checks")
+
+
 def cli():
     args = sys.argv[1:]
     if args[:1] == ["freeze"]:
         freeze()
     elif args[:1] == ["export"]:
         export()
+    elif args[:1] == ["check"]:
+        check()
     elif args[:1] == ["tokens"]:
         tokens()
     elif args[:1] == ["run"] and len(args) == 2:

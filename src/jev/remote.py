@@ -47,6 +47,7 @@ BACKENDS = {
     "llamacpp": ("", "http://localhost:8081/v1/chat/completions", "local"),
 }
 LETTER_SYSTEM = "You are a calibrated decision engine. Reply with one letter."
+PROMPT_VERSION = "letter-1"  # bump whenever LETTER_SYSTEM or letter_prompt changes; fingerprints hash it
 # thinking must be off (else the first token is reasoning); each provider's accepted temperature
 EXTRAS = {
     "deepseek": {"thinking": {"type": "disabled"}, "temperature": 1},
@@ -109,32 +110,37 @@ class Remote:
             return self._vercel(state, questions)
         with ThreadPoolExecutor(CONCURRENCY.get(self.backend, 8)) as pool:
             probs = list(pool.map(lambda q: self._one(state, q), questions.values()))
-        answers, tokens = {}, 0
-        for qid, (labels, descs), (p, used) in zip(
+        answers, invalid, tokens = {}, {}, 0
+        for qid, (labels, descs), (p, coverage, top, used) in zip(
             questions, map(_options, questions.values()), probs, strict=True
         ):
             tokens += used
+            if p is None:  # no option letter among the top tokens: no answer, scored as wrong
+                invalid[qid] = coverage
+                continue
             q = questions[qid]
+            read = {"coverage": coverage, "raw": top}
             if q["type"] == "noul":
-                answers[qid] = {"type": "noul", "noul": p[0]}
+                answers[qid] = {"type": "noul", "noul": p[0]} | read
             elif q["type"] == "choice":
                 answers[qid] = {
                     "type": "choice",
                     "choice": labels[p.index(max(p))],
                     "probabilities": dict(zip(labels, p, strict=True)),
                     "confidence": _confidence(p),
-                }
+                } | read
             else:
                 answers[qid] = {
                     "type": "score",
-                    "score": round(sum(i * x for i, x in enumerate(p)), 4),
+                    "score": sum(i * x for i, x in enumerate(p)),
                     "probabilities": dict(zip(labels, p, strict=True)),
                     "legend": dict(zip(labels, descs, strict=True)),
                     "confidence": _confidence(p),
-                }
+                } | read
         return {
             "model": self.model_id,
             "answers": answers,
+            "invalid": invalid,
             "usage": {"input_tokens": tokens, "output_tokens": 0},
         }
 
@@ -177,14 +183,24 @@ class Remote:
         if not content:  # some providers accept the parameter and send nothing back
             raise NoProbabilities(f"{self.model_id} returned no probabilities")
         top = content[0]["top_logprobs"]
-        seen = {}
-        for t in top:  # "A", " A" and "a" all mean A; keep the most likely spelling
-            key = t["token"].strip().upper()
-            seen[key] = max(seen.get(key, -1e9), t["logprob"])
-        lp = [seen.get(letter, -30.0) for letter in LETTERS[: len(labels)]]
-        z = max(lp)
-        w = [math.exp(x - z) for x in lp]
-        return [round(x / sum(w), 4) for x in w], res.get("usage", {}).get("prompt_tokens", 0)
+        probs, coverage = letter_probs(top, len(labels))
+        raw = [[t["token"], t["logprob"]] for t in top]
+        return probs, coverage, raw, res.get("usage", {}).get("prompt_tokens", 0)
+
+
+def letter_probs(top, n):
+    """Option probabilities from one token's top log-probabilities: each letter's spellings
+    ("A", " A", "a") added together. Returns (probs or None, coverage)."""
+    mass = {}
+    for t in top:
+        key = t["token"].strip().upper()
+        if key in LETTERS[:n]:
+            mass[key] = mass.get(key, 0.0) + math.exp(t["logprob"])
+    observed = sum(mass.values())
+    missing = [letter for letter in LETTERS[:n] if letter not in mass]
+    status = "none" if not mass else "partial" if missing else "complete"
+    probs = None if status == "none" else [mass.get(letter, 0.0) / observed for letter in LETTERS[:n]]
+    return probs, {"status": status, "observed": observed, "missing": missing}
 
 
 def letter_prompt(state, q):
