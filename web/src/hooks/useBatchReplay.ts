@@ -15,7 +15,9 @@ const UPDATE_MS = 50;
 function finishTimes(rows: Row[], workers: number) {
   const slowest = (row: Row) => Math.max(0, ...row.sides.map((side) => side.ms));
   if (rows.length && rows.every((row) => row.at)) {
-    const start = Math.min(...rows.map((row) => (row.at ?? 0) - slowest(row)));
+    // the run began when its first item started; a row saved with only its end time is taken to
+    // have started when its slowest answer did
+    const start = Math.min(...rows.map((row) => row.start ?? (row.at ?? 0) - slowest(row)));
     return rows.map((row, index) => ({ index, end: (row.at ?? 0) - start }));
   }
   const free = Array.from({ length: Math.max(1, workers) }, () => 0);

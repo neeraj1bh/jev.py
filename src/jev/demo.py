@@ -853,6 +853,9 @@ def run_rows(name):
             )
             it["sides"][x["backend"]] = {"ms": x["ms"], "res": {"answers": x["answers"]}}
             if "at" in x:  # older runs did not record it
+                # the item started when its first model started (local models answer one after
+                # another), and ended with its last answer
+                it["start"] = min(it.get("start", x["at"]), x["at"] - x["ms"])
                 it["at"] = max(it.get("at", 0), x["at"])
     return list(items.values())
 

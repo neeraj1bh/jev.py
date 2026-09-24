@@ -79,7 +79,7 @@ interface BatchOptions {
   takeFreshDeck: () => boolean;
   shouldStop: () => boolean;
   onProgress: (progress: { done: number; inFlight: number; left: number | null }) => void;
-  onRow: (item: Item, sides: Side[]) => void;
+  onRow: (item: Item, sides: Side[], startedAt: number) => void;
   onError: (message: string) => void;
 }
 
@@ -108,6 +108,7 @@ export async function runBatchLoop(options: BatchOptions) {
       left = item.left ?? null;
       inFlight++;
       options.onProgress({ done, inFlight, left });
+      const itemStartedAt = Date.now();
       const sides = await runEach(models, options.isLocal, async (backend) => {
         const startedAt = now();
         const response: Response = await readout({ ...item, ...options.requestFields, backend });
@@ -115,7 +116,7 @@ export async function runBatchLoop(options: BatchOptions) {
       });
       const error = sides.find((side) => side.response.error)?.response.error;
       if (error) options.onError(error.message);
-      options.onRow(item, sides);
+      options.onRow(item, sides, itemStartedAt);
       done++;
       inFlight--;
       options.onProgress({ done, inFlight, left });

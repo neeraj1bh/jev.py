@@ -783,8 +783,11 @@ export default function App() {
         );
         if (left !== null) setRemaining(left + inFlight);
       },
-      onRow: (next, sides) => {
-        replaceRows([...rowsRef.current, { item: next, sides, isNew: true, at: Date.now() }]);
+      onRow: (next, sides, startedAt) => {
+        replaceRows([
+          ...rowsRef.current,
+          { item: next, sides, isNew: true, start: startedAt, at: Date.now() },
+        ]);
         showRequest(next);
         // The panels show the latest finished item, as a single run would.
         setPanels(

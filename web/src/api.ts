@@ -38,11 +38,13 @@ export async function fetchRun(name: string) {
   interface Saved {
     it: Item;
     sides: Record<string, { ms: number; res: Response }>;
+    start?: number;
     at?: number;
   }
   const rows = await getJson<Saved[]>(`/v1/run?name=${encodeURIComponent(name)}`);
   return rows.map((row) => ({
     item: row.it,
+    start: row.start,
     at: row.at,
     sides: Object.fromEntries(
       Object.entries(row.sides).map(([backend, side]) => [

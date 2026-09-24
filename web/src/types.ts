@@ -108,7 +108,9 @@ export interface Side {
 export interface Row {
   item: Item;
   sides: Side[];
-  /** When its last answer came back (ms since the epoch); absent in runs saved before it was recorded. */
+  /** When it started and when its last answer came back (ms since the epoch); absent in runs saved
+   * before they were recorded. */
+  start?: number;
   at?: number;
   isNew?: boolean;
 }
