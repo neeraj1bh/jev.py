@@ -9,7 +9,7 @@ interface DownloadBarProps {
   onStop: (key: string) => void;
 }
 
-/** Models and sets coming down: what, how far, and Stop for a model, pinned where it cannot be
+/** Models and sets coming down: what, how far, and Stop (each resumes later), pinned where it cannot be
  * missed. */
 export function DownloadBar({ progress, label, onStop }: DownloadBarProps) {
   const entries = Object.entries(progress).filter(([key]) => key !== "gateway");
@@ -41,17 +41,15 @@ export function DownloadBar({ progress, label, onStop }: DownloadBarProps) {
               </span>
               <div className="mt-2 flex items-center justify-between gap-3">
                 <p className="m-0 font-mono text-xs text-dim tabular-nums">
-                  {detail} · {model ? "resumes if stopped" : "first time only"}
+                  {detail} · resumes if stopped
                 </p>
-                {model && (
-                  <button
-                    type="button"
-                    className={cn(ghostButton, "px-2.5 py-1 text-xs")}
-                    onClick={() => onStop(key)}
-                  >
-                    Stop
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className={cn(ghostButton, "px-2.5 py-1 text-xs")}
+                  onClick={() => onStop(key)}
+                >
+                  Stop
+                </button>
               </div>
             </div>
           </div>

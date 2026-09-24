@@ -30,6 +30,7 @@ import sys
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 
 from jev import demo, remote
 from jev.core import ROOT
@@ -38,6 +39,8 @@ from jev.remote import PROMPT_VERSION
 NAME = "core-v1"
 PATH = os.path.join(ROOT, "benchmarks", f"{NAME}.json")
 TOKENS_PATH = os.path.join(ROOT, "benchmarks", f"{NAME}-tokens.json")
+ROWS_PATH = os.path.join(demo.DATA, f"{NAME}-rows.json")  # picked rows fetched from the Hub, git-ignored
+STOP = Event()  # set by the page's Stop: the download ends before its next page
 TOKENIZER = "Qwen/Qwen2.5-0.5B-Instruct"
 PER_SET = 50  # items a set gives, unless it has more topics: then one per topic
 LETTER_LIMIT = 26
@@ -118,18 +121,20 @@ PROVENANCE = {  # who wrote the text, who made the labels, and any filtering
     "Global-MMLU-Lite Chinese": "MMLU questions translated or post-edited by people; cultural "
     "sensitivity marked by annotators",
     "Global-MMLU-Lite English": "MMLU questions in English; cultural sensitivity marked by annotators",
-    "Banking77": "online banking customer messages; intents by annotators",
-    "CLINC150": "crowd-written requests to an assistant; intents from the prompts they answered",
-    "AG News topic": "news snippets; labels from the source's section (metadata)",
+    "Banking77": "banking customer-service queries; intent labels from the released Banking77 dataset",
+    "CLINC150": "crowd-written assistant requests; labels from collection tasks and curator checks, "
+    "including out-of-scope requests",
+    "AG News topic": "news titles and descriptions; topic labels inherited from the AG News corpus",
     "DBpedia-14": "Wikipedia abstracts; labels from DBpedia's ontology (metadata)",
     "MMLU": "exam questions from public sources; only those MMLU-Redux 2.0 re-checked and marked ok",
-    "MMLU-Pro": "MMLU and other exam questions; options added with model help and checked by people",
+    "MMLU-Pro": "MMLU and other academic problems; distractors added using GPT-4 and reviewed by people",
     "ARC-Challenge": "grade-school science exam questions; keys from the exams; four-option items only",
     "OpenBookQA": "crowd-written science questions; answers by their writers",
     "CommonsenseQA": "crowd-written questions; answers by their writers",
-    "GoldenSwag": "HellaSwag text and labels; filtered with model help",
+    "GoldenSwag": "HellaSwag source continuations and model-generated distractors; filtered using model "
+    "annotations and quality checks",
     "TruthfulQA": "questions and answers written by the authors",
-    "MedQA": "medical licensing exam questions; keys from the source",
+    "MedQA": "medical licensing exam and mock-test questions; answer keys from the source",
     "PubMedQA": "PubMed abstracts and their titles as questions; labels by experts",
     "GPQA Diamond": "questions written by domain experts; answers checked by other experts",
     "ToxicChat": "real user messages to a chatbot; labels by people, people-annotated rows only",
@@ -139,13 +144,16 @@ PROVENANCE = {  # who wrote the text, who made the labels, and any filtering
     "BBQ race and ethnicity": "templated contexts and questions written by the authors; answers by "
     "construction",
     "Arena votes": "real user prompts and chatbot responses; one person's recorded vote; single-turn only",
-    "RewardBench": "prompts and response pairs from several sources; the better response per source's "
-    "method, checked by the authors",
+    "RewardBench": "response pairs from several sources; rankings from source-specific human, model or "
+    "correctness criteria, with manual and metadata-based filtering",
     "HelpSteer2": "prompts and model responses; helpfulness rated by annotators; single-turn only",
-    "ContractNLI": "non-disclosure agreements; labels by experts",
+    "ContractNLI": "non-disclosure agreement text; labels by a computational linguistics researcher with "
+    "crowd-worker assistance",
     "LEDGAR": "contract provisions from SEC filings; labels from their headings (metadata)",
-    "LegalBench hearsay": "evidence written by legal experts; labels by them",
-    "LegalBench definitions": "sentences from US court opinions; labels by legal experts",
+    "LegalBench hearsay": "hand-written legal fact patterns inspired by casebooks and exercises; labels "
+    "from the task authors",
+    "LegalBench definitions": "sentences from US Supreme Court opinions; hand-coded definition labels from "
+    "the task authors",
 }
 REWARDBENCH_FAMILIES = {  # its score is the mean of these, each the mean of its items
     "Chat": ["alpacaeval-easy", "alpacaeval-length", "alpacaeval-hard", "mt-bench-easy", "mt-bench-med"],
@@ -511,37 +519,140 @@ def freeze():
     print(f"{os.path.relpath(PATH, ROOT)}: {main} main items and {len(steps)} TypeSafe steps, {wide} wide")
 
 
-def load(part="main"):
-    """The frozen items of one part, rebuilt from the Hub and checked against their fingerprints.
-    A pool on disk from the recorded revision is read first; if the Hub has moved on, every item
-    comes from the Hub and its fingerprint decides whether the set still holds."""
+def cached_rows():
+    """Picked rows fetched before, by set: {revision, features, rows}."""
+    try:
+        with open(ROWS_PATH) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def pool_revision(path):
+    """A pool file's revision, read from its last bytes (a pool ends with it) so the whole file is
+    not parsed; "" for a missing file or one written before revisions were recorded."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(max(0, os.path.getsize(path) - 200))
+            tail = f.read().decode(errors="ignore")
+    except OSError:
+        return ""
+    found = re.search(r'"revision": "([0-9a-f]+)"}\s*$', tail)
+    return found.group(1) if found else ""
+
+
+def on_disk(name, spec, cache):
+    """Whether a set's rows are already here at the recorded revision: its picked rows, or its full
+    pool. Offline and cheap, for telling the page what a first use will fetch: load reads exactly
+    these sets from disk, without asking the Hub, and fetches the others."""
+    recorded = spec["pool"]["revision"]
+    return (
+        cache.get(name, {}).get("revision") == recorded or pool_revision(demo.dataset_path(name)) == recorded
+    )
+
+
+def size(part="main"):
+    """Items in one part of Core v1; the main part includes the TypeSafe steps."""
     with open(PATH) as f:
         frozen = json.load(f)
+    items = sum(len(s["items"]) for s in frozen["sets"].values() if s["part"] == part)
+    return items + (len(frozen["typesafe"]) if part == "main" else 0)
+
+
+def pages_to_fetch(part="main"):
+    """The Hub pages Core v1 still needs on this machine, and from how many datasets."""
+    with open(PATH) as f:
+        sets = json.load(f)["sets"]
+    cache = cached_rows()
+    need = [spec for name, spec in sets.items() if spec["part"] == part and not on_disk(name, spec, cache)]
+    pages = sum(len({i["row"] // 100 for i in spec["items"]}) for spec in need)
+    return {"datasets": len({spec["hub"] for spec in need}), "pages": pages}
+
+
+def local_rows(name, spec, cache):
+    """A set's rows from this machine at the recorded revision (the rows cache, else the pool), found
+    by the same test as on_disk so the page's download notice matches what load reads."""
+    recorded = spec["pool"]["revision"]
+    entry = cache.get(name)
+    if entry and entry.get("revision") == recorded:
+        return entry
+    path = demo.dataset_path(name)
+    if pool_revision(path) != recorded:
+        return None
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except ValueError as e:
+        raise ValueError(f"{path} cannot be read ({e}); delete it to fetch {name} again") from None
+
+
+def local_items(name, spec, local, path):
+    """A set's items from its copy on this machine; every picked row must be there, unchanged."""
+    rows = {r["row_idx"]: r for r in local.get("rows", [])}
     items = []
-    for name, spec in frozen["sets"].items():
-        if spec["part"] != part:
-            continue
-        recorded, now = spec["pool"]["revision"], demo.revision(spec["hub"])
-        pages, on_disk = {}, set()
-        path = demo.dataset_path(name)
-        if now == recorded and os.path.exists(path):
-            with open(path) as fh:
-                local = json.load(fh)
-            if local.get("revision") == recorded:
-                pages[None] = local
-                on_disk = {r["row_idx"] for r in local["rows"]}
-        for pointer in spec["items"]:
-            start = None if pointer["row"] in on_disk else pointer["row"] - pointer["row"] % 100
-            if start not in pages:
-                pages[start] = demo.rows_page(spec["hub"], spec["config"], spec["split"], start)
-            page = pages[start]
-            row = next(r for r in page["rows"] if r["row_idx"] == pointer["row"])
-            item = demo.row_item(name, page, row)
-            if fingerprint(item) != pointer["sha"]:
-                raise ValueError(f"{name} row {pointer['row']} changed on the Hub since {frozen['frozen']}")
-            items.append(item | {"set": name})
-        if now != recorded:
-            print(f"{name}: the Hub revision moved since {frozen['frozen']}; every item still matches")
+    for pointer in spec["items"]:
+        row = rows.get(pointer["row"])
+        item = demo.row_item(name, local, row) if row else None
+        if not item or fingerprint(item) != pointer["sha"]:
+            raise ValueError(
+                f"{name} row {pointer['row']} is missing or changed in the copy on this machine "
+                f"({path}); delete that file to fetch the set again"
+            )
+        items.append(item | {"set": name})
+    return items
+
+
+def load(part="main"):
+    """The frozen items of one part, rebuilt and checked against their fingerprints. A set on this
+    machine at the recorded revision is read from disk without asking the Hub, as the page's
+    download notice counts it; a row missing or changed there stops the load. The other sets come
+    from the Hub, a page of 100 rows at a time shown as progress, each row checked, and are kept for
+    next time only if the Hub stayed at the recorded revision, so a kept copy is what it claims."""
+    with open(PATH) as f:
+        frozen = json.load(f)
+    cache = cached_rows()
+    STOP.clear()
+    demo.PROGRESS[DATASET] = [0, pages_to_fetch(part)["pages"], "pages"]
+    items = []
+    try:
+        for name, spec in frozen["sets"].items():
+            if spec["part"] != part:
+                continue
+            local = local_rows(name, spec, cache)
+            if local:
+                path = ROWS_PATH if local is cache.get(name) else demo.dataset_path(name)
+                items += local_items(name, spec, local, path)
+                continue
+            recorded, now = spec["pool"]["revision"], demo.revision(spec["hub"])
+            pages, rows = {}, []
+            for pointer in spec["items"]:
+                start = pointer["row"] - pointer["row"] % 100
+                if start not in pages:
+                    if STOP.is_set():
+                        raise ValueError(
+                            "download stopped; the rows so far are kept, and it resumes next time"
+                        )
+                    pages[start] = demo.rows_page(spec["hub"], spec["config"], spec["split"], start)
+                    demo.PROGRESS[DATASET][0] += 1
+                page = pages[start]
+                row = next(r for r in page["rows"] if r["row_idx"] == pointer["row"])
+                rows.append(row)
+                item = demo.row_item(name, page, row)
+                if fingerprint(item) != pointer["sha"]:
+                    raise ValueError(
+                        f"{name} row {pointer['row']} changed on the Hub since {frozen['frozen']}"
+                    )
+                items.append(item | {"set": name})
+            if now != recorded or demo.revision(spec["hub"], fresh=True) != recorded:
+                print(f"{name}: the Hub revision moved since {frozen['frozen']}; every item still matches")
+            else:  # kept after each set, so a stopped download resumes where it stopped
+                features = next(iter(pages.values()))["features"]
+                cache[name] = {"revision": recorded, "features": features, "rows": rows}
+                os.makedirs(demo.DATA, exist_ok=True)
+                with open(ROWS_PATH, "w") as f:
+                    json.dump(cache, f)
+    finally:
+        demo.PROGRESS.pop(DATASET, None)
     if part == "main":
         steps = {
             (case, node): (case, node, doc, qs, truth) for case, node, doc, qs, truth in demo.typesafe_rows()

@@ -232,7 +232,8 @@ The server answers this machine only; `JEV_HOST=0.0.0.0 uv run prod` shares it o
 
 `prod` builds the page first when it is missing or older than its source, as after a pull; without
 Node the server still starts and the page shows the build command. `dev` serves the page on port
-3000, or the next free one, and Ctrl-C stops both. Models already on this machine are listed on their own;
+3000, or the next free one, and Ctrl-C stops both; it runs on Linux, WSL and macOS (on Windows, use
+WSL or `uv run prod`). Models already on this machine are listed on their own;
 others can be added from the model menu. Downloads can be stopped and resume where they stopped.
 Details, and llama.cpp: [docs/local-models.md](docs/local-models.md).
 

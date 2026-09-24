@@ -1,7 +1,8 @@
 """uv run dev: the server and the page's dev server together, for working on either.
 
 Edits to the page reload it at once; edits to the server's Python restart the server. Ctrl-C stops
-both. This process loads no model, so it starts and stops quickly.
+both. This process loads no model, so it starts and stops quickly. It needs Linux, WSL or macOS: it
+stops its children by process group, which native Windows lacks; there, use WSL or uv run prod.
 """
 
 import contextlib
@@ -30,7 +31,8 @@ def page_tools():
     name = next((m for m in MANAGERS if shutil.which(m)), None)
     if not name:
         return None
-    install, script, run = MANAGERS[name]
+    # the full path, since Windows cannot start pnpm.cmd or npm.cmd by their bare names
+    install, script, run = ([shutil.which(c[0]), *c[1:]] for c in MANAGERS[name])
     if not os.path.isdir(os.path.join(WEB, "node_modules")):
         subprocess.run(install, cwd=WEB, check=True)
     return script, run
@@ -57,6 +59,8 @@ def stop(process):
 
 
 def main():
+    if os.name == "nt":
+        raise SystemExit("uv run dev needs Linux, WSL or macOS; on Windows use WSL, or uv run prod")
     # Ctrl-C, SIGTERM and closing the terminal (SIGHUP) all stop both children, even where the shell
     # started this with Ctrl-C ignored
     signal.signal(signal.SIGINT, signal.default_int_handler)

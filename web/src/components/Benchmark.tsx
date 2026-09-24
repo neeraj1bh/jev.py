@@ -125,7 +125,8 @@ export function Benchmark(props: BenchmarkProps) {
   const sizeNote = chosenSet?.tokens
     ? `, about ${chosenSet.tokens.toLocaleString("en-US")} input tokens each`
     : "";
-  const [items, setItems] = useState(50);
+  const [chosenItems, setItems] = useState(50);
+  const items = chosenSet?.items ?? chosenItems; // a frozen benchmark is always asked whole
   const chosen = backends.filter((backend) => picked.includes(backend.id));
   const toggleModel = (id: string) =>
     setPicked((all) => (all.includes(id) ? all.filter((other) => other !== id) : [...all, id]));
@@ -227,15 +228,23 @@ export function Benchmark(props: BenchmarkProps) {
             open={menu === "set"}
             onOpenChange={menuHandler("set")}
           />
-          <input
-            type="number"
-            min={1}
-            value={items}
-            onChange={(event) => setItems(Math.max(1, Number(event.target.value) || 1))}
-            aria-label="Items per model"
-            className={numberInput}
-          />
-          <span className={labelText}>items each</span>
+          {chosenSet?.items ? (
+            <span className={labelText}>
+              all {chosenSet.items.toLocaleString("en-US")} items, the same for every model
+            </span>
+          ) : (
+            <>
+              <input
+                type="number"
+                min={1}
+                value={items}
+                onChange={(event) => setItems(Math.max(1, Number(event.target.value) || 1))}
+                aria-label="Items per model"
+                className={numberInput}
+              />
+              <span className={labelText}>items each</span>
+            </>
+          )}
         </div>
         {makers.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2">

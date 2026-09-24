@@ -1160,6 +1160,7 @@ def backends(extra):
 
 SAMPLE_LOCK = Lock()
 LOADED, LOCK = {}, Lock()  # backend id -> Jev or Remote; at most two local models stay in memory
+SYSTEMS = {}  # backend id -> the system it answers as, also logged with the rows of its failed items
 
 
 def download_model(bid):
@@ -1541,9 +1542,19 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     for n in [*DATASETS, *MC]
                 ]
                 frozen = os.path.exists(os.path.join(ROOT, "benchmarks", "core-v1.json"))
-                sets += [
-                    {"name": n, "options": 26, "yes_no": False, "frozen": True, "local": frozen} for n in CORE
-                ]
+                if frozen:
+                    from jev import bench  # bench imports this module
+
+                    fetch = bench.pages_to_fetch()
+                    sets += [
+                        {
+                            "name": n, "options": 26, "yes_no": False, "frozen": True,
+                            "local": not fetch["pages"], "fetch": fetch, "items": bench.size(),
+                            "fetch_wide": bench.pages_to_fetch("wide"),
+                            "needs_token": bool(GATED) and not env("HF_TOKEN"),  # GPQA is in Core v1
+                        }
+                        for n in CORE
+                    ]  # fmt: skip
                 ts = os.path.isdir(os.path.join(ROOT, "results", "typesafe"))
                 sets.append({"name": "TypeSafe cases", "options": None, "local": ts})
                 group = {n: g for g, names in GROUPS.items() for n in names}
@@ -1584,6 +1595,11 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 return self._send(403, b'{"error": {"message": "requests from other sites are refused"}}')
             body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
             try:
+                if self.path.endswith("/stop") and body.get("backend") in CORE:  # Core v1's rows, not a model
+                    from jev import bench
+
+                    bench.STOP.set()
+                    return self._send(200, b"{}")
                 if self.path.endswith("/sample"):
                     with SAMPLE_LOCK:  # batches ask in parallel; one download and one deck per set
                         try:
@@ -1634,6 +1650,9 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     return self._send(200, b"{}")
                 was_running = set(llamaserver.running())
                 jev = get(bid)
+                from jev import bench  # bench imports this module
+
+                SYSTEMS[bid] = bench.system(bid, jev)
                 by_path = {m["path"]: m for m in backends([]) if m["group"] == "gguf"}
                 gone = was_running - set(llamaserver.running())
                 stopped_for_room = [by_path[p]["label"] for p in gone if p in by_path]
@@ -1672,8 +1691,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 t = time.time()
                 res = jev.ask(body["state"], body["questions"])
                 res["latency_ms"] = round((time.time() - t) * 1000)
-                if body.get("log"):  # every run is kept, with its input and label
-                    log_row(body, body.get("backend") or model_id, res["answers"], res["latency_ms"], res)
+                if body.get("log"):  # every run is kept, with its input, label and the system that answered
+                    log_row(body | {"system": SYSTEMS[bid]}, bid, res["answers"], res["latency_ms"], res)
                 self._send(200, json.dumps(res).encode())
             except Exception as e:
                 bid = body.get("backend") or model_id
@@ -1700,10 +1719,12 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 elif isinstance(e, urllib.error.URLError):
                     LOADED.pop(bid, None)
                     msg = f"Could not reach {bid.split(':', 1)[-1]}: {e.reason}"
-                if self.path.endswith("/systemone") and body.get(
-                    "log"
-                ):  # a failed item still counts, as wrong
-                    log_row(body, bid, {}, 0, {"answers": {}, "error": msg})
+                # a failed item is still logged, as the system the run's answered items name, so it counts
+                # as wrong in that run; the page starts every model before a run, so only a model this
+                # server never started is logged by its id alone
+                if self.path.endswith("/systemone") and body.get("log"):
+                    system = SYSTEMS.get(bid, {"id": bid})
+                    log_row(body | {"system": system}, bid, {}, 0, {"answers": {}, "error": msg})
                 self._send(400, json.dumps({"error": {"message": msg}}).encode())
 
         def log_message(self, fmt, *a):

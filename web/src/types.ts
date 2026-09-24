@@ -44,6 +44,12 @@ export interface Dataset {
   /** Behind a Hugging Face login, and no token is set yet. */
   needs_token?: boolean;
   local: boolean;
+  /** For a frozen benchmark: the Hub pages still to fetch on this machine, and from how many datasets. */
+  fetch?: { pages: number; datasets: number };
+  /** The same for its wide sets, loaded when every picked model reads over 26 options. */
+  fetch_wide?: { pages: number; datasets: number };
+  /** For a frozen benchmark: its size, the same for every model. */
+  items?: number;
   about?: string;
   /** The menu heading it sits under, e.g. "Knowledge and exams". */
   group?: string;
@@ -86,6 +92,8 @@ export interface Request {
 }
 
 export interface Item extends Request {
+  /** The dataset an item of a frozen benchmark came from. */
+  set?: string;
   truth: Record<string, string>;
   source: string;
   options?: number;

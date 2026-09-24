@@ -11,13 +11,14 @@ resamples whole source clusters (SQuAD articles, RAGTruth sources, one question 
 TypeSafe documents) within each set; with two or more runs, differences are paired on shared items.
 """
 
+import hashlib
 import json
 import math
 import random
 import re
 from collections import Counter, defaultdict
 
-from jev import demo
+from jev import bench, demo
 from jev.bench import PATH
 from jev.core import _options
 
@@ -33,25 +34,52 @@ ROW_FIELDS = {  # sets whose clusters or families need a field of the source row
 
 
 def read_runs(paths):
-    """Saved rows by the system that answered them."""
+    """Saved rows by the system that answered them. Two runs of one backend with different settings
+    (prompt version, request settings) stay apart, named with a short hash of their settings."""
     runs = defaultdict(list)
     for path in paths:
         with open(path) as f:
             for line in f.read().split("\n"):
                 if line.strip():
                     row = json.loads(line)
-                    runs[row["backend"]].append(row)
-    return runs
+                    runs[(row["backend"], json.dumps(row.get("system"), sort_keys=True))].append(row)
+    backends = Counter(backend for backend, _ in runs)
+    return {
+        backend
+        if backends[backend] == 1
+        else f"{backend} [{hashlib.sha1(config.encode()).hexdigest()[:6]}]": rows
+        for (backend, config), rows in runs.items()
+    }
+
+
+def check_run(system, rows, frozen):
+    """Every row must be a Core v1 item as frozen (its fingerprint in the manifest), and none twice:
+    a changed item or a repeated one would silently change what is scored. Returns the item count."""
+    allowed = {i["sha"] for spec in frozen["sets"].values() for i in spec.get("items", [])}
+    allowed |= {step["sha"] for step in frozen["typesafe"]}
+    seen = set()
+    for row in rows:
+        sha = bench.fingerprint(row)
+        if sha not in allowed:
+            raise ValueError(f"{system}: {row['source']} is not a Core v1 item as frozen")
+        if sha in seen:
+            raise ValueError(f"{system}: {row['source']} is there twice; score one run per system")
+        seen.add(sha)
+    return len(seen)
 
 
 def row_fields(sets):
-    """For the sets in ROW_FIELDS, each picked row's field (article, subset, question id)."""
-    fields = {}
+    """For the sets in ROW_FIELDS, each picked row's field (article, subset, question id), from the
+    rows Core v1 keeps on this machine; nothing is downloaded just to score."""
+    cache, fields = bench.cached_rows(), {}
     for name, field in ROW_FIELDS.items():
-        spec = sets[name]
-        pool = demo.download(name, spec["hub"], spec["config"], spec["split"])
-        picked = {i["row"] for i in spec["items"]}
-        fields[name] = {r["row_idx"]: r["row"][field] for r in pool["rows"] if r["row_idx"] in picked}
+        rows = bench.local_rows(name, sets[name], cache)
+        if rows is None:
+            raise ValueError(
+                f"{name}'s rows are not on this machine: open Core v1 once, or run jev-bench export"
+            )
+        picked = {i["row"] for i in sets[name]["items"]}
+        fields[name] = {r["row_idx"]: r["row"][field] for r in rows["rows"] if r["row_idx"] in picked}
     return fields
 
 
@@ -79,6 +107,7 @@ def outcomes(row, fields, families):
             "set": name,
             "key": (row["source"], qid),
             "family": re.sub(r"\d+", "N", qid),
+            "answered": bool(answer),
             "right": bool(answer) and demo.right(answer, truth),
             "p": distribution(answer, labels),
             "score": answer.get("score") if answer else None,
@@ -185,6 +214,7 @@ def probability_scores(scored):
         "brier always A": mean(brier([1.0] + [0.0] * (o["k"] - 1), o["y"]) for o in complete),
         "log loss": mean(-math.log(max(o["p"][o["y"]], CLIP)) for o in complete),
         "log loss uniform": mean(math.log(o["k"]) for o in complete),
+        "log loss always A": mean(0.0 if o["y"] == 0 else -math.log(CLIP) for o in complete),
         "clipped": clipped,
     }
 
@@ -203,12 +233,13 @@ def ece(scored):
     return sum(count / n * abs(acc - conf) for _, count, conf, acc in rows), rows
 
 
-def ordinal(scored):
-    """HelpSteer2: exact level (the most probable), mean absolute error of the expected level and
-    the ranked probability score, both divided by the number of levels minus one."""
+def ordinal(scored, complete):
+    """HelpSteer2: exact level (the most probable) over every shared question, an unanswered one
+    wrong; mean absolute error of the expected level and the ranked probability score, both divided
+    by the number of levels minus one, over the `complete` questions: those every run answered with
+    all levels seen, so runs compare on the same questions and no level is read from part of them."""
     k = scored[0]["k"] - 1
-    expected = [o for o in scored if o["score"] is not None]
-    complete = [o for o in scored if o["p"] is not None]
+    seen = [o for o in scored if o["key"] in complete]
 
     def rps(p, y):
         cdf, total = 0.0, 0.0
@@ -219,17 +250,17 @@ def ordinal(scored):
 
     return {
         "exact": mean(o["right"] for o in scored),
-        "mae": mean(abs(o["score"] - o["y"]) / k for o in expected) if expected else None,
-        "rps": mean(rps(o["p"], o["y"]) / k for o in complete) if complete else None,
-        "complete": len(complete),
+        "mae": mean(abs(o["score"] - o["y"]) / k for o in seen) if seen else None,
+        "rps": mean(rps(o["p"], o["y"]) / k for o in seen) if seen else None,
+        "complete": len(seen),
         "of": len(scored),
     }
 
 
 def typesafe(scored):
-    """Per workflow and question family: accuracy; for yes/no families with both labels, balanced
-    accuracy and false positives and negatives; the all-no and (hindsight) commonest-label
-    baselines."""
+    """Per workflow and question family: accuracy (a question left unanswered is wrong); for yes/no
+    families, false positives and negatives among the answered, the unanswered apart, balanced
+    accuracy where both labels occur; the all-no and (hindsight) commonest-label baselines."""
     rows = []
     by = defaultdict(list)
     for o in scored:
@@ -242,14 +273,15 @@ def typesafe(scored):
             "cases": len({o["cluster"] for o in group}),
             "n": len(group),
             "accuracy": mean(o["right"] for o in group),
+            "no answer": sum(not o["answered"] for o in group),
             "commonest label (hindsight)": labels.most_common(1)[0][1] / len(group),
         }
         if group[0]["k"] == 2:  # yes/no: index 0 is yes
             yes = [o for o in group if o["y"] == 0]
             no = [o for o in group if o["y"] == 1]
             row["all no"] = len(no) / len(group)
-            row["false positives"] = sum(not o["right"] for o in no)
-            row["false negatives"] = sum(not o["right"] for o in yes)
+            row["false positives"] = sum(o["answered"] and not o["right"] for o in no)
+            row["false negatives"] = sum(o["answered"] and not o["right"] for o in yes)
             if yes and no:
                 row["balanced accuracy"] = (mean(o["right"] for o in yes) + mean(o["right"] for o in no)) / 2
         rows.append(row)
@@ -262,17 +294,32 @@ def mean(values):
 
 
 def score(paths):
-    """Every system in the runs, scored and printed as Markdown; the numbers are returned too."""
+    """Every system in the runs, scored and printed as Markdown; the numbers are returned too.
+    Systems are compared on the questions every run answered, so a stopped or partial run cannot
+    shift the others; probability scores use the questions every run answered completely."""
     with open(PATH) as f:
-        sets = json.load(f)["sets"]
+        frozen = json.load(f)
+    sets = frozen["sets"]
     sets["TypeSafe cases"] = {"track": "typesafe", "group": "TypeSafe"}
     families = {s: f for f, subsets in sets["RewardBench"]["families"].items() for s in subsets}
     fields = row_fields(sets)
     runs = read_runs(paths)
+    main, wide = bench.size("main"), bench.size("wide")
+    coverage = {}
+    for system, rows in runs.items():
+        items = check_run(system, rows, frozen)
+        full = main + (wide if any(sets[r["set"]]["track"] == "wide" for r in rows) else 0)
+        coverage[system] = (
+            f"complete, {items} items" if items == full else f"incomplete: {items} of {full} items"
+        )
     scored = {
         system: [o for row in rows for o in outcomes(row, fields, families)] for system, rows in runs.items()
     }
     shared = set.intersection(*({o["key"] for o in s} for s in scored.values()))
+    if not shared:
+        raise SystemExit("no question is answered by every run; score them one at a time")
+    scored = {system: [o for o in s if o["key"] in shared] for system, s in scored.items()}
+    complete = set.intersection(*({o["key"] for o in s if o["p"] is not None} for s in scored.values()))
     report = {}
     for system, all_scored in scored.items():
         track = defaultdict(list)
@@ -283,22 +330,27 @@ def score(paths):
             counts[o["unit"]][0] += o["right"]
             counts[o["unit"]][1] += 1
         overall, groups = headline(counts, sets) if counts else (None, {})
-        by_set = defaultdict(list)
+        every = defaultdict(lambda: [0, 0])
         for o in all_scored:
-            by_set[o["set"]].append(o)
+            every[o["unit"]][0] += o["right"]
+            every[o["unit"]][1] += 1
+        by_set = Counter(o["set"] for o in all_scored)
+        comparable = [o for o in track["headline"] if o["key"] in complete]
+        own_complete = sum(o["p"] is not None for o in track["headline"])
         report[system] = {
+            "coverage": coverage[system],
             "headline": overall,
             "groups": groups,
-            "sets": {n: (mean(o["right"] for o in v), len(v)) for n, v in sorted(by_set.items())},
+            # RewardBench's score is the mean of its families, here as in the headline
+            "sets": {n: (value, by_set[n]) for n, value in sorted(set_scores(every).items())},
             "tracks": {t: len(v) for t, v in track.items()},
-            "probabilities": probability_scores(track["headline"]),
-            "ece": ece(track["headline"]),
-            "ordinal": ordinal(track["ordinal"]) if track["ordinal"] else None,
+            "probabilities": probability_scores(comparable) | {"own complete": own_complete},
+            "ece": ece(comparable),
+            "ordinal": ordinal(track["ordinal"], complete) if track["ordinal"] else None,
             "typesafe": typesafe(track["typesafe"]),
         }
     headline_shared = {
-        system: [o for o in s if o["key"] in shared and sets[o["set"]]["track"] == "headline"]
-        for system, s in scored.items()
+        system: [o for o in s if sets[o["set"]]["track"] == "headline"] for system, s in scored.items()
     }
     intervals = bootstrap(headline_shared, sets) if all(headline_shared.values()) else {}
     print_report(report, intervals, sets, len(shared))
@@ -308,20 +360,28 @@ def score(paths):
 def print_report(report, intervals, sets, shared):
     pct = "{:.1%}".format
     print(
-        f"# Core v1 scores\n\n{shared} questions shared by every run; "
+        f"# Core v1 scores\n\nEvery number compares the {shared} questions every run answered; "
+        f"probability scores, the questions every run answered with all options seen. "
         f"{RESAMPLES} cluster resamples, seed {SEED}.\n"
     )
-    print("| System | Headline | 95% interval | Complete answers | Brier (uniform) | Log loss (uniform) |")
-    print("|---|---:|---:|---:|---:|---:|")
+    print(
+        "| System | Run | Headline | 95% interval | Probability questions (own) "
+        "| Brier (uniform, always A) | Log loss (uniform, always A) |"
+    )
+    print("|---|---|---:|---:|---:|---:|---:|")
     for system, r in report.items():
         lo, hi = intervals.get(system, (None, None))
         p = r["probabilities"]
         cells = [
+            r["coverage"],
             pct(r["headline"]) if r["headline"] is not None else "—",
             f"{pct(lo)}–{pct(hi)}" if lo is not None else "—",
-            f"{p['complete']} of {p['of']}",
-            f"{p['brier']:.3f} ({p['brier uniform']:.3f})" if p.get("brier") is not None else "—",
-            f"{p['log loss']:.3f} ({p['log loss uniform']:.3f}), {p['clipped']} clipped"
+            f"{p['complete']} ({p['own complete']})",
+            f"{p['brier']:.3f} ({p['brier uniform']:.3f}, {p['brier always A']:.3f})"
+            if p.get("brier") is not None
+            else "—",
+            f"{p['log loss']:.3f} ({p['log loss uniform']:.3f}, {p['log loss always A']:.3f}), "
+            f"{p['clipped']} clipped"
             if p.get("log loss") is not None
             else "—",
         ]
@@ -334,16 +394,19 @@ def print_report(report, intervals, sets, shared):
         print("| Group | Score |\n|---|---:|")
         for group, value in r["groups"].items():
             print(f"| {group} | {pct(value)} |")
-        print("\n| Set | Track | Accuracy | Questions |\n|---|---|---:|---:|")
+        print("\n| Set | Track | Score | Questions |\n|---|---|---:|---:|")
         for name, (acc, n) in r["sets"].items():
-            print(f"| {name} | {sets[name]['track']} | {pct(acc)} | {n} |")
+            family = " (mean of its families)" if name == "RewardBench" else ""
+            print(f"| {name}{family} | {sets[name]['track']} | {pct(acc)} | {n} |")
         if r["ordinal"]:
             o = r["ordinal"]
             print(
-                f"\nHelpSteer2: exact level {pct(o['exact'])}; MAE/(K−1) {o['mae']:.3f}; RPS/(K−1) "
-                f"{o['rps']:.3f} on {o['complete']} of {o['of']} complete"
-                if o["rps"] is not None
-                else f"\nHelpSteer2: exact level {pct(o['exact'])}"
+                f"\nHelpSteer2: exact level {pct(o['exact'])} on {o['of']} questions; MAE/(K−1) "
+                f"{o['mae']:.3f} and RPS/(K−1) {o['rps']:.3f} on the {o['complete']} every run "
+                "answered with all levels seen"
+                if o["complete"]
+                else f"\nHelpSteer2: exact level {pct(o['exact'])} on {o['of']} questions; no MAE or RPS, "
+                "as no question was answered with all levels seen by every run"
             )
         value, bins = r["ece"]
         if value is not None:
@@ -354,14 +417,14 @@ def print_report(report, intervals, sets, shared):
             print(f"\nECE (descriptive, headline): {value:.3f}; bins {shown}")
         if r["typesafe"]:
             print(
-                "\n| Workflow | Family | Cases | n | Accuracy | Balanced | FP | FN | All no "
+                "\n| Workflow | Family | Cases | n | Accuracy | Balanced | FP | FN | No answer | All no "
                 "| Commonest (hindsight) |"
             )
-            print("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+            print("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
             for t in r["typesafe"]:
                 cells = [t["workflow"], t["family"], t["cases"], t["n"], pct(t["accuracy"]),
                          pct(t["balanced accuracy"]) if "balanced accuracy" in t else "—",
-                         t.get("false positives", "—"), t.get("false negatives", "—"),
+                         t.get("false positives", "—"), t.get("false negatives", "—"), t["no answer"],
                          pct(t["all no"]) if "all no" in t else "—",
                          pct(t["commonest label (hindsight)"])]  # fmt: skip
                 print("| " + " | ".join(map(str, cells)) + " |")

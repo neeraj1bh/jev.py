@@ -1676,7 +1676,7 @@
    "track": "auxiliary",
    "group": "Intent and topic",
    "knowledge": false,
-   "provenance": "news snippets; labels from the source's section (metadata)",
+   "provenance": "news titles and descriptions; topic labels inherited from the AG News corpus",
    "items": [
     {
      "row": 82,
@@ -2166,7 +2166,7 @@
    "track": "wide",
    "group": "Intent and topic",
    "knowledge": false,
-   "provenance": "online banking customer messages; intents by annotators",
+   "provenance": "banking customer-service queries; intent labels from the released Banking77 dataset",
    "items": [
     {
      "row": 12,
@@ -2551,7 +2551,7 @@
    "track": "wide",
    "group": "Intent and topic",
    "knowledge": false,
-   "provenance": "crowd-written requests to an assistant; intents from the prompts they answered",
+   "provenance": "crowd-written assistant requests; labels from collection tasks and curator checks, including out-of-scope requests",
    "items": [
     {
      "row": 11,
@@ -4628,7 +4628,7 @@
    "track": "headline",
    "group": "Contracts and business",
    "knowledge": false,
-   "provenance": "non-disclosure agreements; labels by experts",
+   "provenance": "non-disclosure agreement text; labels by a computational linguistics researcher with crowd-worker assistance",
    "items": [
     {
      "row": 131,
@@ -6892,7 +6892,7 @@
    "track": "headline",
    "group": "Contracts and business",
    "knowledge": true,
-   "provenance": "evidence written by legal experts; labels by them",
+   "provenance": "hand-written legal fact patterns inspired by casebooks and exercises; labels from the task authors",
    "items": [
     {
      "row": 5,
@@ -7128,7 +7128,7 @@
    "track": "headline",
    "group": "Contracts and business",
    "knowledge": false,
-   "provenance": "sentences from US court opinions; labels by legal experts",
+   "provenance": "sentences from US Supreme Court opinions; hand-coded definition labels from the task authors",
    "items": [
     {
      "row": 0,
@@ -8789,7 +8789,7 @@
    "track": "headline",
    "group": "Knowledge and exams",
    "knowledge": true,
-   "provenance": "MMLU and other exam questions; options added with model help and checked by people",
+   "provenance": "MMLU and other academic problems; distractors added using GPT-4 and reviewed by people",
    "items": [
     {
      "row": 11,
@@ -9261,7 +9261,7 @@
    "track": "headline",
    "group": "Knowledge and exams",
    "knowledge": false,
-   "provenance": "HellaSwag text and labels; filtered with model help",
+   "provenance": "HellaSwag source continuations and model-generated distractors; filtered using model annotations and quality checks",
    "items": [
     {
      "row": 18,
@@ -10424,7 +10424,7 @@
    "track": "headline",
    "group": "Knowledge and exams",
    "knowledge": true,
-   "provenance": "medical licensing exam questions; keys from the source",
+   "provenance": "medical licensing exam and mock-test questions; answer keys from the source",
    "items": [
     {
      "row": 8,
@@ -11150,7 +11150,7 @@
    "track": "headline",
    "group": "Which answer is better",
    "knowledge": false,
-   "provenance": "prompts and response pairs from several sources; the better response per source's method, checked by the authors",
+   "provenance": "response pairs from several sources; rankings from source-specific human, model or correctness criteria, with manual and metadata-based filtering",
    "families": {
     "Chat": [
      "alpacaeval-easy",

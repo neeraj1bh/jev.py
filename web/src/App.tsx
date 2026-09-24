@@ -105,6 +105,7 @@ export default function App() {
   const [addingFor, setAddingFor] = useState<"generate" | "compare" | "benchmark" | null>(null);
   const [runningOpen, setRunningOpen] = useState(false);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const fetchAgreed = useRef(new Set<string>()); // frozen benchmarks the viewer agreed to download
   const [source, setSource] = useState<InputSource>("examples");
   const [example, setExample] = useState<ExampleName | "">(FIRST_EXAMPLE);
   const [dataset, setDataset] = useState("");
@@ -481,11 +482,35 @@ export default function App() {
       );
       return;
     }
+    // A frozen benchmark's first use downloads its rows: its wide sets too when every picked model
+    // reads over 26 options, as the load that follows will.
+    const chosen = datasets.find((set) => set.name === name);
+    const wide = readsWide(isCompare ? compareModels : [generateModel]);
+    const pages = (chosen?.fetch?.pages ?? 0) + (wide ? (chosen?.fetch_wide?.pages ?? 0) : 0);
+    const sources =
+      (chosen?.fetch?.datasets ?? 0) + (wide ? (chosen?.fetch_wide?.datasets ?? 0) : 0);
+    const agreedKey = `${name}${wide ? " + wide" : ""}`;
+    if (pages && !fetchAgreed.current.has(agreedKey)) {
+      const ok = await askConfirm(
+        `Download ${name}'s items?`,
+        `${name} is rebuilt from public Hugging Face datasets the first time: ${pages} pages of rows ` +
+          `from ${sources} datasets, kept on this machine afterwards. It can take a while, as Hugging ` +
+          "Face paces downloads; the bar below counts the pages. Stop keeps every finished dataset, " +
+          "and choosing it again fetches the rest. Nothing is paid.",
+        "Download",
+      );
+      if (!ok) return;
+      fetchAgreed.current.add(agreedKey);
+    }
     setDataset(name);
     setExample("");
     clearBatch();
     setRemaining(null);
-    setVerdict(`Fetching an item from ${name}…`);
+    setVerdict(
+      pages
+        ? `Downloading ${name}'s items; progress shows below.`
+        : `Fetching an item from ${name}…`,
+    );
     if (await nextItem(name)) setVerdict("Run to score it against the dataset's label.");
   }
 
@@ -558,6 +583,7 @@ export default function App() {
     mode: runKind,
     sides: models,
     dataset: inputName,
+    set: current?.set,
     source: current?.source ?? "built-in example",
     truth: current?.truth ?? {},
   });
