@@ -8,12 +8,20 @@ export const FIT = "fit";
 export const FIT_MS = 30_000;
 const UPDATE_MS = 50;
 
-/** When each row finished, rebuilt from the recorded times: `workers` rows ran at once, in order. */
+/**
+ * When each row finished, from the start of the run: the recorded finish times when every row has
+ * one, else rebuilt from the recorded durations with `workers` rows running at once, in order.
+ */
 function finishTimes(rows: Row[], workers: number) {
+  const slowest = (row: Row) => Math.max(0, ...row.sides.map((side) => side.ms));
+  if (rows.length && rows.every((row) => row.at)) {
+    const start = Math.min(...rows.map((row) => (row.at ?? 0) - slowest(row)));
+    return rows.map((row, index) => ({ index, end: (row.at ?? 0) - start }));
+  }
   const free = Array.from({ length: Math.max(1, workers) }, () => 0);
   return rows.map((row, index) => {
     const worker = free.indexOf(Math.min(...free));
-    const end = (free[worker] ?? 0) + Math.max(0, ...row.sides.map((side) => side.ms));
+    const end = (free[worker] ?? 0) + slowest(row);
     free[worker] = end;
     return { index, end };
   });

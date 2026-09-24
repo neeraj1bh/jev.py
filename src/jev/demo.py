@@ -756,7 +756,8 @@ def log_row(body, backend, answers, ms, response=None):
     os.makedirs(LOGS, exist_ok=True)
     keys = ("dataset", "set", "source", "state", "questions", "truth", "mode", "sides", "system")
     row = {k: body.get(k) for k in keys}
-    row |= {"backend": backend, "answers": answers, "ms": ms}
+    # "at" is when the answer came back, so a replay can follow the run's real timeline
+    row |= {"backend": backend, "answers": answers, "ms": ms, "at": round(time.time() * 1000)}
     if response:
         row["response"] = {k: v for k, v in response.items() if k != "answers"}
     with LOCK, open(os.path.join(LOGS, name + ".jsonl"), "a") as f:
@@ -851,6 +852,8 @@ def run_rows(name):
                 item_key(x), {"it": {k: x[k] for k in ("state", "questions", "truth", "source")}, "sides": {}}
             )
             it["sides"][x["backend"]] = {"ms": x["ms"], "res": {"answers": x["answers"]}}
+            if "at" in x:  # older runs did not record it
+                it["at"] = max(it.get("at", 0), x["at"])
     return list(items.values())
 
 
