@@ -56,8 +56,19 @@ DATA = os.path.join(ROOT, "data")  # dataset rows fetched for the demo, git-igno
 ADDED_PATH = os.path.join(DATA, "added-models.json")  # Hugging Face models added in the page: id -> GB
 LOGS = os.path.join(ROOT, "results", "logs", "demo")  # one .jsonl per batch, git-ignored
 ROWS = "https://datasets-server.huggingface.co/rows?dataset={}&config={}&split={}&offset={}&length={}"
-POOL, POOL_RUNS = 300, 20  # rows of a set kept on disk, and how many places in the split they come from
-# name: (Hub dataset, config, split, state fields, question, label field, the label meaning yes)
+POOL, POOL_RUNS = 300, 20  # rows of a larger split kept on disk, and how many windows they come from
+FULL_ROWS = 3300  # a split this small is kept whole
+# windows per set where 20 would miss a stratum: DBpedia-14's test split is 14 label blocks of 5,000
+# rows (four windows a block); MMLU-Pro's smallest category has about 380 rows
+RUNS = {"DBpedia-14": 56, "MMLU-Pro": 60}
+# Core v1 picks these one per label or subject, or by quota, so it needs every row
+FULL = {
+    "MMLU", "Banking77", "CLINC150", "LEDGAR", "RewardBench", "Jailbreak attempts", "ToxicChat",
+    "BBQ race and ethnicity", "RAGTruth", "SQuAD v2", "Global-MMLU-Lite Hindi",
+    "Global-MMLU-Lite Chinese", "Global-MMLU-Lite English",
+}  # fmt: skip
+# name: (Hub dataset, config, split, state fields, question, label field or a function of the row,
+# the label meaning yes)
 DATASETS = {
     "SST-2 sentiment": (
         "stanfordnlp/sst2", "default", "validation", {"review": "sentence"},
@@ -119,7 +130,7 @@ DATASETS = {
     "ContractNLI": (
         "kiddothe2b/contract-nli", "contractnli_a", "test",
         {"contract clause": "premise", "hypothesis": "hypothesis"},
-        "Does the clause entail, contradict or not mention the hypothesis?", "label", None,
+        "Given only this excerpt, is the hypothesis entailed, contradicted, or neither?", "label", None,
     ),
     "MultiRC": (
         "aps/super_glue", "multirc", "validation",
@@ -158,14 +169,22 @@ DATASETS = {
         "nguha/legalbench", "definition_classification", "test", {"sentence": "text"},
         "Does this sentence from a court opinion define a term?", "answer", "Yes",
     ),
-    "HaluEval QA": (
-        "pminervini/HaluEval", "qa_samples", "data",
-        {"knowledge": "knowledge", "question": "question", "answer": "answer"},
-        "Does the answer contain anything the knowledge does not support?", "hallucination", "yes",
+    "RAGTruth": (  # people marked each unsupported span; any span makes the answer yes
+        "wandb/RAGTruth-processed", "default", "test",
+        {"request": "query", "context": "context", "response": "output"},
+        "Does the response contain a factual claim that contradicts, or is unsupported by, the supplied "
+        "request and context?",
+        lambda r: "yes" if sum(r["hallucination_labels_processed"].values()) else "no", "yes",
     ),
-    "Prompt injection": (
-        "deepset/prompt-injections", "default", "test", {"text": "text"},
-        "Is this text trying to make an AI assistant ignore or change its instructions?", "label", 1,
+    "Jailbreak attempts": (  # ToxicChat's own jailbreak label, set by its annotators
+        "lmsys/toxic-chat", "toxicchat0124", "test", {"user message": "user_input"},
+        "Is this message trying to get the chatbot to break its rules or safety guidelines?",
+        "jailbreaking", 1,
+    ),
+    "SQuAD v2": (  # the answers are never shown: a question with none is unanswerable
+        "rajpurkar/squad_v2", "squad_v2", "validation", {"passage": "context", "question": "question"},
+        "Can the question be answered from the passage?",
+        lambda r: "yes" if r["answers"]["text"] else "no", "yes",
     ),
     "BBH causal judgement": (
         "lukaemon/bbh", "causal_judgement", "test", {"question": "input"},
@@ -193,8 +212,8 @@ MC = {  # benchmarks whose options differ per question: (Hub dataset, config, sp
         "Which answer is correct?",
         lambda r: (r["choices"]["text"], r["choices"]["label"].index(r["answerKey"])),
     ),
-    "HellaSwag": (
-        "Rowan/hellaswag", "default", "validation",
+    "GoldenSwag": (  # the HellaSwag validation items that pass GoldenSwag's validity checks
+        "PleIAs/GoldenSwag", "default", "validation",
         lambda r: {"activity": r["activity_label"], "context": r["ctx"]},
         "Which ending is the most likely continuation?",
         lambda r: (r["endings"], int(r["label"])),
@@ -220,7 +239,7 @@ MC = {  # benchmarks whose options differ per question: (Hub dataset, config, sp
     "WinoGrande": (
         "allenai/winogrande", "winogrande_debiased", "validation",
         lambda r: {"sentence": r["sentence"]},
-        "Who or what does the blank (_) refer to?",
+        "Which option correctly fills the blank (_)?",
         lambda r: ([r["option1"], r["option2"]], int(r["answer"]) - 1),
     ),
     "MedQA": (
@@ -232,7 +251,7 @@ MC = {  # benchmarks whose options differ per question: (Hub dataset, config, sp
     "PubMedQA": (
         "qiaojin/PubMedQA", "pqa_labeled", "train",
         lambda r: {"abstract": " ".join(r["context"]["contexts"]), "question": r["question"]},
-        "Given the abstract, what is the answer to the question?",
+        "What conclusion about the question is supported by the supplied study context?",
         lambda r: (["yes", "no", "maybe"], ["yes", "no", "maybe"].index(r["final_decision"])),
     ),
     "Arena votes": (
@@ -244,39 +263,51 @@ MC = {  # benchmarks whose options differ per question: (Hub dataset, config, sp
         },
         "Which response did the person who asked prefer?",
         lambda r: (
-            ["A is better", "B is better", "a tie"],
+            ["response A was preferred", "response B was preferred", "recorded tie"],
             [r["winner_model_a"], r["winner_model_b"], r["winner_tie"]].index(1),
         ),
     ),
     "RewardBench": (
         "allenai/reward-bench", "default", "filtered",
         lambda r: {"prompt": r["prompt"], **_pair(r["id"], r["chosen"], r["rejected"])},
-        "Which response is better?",
+        "Which response better satisfies the request, considering correctness, relevance and safety?",
         lambda r: (["A is better", "B is better"], 0 if int(r["id"]) % 2 == 0 else 1),
     ),
-    "Global-MMLU Hindi": (
-        "CohereLabs/Global-MMLU", "hi", "test",
+    "Global-MMLU-Lite Hindi": (  # the Lite set is human-translated or post-edited throughout
+        "CohereLabs/Global-MMLU-Lite", "hi", "test",
         lambda r: {"subject": r["subject"].replace("_", " "), "question": r["question"]},
         "Which answer is correct?",
         lambda r: ([r[f"option_{k}"] for k in "abcd"], "ABCD".index(r["answer"])),
     ),
-    "Global-MMLU Chinese": (
-        "CohereLabs/Global-MMLU", "zh", "test",
+    "Global-MMLU-Lite Chinese": (
+        "CohereLabs/Global-MMLU-Lite", "zh", "test",
         lambda r: {"subject": r["subject"].replace("_", " "), "question": r["question"]},
         "Which answer is correct?",
         lambda r: ([r[f"option_{k}"] for k in "abcd"], "ABCD".index(r["answer"])),
     ),
-    "BBQ race and ethnicity": (
-        "walledai/BBQ", "default", "raceEthnicity",
+    "Global-MMLU-Lite English": (  # the same questions as Hindi and Chinese: the language control
+        "CohereLabs/Global-MMLU-Lite", "en", "test",
+        lambda r: {"subject": r["subject"].replace("_", " "), "question": r["question"]},
+        "Which answer is correct?",
+        lambda r: ([r[f"option_{k}"] for k in "abcd"], "ABCD".index(r["answer"])),
+    ),
+    "BBQ race and ethnicity": (  # this copy keeps each item's template, polarity and context type
+        "heegyu/bbq", "Race_ethnicity", "test",
         lambda r: {"context": r["context"], "question": r["question"]},
-        "Which answer is correct?",
-        lambda r: (r["choices"], int(r["answer"])),
+        "Based only on the context, which answer is supported?",
+        lambda r: ([r["ans0"], r["ans1"], r["ans2"]], int(r["label"])),
     ),
     "MuSR murder mysteries": (
         "TAUR-Lab/MuSR", "default", "murder_mysteries",
         lambda r: {"story": r["narrative"], "question": r["question"]},
         "Which answer does the story support?",
         lambda r: (ast.literal_eval(r["choices"]), int(r["answer_index"])),
+    ),
+    "HelpSteer2": (  # a score question: its options are the annotators' level descriptions
+        "nvidia/HelpSteer2", "default", "validation",
+        lambda r: {"prompt": r["prompt"], "response": r["response"]},
+        "How helpful is the response to the prompt?",
+        lambda r: (HELPFULNESS, int(r["helpfulness"])),
     ),
     "BBH date understanding": (
         "lukaemon/bbh", "date_understanding", "test",
@@ -293,6 +324,31 @@ MC = {  # benchmarks whose options differ per question: (Hub dataset, config, sp
         ),
     ),
 }  # fmt: skip
+SCORED = {"HelpSteer2"}  # asked as a score: the label is the index of its level
+HELPFULNESS = [  # HelpSteer2's annotation guidelines, level 0 first
+    "The response is not useful or helpful at all. The response completely missed the essence of "
+    "what the user wanted.",
+    "The response is borderline unhelpful and mostly does not capture what the user was looking "
+    "for, but it is still usable and helpful in a small way.",
+    "The response is partially helpful but misses the overall goal of the user's query/input in "
+    "some way. The response did not fully satisfy what the user was looking for.",
+    "The response is mostly helpful and mainly aligned with what the user was looking for, but "
+    "there is still some room for improvement.",
+    "The response is extremely helpful and completely aligned with the spirit of what the prompt "
+    "was asking for.",
+]
+KEEP = {  # rows a set leaves out, and why
+    "Arena votes": lambda r: len(json.loads(r["prompt"])) == 1,  # joined turns lose their order
+    "RAGTruth": lambda r: r["quality"] == "good",  # not truncated answers or wrong refusals
+    "ToxicChat": lambda r: r["human_annotation"],  # the rest were labelled by a model
+    "Jailbreak attempts": lambda r: r["human_annotation"],
+    "ARC-Challenge": lambda r: len(r["choices"]["text"]) == 4,  # so answer positions can balance
+    "HelpSteer2": lambda r: "<extra_id_1>" not in r["prompt"],  # multi-turn chats joined by markers
+}
+DESCRIBE = {  # an option's meaning, shown with it where its name alone is unclear
+    "PubMedQA": {"maybe": "the evidence is mixed or inconclusive"},
+    "ContractNLI": {"neutral": "neither established nor contradicted"},
+}
 
 
 def _joined(value):
@@ -343,7 +399,7 @@ ABOUT = {  # one line per set, shown when hovering it in the page
     "MMLU": "Exam question from 57 subjects, four choices",
     "MMLU-Pro": "Harder exam question, ten choices",
     "ARC-Challenge": "Grade-school science question that simple methods get wrong",
-    "HellaSwag": "Which ending continues the scene most plausibly?",
+    "GoldenSwag": "Which ending continues the scene most plausibly? HellaSwag's checked items",
     "TruthfulQA": "Which answer is true, where a common misconception is also offered?",
     "Tweet sentiment": "Tweet: negative, neutral or positive?",
     "Tweet hate": "Is this tweet hate speech against immigrants or women?",
@@ -360,26 +416,30 @@ ABOUT = {  # one line per set, shown when hovering it in the page
     "LEDGAR": "Contract provision: which of 100 provision types?",
     "CommonsenseQA": "Everyday-knowledge question, five choices",
     "OpenBookQA": "Elementary science question needing a fact plus common sense",
-    "WinoGrande": "Who does the pronoun gap refer to? Two choices",
+    "WinoGrande": "Which option fills the gap in the sentence? Two choices",
     "MedQA": "US medical licensing exam question, four choices",
     "PubMedQA": "A research abstract and a question: yes, no or maybe?",
     "Arena votes": "Two chatbot answers to one prompt: which did the person prefer, or a tie?",
     "RewardBench": "A prompt and two responses: which is better? Labels from a curated benchmark",
     "GPQA Diamond": "Graduate-level science question written to resist search (needs HF_TOKEN)",
     "XNLI Hindi": "NLI in Hindi: entailment, neutral or contradiction?",
-    "Global-MMLU Hindi": "MMLU translated into Hindi, four choices",
-    "Global-MMLU Chinese": "MMLU translated into Chinese, four choices",
+    "Global-MMLU-Lite Hindi": "MMLU in Hindi, translated by people, four choices",
+    "Global-MMLU-Lite Chinese": "MMLU in Chinese, translated by people, four choices",
+    "Global-MMLU-Lite English": "The same MMLU questions in English, the control for Hindi and Chinese",
     "LegalBench hearsay": "A piece of evidence and the issue it is offered for: is it hearsay?",
     "LegalBench definitions": "A sentence from a US court opinion: does it define a term?",
-    "HaluEval QA": "Knowledge, a question and an answer: does the answer add unsupported claims?",
-    "Prompt injection": "A message to an assistant: is it trying to override its instructions?",
+    "RAGTruth": "A source, a request and a model's answer: does it claim what the source does not say?",
+    "SQuAD v2": "A Wikipedia paragraph and a question: can the paragraph answer it?",
+    "Jailbreak attempts": "A real user message to a chatbot: is it trying to break its rules?",
+    "HelpSteer2": "A prompt and a response: how helpful is it, from 0 to 4? Rated by people",
     "BBQ race and ethnicity": "A short scene and a question where one answer is a stereotype",
     "MuSR murder mysteries": "A 1,000-word mystery: who is the most likely murderer? Two suspects",
     "BBH causal judgement": "A story about cause and blame: would a typical person say yes?",
     "BBH date understanding": "Date arithmetic in words, up to six choices",
     "Core v1": (
-        "Frozen 2026-09-22: 50 balanced items from each set and every TypeSafe step. Banking77, "
-        "CLINC150 and LEDGAR join only when every picked model reads over 26 options"
+        "Picked 2026-09-24 from the decided question list, Review 2 next: 50 items a set (one per "
+        "label or subject where it has more), spread over its strata, and every TypeSafe step. "
+        "Banking77, CLINC150 and LEDGAR join only when every picked model reads over 26 options"
     ),
 }
 CORE = ("Core v1",)  # frozen benchmarks, see bench.py
@@ -397,20 +457,22 @@ GROUPS = {  # menu headings, in order; every set belongs to one
     ],
     "Meaning and reading": [
         "RTE entailment", "SNLI", "MultiNLI mismatched", "ANLI round 3", "BoolQ", "MultiRC",
-        "WinoGrande", "HaluEval QA",
+        "WinoGrande", "RAGTruth", "SQuAD v2",
     ],
     "Reasoning": ["MuSR murder mysteries", "BBH causal judgement", "BBH date understanding"],
-    "Other languages": ["XNLI Hindi", "Global-MMLU Hindi", "Global-MMLU Chinese"],
+    "Other languages": [
+        "XNLI Hindi", "Global-MMLU-Lite Hindi", "Global-MMLU-Lite Chinese", "Global-MMLU-Lite English",
+    ],
     "Intent and topic": ["Banking77", "CLINC150", "AG News topic", "DBpedia-14"],
     "Knowledge and exams": [
-        "MMLU", "MMLU-Pro", "ARC-Challenge", "OpenBookQA", "CommonsenseQA", "HellaSwag",
+        "MMLU", "MMLU-Pro", "ARC-Challenge", "OpenBookQA", "CommonsenseQA", "GoldenSwag",
         "TruthfulQA", "MedQA", "PubMedQA", "GPQA Diamond",
     ],
     "Safety and spam": [
-        "ToxicChat", "Tweet hate", "Tweet offensive", "SMS spam", "Prompt injection",
+        "ToxicChat", "Tweet hate", "Tweet offensive", "SMS spam", "Jailbreak attempts",
         "BBQ race and ethnicity",
     ],
-    "Which answer is better": ["Arena votes", "RewardBench"],
+    "Which answer is better": ["Arena votes", "RewardBench", "HelpSteer2"],
     "Contracts and business": [
         "ContractNLI", "LEDGAR", "LegalBench hearsay", "LegalBench definitions", "TypeSafe cases",
     ],
@@ -418,8 +480,8 @@ GROUPS = {  # menu headings, in order; every set belongs to one
 OPTIONS = {
     "MMLU": 4,
     "MMLU-Pro": 10,
-    "ARC-Challenge": 5,
-    "HellaSwag": 4,
+    "ARC-Challenge": 4,
+    "GoldenSwag": 4,
     "TruthfulQA": 13,
     "SNLI": 3,
     "AG News topic": 4,
@@ -441,8 +503,10 @@ OPTIONS = {
     "RewardBench": 2,
     "GPQA Diamond": 4,
     "XNLI Hindi": 3,
-    "Global-MMLU Hindi": 4,
-    "Global-MMLU Chinese": 4,
+    "Global-MMLU-Lite Hindi": 4,
+    "Global-MMLU-Lite Chinese": 4,
+    "Global-MMLU-Lite English": 4,
+    "HelpSteer2": 5,
     "BBQ race and ethnicity": 3,
     "MuSR murder mysteries": 2,
     "BBH date understanding": 6,
@@ -482,7 +546,7 @@ def rows_page(hub, config, split, offset, length=100):
         ROWS.format(hub, config, split, offset, length),
         headers={"authorization": f"Bearer {token}"} if token else {},
     )
-    for attempt in range(4):
+    for attempt in range(7):
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
                 return json.load(r)
@@ -492,39 +556,72 @@ def rows_page(hub, config, split, offset, length=100):
                     f"{hub} is behind a login: accept its terms at https://huggingface.co/datasets/{hub}"
                     + ("" if token else ", then add a Hugging Face token under Keys")
                 ) from e
-            if e.code != 429 or attempt == 3:
+            if e.code not in (429, 500, 502, 503, 504) or attempt == 6:
                 raise
-            time.sleep(float(e.headers.get("retry-after") or 5 * (attempt + 1)))  # the Hub rate-limits
+            # The Hub rate-limits, and its rows service fails now and then under load. Fetching a
+            # whole split (FULL) takes hundreds of pages, so back off for up to a few minutes.
+            time.sleep(float(e.headers.get("retry-after") or min(60, 5 * 2**attempt)))
+
+
+REVISIONS = {}  # Hub dataset -> its current commit, read once per process
+
+
+def revision(hub, fresh=False):
+    """The dataset's current commit on the Hub, recorded with every pool and pick."""
+    if fresh or hub not in REVISIONS:
+        token = env("HF_TOKEN")
+        req = urllib.request.Request(
+            f"https://huggingface.co/api/datasets/{hub}",
+            headers={"authorization": f"Bearer {token}"} if token else {},
+        )
+        with urllib.request.urlopen(req, timeout=30) as r:
+            REVISIONS[hub] = json.load(r)["sha"]
+    return REVISIONS[hub]
 
 
 def download(name, hub, config, split):
-    """About 300 rows of a set, fetched once into DATA: a short run of rows from each of 20 equal
-    stretches of the split. Some splits are sorted by label (DBpedia-14 holds 5,000 rows of each
-    of its 14 in order), so a few long pages would hold only a few labels."""
+    """A set's pool, fetched once into DATA with the Hub revision it came from. A split of up to
+    FULL_ROWS rows, or a set in FULL, is kept whole. A larger one is read as seeded windows: a short
+    run of rows from each equal stretch of the split, since some splits are sorted by label."""
     path = dataset_path(name)
     if not os.path.exists(path):
-        size = POOL // POOL_RUNS
-        PROGRESS[name] = [0, POOL_RUNS, "pages"]
-        try:
-            first = rows_page(hub, config, split, 0, size)
-            total, rows = first["num_rows_total"], first["rows"]
-            if total <= POOL:
-                starts = range(len(rows), total, 100)
-                size = 100
-            else:
-                stretch = total / POOL_RUNS
-                starts = [int(k * stretch + random.random() * (stretch - size)) for k in range(1, POOL_RUNS)]
-            PROGRESS[name] = [1, 1 + len(starts), "pages"]
-            for start in starts:
-                rows += rows_page(hub, config, split, start, size)["rows"]
-                PROGRESS[name][0] += 1
-        finally:
-            PROGRESS.pop(name, None)
+        for _ in range(2):  # a pool read while the dataset changed is read again, once
+            before = revision(hub, fresh=True)
+            pool = read_pool(name, hub, config, split)
+            if revision(hub, fresh=True) == before:
+                break
+        else:
+            raise ValueError(f"{hub} changed on the Hub twice while {name} was downloading; try later")
         os.makedirs(DATA, exist_ok=True)
         with open(path, "w") as f:
-            json.dump({"features": first["features"], "rows": rows}, f)
+            json.dump(pool | {"revision": before}, f)
     with open(path) as f:
         return json.load(f)
+
+
+def read_pool(name, hub, config, split):
+    first = rows_page(hub, config, split, 0, 1)
+    total = first["num_rows_total"]
+    if total <= FULL_ROWS or name in FULL:
+        rule, seed, size = "full", None, 100
+        starts = list(range(0, total, size))
+    else:
+        runs = RUNS.get(name, POOL_RUNS)
+        rule, seed, size, stretch = f"{runs} seeded windows", f"pool:{name}", POOL // runs, total / runs
+        rng = random.Random(seed)
+        starts = [int(k * stretch + rng.random() * (stretch - size)) for k in range(runs)]
+    PROGRESS[name] = [0, len(starts), "pages"]
+    rows = []
+    try:
+        for start in starts:
+            rows += rows_page(hub, config, split, start, size)["rows"]
+            PROGRESS[name][0] += 1
+    finally:
+        PROGRESS.pop(name, None)
+    return {
+        "features": first["features"], "rows": rows, "rule": rule, "seed": seed, "total": total,
+        "starts": starts, "size": size,
+    }  # fmt: skip
 
 
 def typesafe_item(case, node, doc, qs, truth):
@@ -539,11 +636,19 @@ def typesafe_item(case, node, doc, qs, truth):
 
 
 def labelled_rows(name, page):
-    """The rows of a downloaded page that carry a label; SNLI marks unlabelled pairs -1."""
-    if name in MC:
-        return page["rows"]
+    """The rows of a downloaded page that carry a label (SNLI marks unlabelled pairs -1) and that
+    the set keeps."""
+    rows = page["rows"]
+    if name in KEEP:
+        rows = [r for r in rows if KEEP[name](r["row"])]
+    if name in MC or callable(DATASETS[name][5]):
+        return rows
     label = DATASETS[name][5]
-    return [r for r in page["rows"] if r["row"][label] != -1]
+    return [r for r in rows if r["row"][label] != -1]
+
+
+def criteria(name, options):
+    return {o: DESCRIBE.get(name, {}).get(o) for o in options}
 
 
 def row_item(name, page, r):
@@ -551,24 +656,30 @@ def row_item(name, page, r):
     if name in MC:
         hub, _, split, state_of, question, options_of = MC[name]
         options, answer = options_of(r["row"])
+        if name in SCORED:
+            q, truth = {"type": "score", "instructions": question, "criteria": options}, str(answer)
+        else:
+            q = {"type": "choice", "instructions": question, "criteria": criteria(name, options)}
+            truth = options[answer]
         return {
             "state": state_of(r["row"]),
-            "questions": {
-                "answer": {"type": "choice", "instructions": question, "criteria": dict.fromkeys(options)}
-            },
-            "truth": {"answer": options[answer]},
+            "questions": {"answer": q},
+            "truth": {"answer": truth},
             "source": f"{hub} · {split} row {r['row_idx']}",
             "options": len(options),
         }
     hub, _, split, fields, question, label, yes = DATASETS[name]
-    names = next(x["type"].get("names") for x in page["features"] if x["name"] == label)
-    row, value = r["row"], r["row"][label]
-    value = names[value] if names else value
+    row = r["row"]
+    if callable(label):
+        names, value = None, label(row)
+    else:
+        names = next(x["type"].get("names") for x in page["features"] if x["name"] == label)
+        value = names[row[label]] if names else row[label]
     if yes is not None:
         q = {"type": "noul", "instructions": question}
         truth = "yes" if value == yes else "no"
     else:
-        q = {"type": "choice", "instructions": question, "criteria": dict.fromkeys(names)}
+        q = {"type": "choice", "instructions": question, "criteria": criteria(name, names)}
         truth = value
     return {
         "state": {k: row[v] for k, v in fields.items()},

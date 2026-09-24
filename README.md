@@ -185,24 +185,34 @@ latency figure. DeepSeek is V4.1-Flash, hosted.
 
 ### Core v1, the frozen benchmark
 
-`benchmarks/core-v1.json` fixes one set of items for every model. It is a **draft**, a balanced
-random pick made on 2026-09-22; the final list is the one that survives review (below).
-- **Items:** 50 from each of the 45 labelled sets in the demo, plus every TypeSafe step, for
-  2,295 items in all.
-- **Balance:** equal yes and no, equal counts per label, and the right answer spread evenly across
-  positions.
-- **Pointers, not text:** the file stores each item's dataset, split, row and a fingerprint.
-  Anyone rebuilds the same items from the Hub, and a changed item is reported, not silently used.
+`benchmarks/core-v1.json` fixes one set of items for every model. It was picked on 2026-09-24
+from a decided list of sets and questions, and is final once reviewers have checked every item.
+- **Items:** 48 public sets and every TypeSafe step: 2,630 items and 2,939 questions (1,021
+  yes/no, 1,841 pick one, 77 score). A set gives 50 items, or one per label or subject where it
+  has more (MMLU 57, Banking77 77, CLINC150 151, LEDGAR 100).
+- **Balance:** each set's own quotas first (BBQ, RAGTruth, SQuAD v2, jailbreak attempts), then its
+  strata (subjects, categories, subsets, genres), then equal counts per label, and the right answer
+  spread across positions where every item has the same number of options. TypeSafe's steps are
+  taken as published, so their labels are not balanced.
+- **Recorded pools:** picks are seeded and drawn from pools whose rule, seed, size and Hub revision
+  are stored with the set: the whole split where it is small, otherwise seeded windows across it.
+- **Tracks:** each set is marked headline, auxiliary, ordinal or wide, with its group, where its
+  text and labels came from, and whether it needs outside knowledge.
+- **Pointers, not text:** the file stores each item's dataset, split, row and a fingerprint of the
+  item with its options in order and the prompt version. Anyone rebuilds the same items from the
+  Hub, and a changed item is reported, not silently used.
 
-Banking77, CLINC150 and LEDGAR have more than 26 options, and letter-reading backends answer 26 at
-most. So these three sets' 150 items run only for models that read every option, Jev and local
-models. Everyone else answers the other 2,145, and every comparison stays paired.
+Banking77, CLINC150 and LEDGAR have more than 26 options, and letter-reading backends (hosted
+models and llama.cpp) answer 26 at most. So these three sets' 328 items form a separate wide suite
+that only Jev and local PyTorch models answer. Everyone else answers the other 2,302, and every
+comparison stays paired.
 
 ```sh
 uv run jev-bench run remote:deepseek              # one model, saved to Past runs
 uv run jev-bench run Qwen/Qwen2.5-1.5B-Instruct   # a local model, wide items included
 uv run jev-bench run remote:llamacpp:qwen2.5-7b-q4  # whatever GGUF llama-server has loaded
 uv run jev-bench export                           # every item with its text, into local/review/
+uv run jev-bench check                            # offline checks of the letter readout and fingerprints
 ```
 
 Run each model separately, then open the runs together in Past runs. The models to run are in
