@@ -145,6 +145,7 @@ class Remote:
             "usage": {
                 "input_tokens": total(usage.values(), "prompt_tokens"),
                 "output_tokens": total(usage.values(), "completion_tokens"),
+                "cost": total(usage.values(), "cost"),  # dollars billed, where the provider says (OpenRouter)
                 "per_question": usage,  # as each provider reported it, cached tokens included
             },
         }

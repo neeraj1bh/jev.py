@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { FIT, FIT_MS, type ReplaySpeed } from "../hooks/useBatchReplay";
 import { rankColumns } from "../scoring";
 import { chipButton, cn, labelText } from "../styles";
-import type { Row } from "../types";
+import type { Backend, Row } from "../types";
 import { BatchTable } from "./BatchTable";
 import { Icon } from "./Icon";
 import { Scoreboard } from "./Scoreboard";
@@ -27,6 +27,8 @@ interface ResultsViewProps {
   /** Generate vs readout shows its two panels instead, live or replayed, as a single run does. */
   stage?: ReactNode;
   dataset: string;
+  /** The model behind a column, for its price; none for a column no model list names. */
+  priceOf: (column: string) => Backend | undefined;
   rows: Row[];
   columns: string[];
   note: string;
@@ -127,7 +129,12 @@ export function ResultsView(props: ResultsViewProps) {
         (props.scoreboard ? (
           <Scoreboard rows={props.rows} columns={props.columns} {...props.scoreboard} />
         ) : (
-          <Summary rows={ranked.rows} columns={ranked.columns} dataset={props.dataset} />
+          <Summary
+            rows={ranked.rows}
+            columns={ranked.columns}
+            dataset={props.dataset}
+            priceOf={props.priceOf}
+          />
         ))}
       <BatchTable
         rows={ranked.rows}

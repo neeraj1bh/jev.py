@@ -1,6 +1,7 @@
+import { dollars, dollarText } from "../backends";
 import { answerLabel, percent, scoreResponse } from "../scoring";
 import { cn, inset, labelText, rankChip, shell, tableCell, tableHead } from "../styles";
-import type { Answer, Row } from "../types";
+import type { Answer, Backend, Row } from "../types";
 import { InfoTip } from "./InfoTip";
 import { Tip } from "./Tip";
 
@@ -10,6 +11,10 @@ interface ColumnStats {
   fullyRight: number;
   averageMs: number;
   medianMs: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** Dollars billed, when the provider said so for every answer. */
+  billed: number | null;
 }
 
 function columnStats(rows: Row[], column: number): ColumnStats {
@@ -17,10 +22,20 @@ function columnStats(rows: Row[], column: number): ColumnStats {
   let total = 0;
   let fullyRight = 0;
   const times: number[] = [];
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let billed: number | null = null;
+  let unbilled = false;
   for (const row of rows) {
     const side = row.sides[column];
     if (!side) continue;
     times.push(side.ms);
+    inputTokens += side.response.usage?.input_tokens ?? 0;
+    outputTokens += side.response.usage?.output_tokens ?? 0;
+    // a failed request has no usage and no bill, so it is left out rather than counted unknown
+    const cost = side.response.usage?.cost;
+    if (typeof cost === "number") billed = (billed ?? 0) + cost;
+    else if (side.response.usage) unbilled = true;
     const [c, n] = scoreResponse(side.response, row.item.truth);
     correct += c;
     total += n;
@@ -30,7 +45,16 @@ function columnStats(rows: Row[], column: number): ColumnStats {
   const averageMs = times.length
     ? Math.round(times.reduce((sum, ms) => sum + ms, 0) / times.length)
     : 0;
-  return { correct, total, fullyRight, averageMs, medianMs: times[times.length >> 1] ?? 0 };
+  return {
+    correct,
+    total,
+    fullyRight,
+    averageMs,
+    medianMs: times[times.length >> 1] ?? 0,
+    inputTokens,
+    outputTokens,
+    billed: unbilled ? null : billed,
+  };
 }
 
 function agreementRate(rows: Row[]) {
@@ -55,7 +79,30 @@ const INFO = {
   average: "Time from sending the item to getting every answer back, averaged over the batch.",
   median:
     "The middle time: half the items were faster. One slow request moves it less than the average.",
+  cost: "What the run cost: the provider's own bill where it gives one (OpenRouter), otherwise ~ its reported tokens at today's list price, which cached input can make lower. Models on this machine are free.",
 };
+
+interface Cost {
+  dollars: number;
+  /** An estimate from tokens and list price, not the provider's bill. */
+  estimate: boolean;
+}
+
+/** What a column's run cost, or null when its price or token counts are unknown. */
+function columnCost(backend: Backend | undefined, s: ColumnStats): Cost | null {
+  if (s.billed !== null) return { dollars: s.billed, estimate: false };
+  if (!backend) return null;
+  if (backend.group === "local" || backend.free) return { dollars: 0, estimate: false };
+  const listed = s.inputTokens ? dollars(backend, s.inputTokens, s.outputTokens) : null;
+  return listed === null ? null : { dollars: listed, estimate: true };
+}
+
+function costText(cost: Cost | null) {
+  if (!cost) return "—";
+  if (cost.dollars === 0) return "free";
+  const text = cost.dollars < 0.01 ? "<$0.01" : dollarText(cost.dollars);
+  return cost.estimate ? `~${text}` : text;
+}
 
 /** Index of the single best value, or -1 when there is a tie. */
 function bestIndex(values: number[], higherIsBetter: boolean) {
@@ -94,19 +141,21 @@ interface Best {
   whole: number;
   average: number;
   median: number;
+  cost: number;
 }
 
 interface RankTableProps {
   rows: Row[];
   columns: string[];
   stats: ColumnStats[];
+  costs: (Cost | null)[];
   best: Best;
   labelled: boolean;
   byQuestion: boolean;
 }
 
 /** Many models as one table, best first: the same numbers as the cards, one row each. */
-function RankTable({ rows, columns, stats, best, labelled, byQuestion }: RankTableProps) {
+function RankTable({ rows, columns, stats, costs, best, labelled, byQuestion }: RankTableProps) {
   const head = (label: string, info: string, right = true) => (
     <th className={cn(tableHead, right && "text-right")}>
       <span className="inline-flex items-center gap-1">
@@ -138,6 +187,7 @@ function RankTable({ rows, columns, stats, best, labelled, byQuestion }: RankTab
               {labelled && byQuestion && head("Items fully right", INFO.whole)}
               {head("Average", INFO.average)}
               {head("Median", INFO.median)}
+              {head("Cost", INFO.cost)}
             </tr>
           </thead>
           <tbody>
@@ -185,6 +235,7 @@ function RankTable({ rows, columns, stats, best, labelled, byQuestion }: RankTab
                     )}
                   {number(`${s.averageMs.toLocaleString()} ms`, best.average === k)}
                   {number(`${s.medianMs.toLocaleString()} ms`, best.median === k)}
+                  {number(costText(costs[k] ?? null), best.cost === k)}
                 </tr>
               );
             })}
@@ -199,13 +250,15 @@ interface SummaryProps {
   rows: Row[];
   columns: string[];
   dataset: string;
+  priceOf: (column: string) => Backend | undefined;
 }
 
 /** One card per model: its share right up front, then the details, the best of each in green. */
-export function Summary({ rows, columns, dataset }: SummaryProps) {
+export function Summary({ rows, columns, dataset, priceOf }: SummaryProps) {
   const [first] = rows;
   if (!first) return null;
   const stats = columns.map((_, k) => columnStats(rows, k));
+  const costs = columns.map((column, k) => columnCost(priceOf(column), stats[k] as ColumnStats));
   const labelled = (stats[0]?.total ?? 0) > 0;
   const byQuestion = Object.keys(first.item.questions).length > 1;
   const shares = stats.map((s) => (s.total ? s.correct / s.total : 0));
@@ -221,6 +274,11 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
     ),
     median: bestIndex(
       stats.map((s) => s.medianMs),
+      false,
+    ),
+    // an unknown cost never counts as cheapest
+    cost: bestIndex(
+      costs.map((cost) => cost?.dollars ?? Number.POSITIVE_INFINITY),
       false,
     ),
   };
@@ -244,6 +302,7 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
           rows={rows}
           columns={columns}
           stats={stats}
+          costs={costs}
           best={best}
           labelled={labelled}
           byQuestion={byQuestion}
@@ -312,6 +371,12 @@ export function Summary({ rows, columns, dataset }: SummaryProps) {
                     info={INFO.median}
                     value={`${s.medianMs.toLocaleString()} ms`}
                     best={best.median === k}
+                  />
+                  <StatLine
+                    label="Cost"
+                    info={INFO.cost}
+                    value={costText(costs[k] ?? null)}
+                    best={best.cost === k}
                   />
                 </div>
               </article>

@@ -110,7 +110,7 @@ const RUN_INPUT_TOKENS = 2_303_109;
 // For a set with no measurement: the average one-question item of the frozen set above.
 const ITEM_INPUT_TOKENS = 245;
 
-const dollars = (backend: Backend, input: number, output: number) => {
+export const dollars = (backend: Backend, input: number, output: number) => {
   if (backend.free || backend.price === 0) return 0;
   if (backend.price === undefined) return null;
   return ((backend.price ?? 0) * input + (backend.price_out ?? 0) * output) / 1e6;

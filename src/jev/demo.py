@@ -37,7 +37,7 @@ from jev import cache, downloads, folders, hub, llamaserver
 from jev.core import DEFAULT_MODEL, ROOT, SYSTEM, Jev, _options, _text, gpu_hint
 from jev.dev import NO_NODE, page_tools
 from jev.eval import typesafe_rows
-from jev.remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env
+from jev.remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env, total
 
 WEB = os.path.join(ROOT, "web", "dist")  # the built page; see web/
 MODELS = os.environ.get("JEV_MODELS") or os.path.join(ROOT, "models")
@@ -854,7 +854,16 @@ def run_rows(name):
             it = items.setdefault(
                 item_key(x), {"it": {k: x[k] for k in ("state", "questions", "truth", "source")}, "sides": {}}
             )
-            it["sides"][x["backend"]] = {"ms": x["ms"], "res": {"answers": x["answers"]}}
+            res = {"answers": x["answers"]}
+            if usage := (x.get("response") or {}).get("usage"):
+                # the totals the page prices a run from, not each question's details
+                billed = total((usage.get("per_question") or {}).values(), "cost")
+                res["usage"] = {
+                    "input_tokens": usage.get("input_tokens"),
+                    "output_tokens": usage.get("output_tokens"),
+                    "cost": usage.get("cost", billed if usage.get("per_question") else None),
+                }
+            it["sides"][x["backend"]] = {"ms": x["ms"], "res": res}
             if "at" in x:  # older runs did not record it
                 # the item started when its first model started (local models answer one after
                 # another), and ended with its last answer

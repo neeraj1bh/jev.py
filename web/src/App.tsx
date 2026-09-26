@@ -1121,6 +1121,9 @@ export default function App() {
               ) : undefined
             }
             dataset={inputName}
+            priceOf={(column) =>
+              Object.values(backends).find((backend) => columnName(backend.id) === column)
+            }
             rows={batchReplay.visibleRows}
             columns={columns}
             note={tableNote}

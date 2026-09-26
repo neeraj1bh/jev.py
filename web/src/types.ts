@@ -75,7 +75,8 @@ export type Answer =
 
 export interface Response {
   answers: Record<string, Answer>;
-  usage?: { input_tokens?: number };
+  /** Tokens as the provider counted them, and the dollars it billed where it says (OpenRouter). */
+  usage?: { input_tokens?: number; output_tokens?: number; cost?: number | null };
   latency_ms?: number;
   error?: { message: string };
 }
