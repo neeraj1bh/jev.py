@@ -1,6 +1,6 @@
 import { ArrowDown, Rows } from "@phosphor-icons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { type ReactElement, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, type ReactElement, useEffect, useRef, useState } from "react";
 
 import { answerLabel, inputSnippet, matchesLabel, scoreResponse } from "../scoring";
 import { cn, labelText, monoDim, tableCell, tableHead } from "../styles";
@@ -80,6 +80,7 @@ interface BatchTableProps {
 
 const ROW_PX = 35; // every row is one line and pinned to this height, so the scroll never corrects itself
 const NEW_ROWS = 6; // only the rows that just arrived rise in, not every row scrolled back into view
+const GLIDE = 0.12; // share of the gap to the newest row closed each frame while following
 const STRIP_AFTER = 6; // more models than this get one square each instead of a column each
 
 /** Green when every model got the item right, orange when any missed or failed, grey unlabelled. */
@@ -137,6 +138,80 @@ function StripCell({ row, columns }: { row: Row; columns: string[] }) {
   );
 }
 
+type BatchRowProps = {
+  row: Row;
+  index: number;
+  columns: string[];
+  labelled: boolean;
+  strip: boolean;
+  selected: boolean;
+  rising: boolean;
+  onOpen: (index: number) => void;
+};
+
+/** One item's row. Memoised: a scroll step then draws only the rows coming into view, not the
+ * forty already drawn with a tooltip on every cell, which dropped scrolling to a few frames a second. */
+const BatchRow = memo(function BatchRow({
+  row,
+  index,
+  columns,
+  labelled,
+  strip,
+  selected,
+  rising,
+  onOpen,
+}: BatchRowProps) {
+  const questionCount = Object.keys(row.item.truth).length;
+  const input = inputSnippet(row.item.state);
+  return (
+    <tr
+      data-index={index}
+      style={{ height: ROW_PX }}
+      onClick={() => onOpen(index)}
+      className={cn(
+        "cursor-pointer transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md",
+        selected && "bg-lift",
+        rising && "animate-rise motion-reduce:animate-none",
+      )}
+    >
+      <td className={tableCell}>
+        <RowDot row={row} />
+        <span className={monoDim}>{index + 1}</span>
+      </td>
+      <Tip content={input}>
+        <td className={cn(tableCell, "max-w-none text-ink")}>{input}</td>
+      </Tip>
+      {labelled && (
+        <td className={tableCell}>
+          {questionCount > 1 ? (
+            <span className={monoDim}>{questionCount} questions</span>
+          ) : (
+            Object.values(row.item.truth)[0]
+          )}
+        </td>
+      )}
+      {strip ? (
+        <StripCell row={row} columns={columns} />
+      ) : (
+        columns.map((column, k) => {
+          const side = row.sides[k];
+          return (
+            side && (
+              <ResultCell
+                key={column}
+                response={side.response}
+                truth={row.item.truth}
+                ms={side.ms}
+                compact={columns.length > 4}
+              />
+            )
+          );
+        })
+      )}
+    </tr>
+  );
+});
+
 export function BatchTable({
   rows,
   columns,
@@ -172,20 +247,40 @@ export function BatchTable({
     virtualRef.current.scrollToIndex(selected, { align: "center" });
   }, [selected, follow, live]);
 
-  // While rows arrive the table sticks to its newest row, as a terminal does, unless the reader
-  // has scrolled up to look at something. The jump is instant: a smooth scroll restarted for
-  // every row never catches up at replay speeds.
+  // While rows arrive the table follows its newest row, as a terminal does, unless the reader has
+  // scrolled up to look at something. It glides rather than jumps: each frame closes a share of
+  // the gap, so the speed follows the rows' arrival rate and a fast replay flows instead of
+  // lurching a dozen rows at a time.
   const [pinned, setPinned] = useState(true);
+  const glidedTo = useRef<number | null>(null);
   const onScroll = () => {
     const box = scrollRef.current;
-    if (box) setPinned(box.scrollHeight - box.clientHeight - box.scrollTop < ROW_PX * 2);
+    if (!box) return;
+    const atEnd = box.scrollHeight - box.clientHeight - box.scrollTop < ROW_PX * 2;
+    // the glide trails the newest row by design; only a move up against it is the reader's
+    const movedUp = glidedTo.current !== null && box.scrollTop < glidedTo.current - 1;
+    if (atEnd) setPinned(true);
+    else if (glidedTo.current === null || movedUp) setPinned(false);
   };
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new row is what moves the table
-  useLayoutEffect(() => {
-    const box = scrollRef.current;
-    if (live && pinned && box) box.scrollTop = box.scrollHeight;
-  }, [live, pinned, rows.length]);
-  // Pinning again is enough: the layout effect above takes the table to its newest row.
+  useEffect(() => {
+    if (!(live && pinned)) {
+      glidedTo.current = null;
+      return;
+    }
+    let frame = 0;
+    const glide = () => {
+      const box = scrollRef.current;
+      if (box) {
+        const gap = box.scrollHeight - box.clientHeight - box.scrollTop;
+        if (gap > 0.5) box.scrollTop += Math.max(1, gap * GLIDE);
+        glidedTo.current = box.scrollTop;
+      }
+      frame = requestAnimationFrame(glide);
+    };
+    frame = requestAnimationFrame(glide);
+    return () => cancelAnimationFrame(frame);
+  }, [live, pinned]);
+  // Pinning again is enough: the glide takes the table to its newest row.
   const toLatest = () => setPinned(true);
 
   return (
@@ -207,7 +302,7 @@ export function BatchTable({
         <div ref={scrollRef} onScroll={onScroll} className="max-h-[460px] overflow-auto">
           <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px]">
             <colgroup>
-              <col className="w-14" />
+              <col className="w-16" />
               <col className={strip ? "w-[32%]" : columns.length > 3 ? "w-[26%]" : "w-[38%]"} />
               {labelled && <col className={strip ? "w-44" : "w-28"} />}
               {strip ? <col /> : columns.map((column) => <col key={column} />)}
@@ -238,58 +333,20 @@ export function BatchTable({
               )}
               {drawn.map(({ index }) => {
                 const row = rows[index];
-                if (!row) return null;
-                const questionCount = Object.keys(row.item.truth).length;
-                const input = inputSnippet(row.item.state);
                 return (
-                  <tr
-                    key={index}
-                    data-index={index}
-                    style={{ height: ROW_PX }}
-                    onClick={() => onOpen(index)}
-                    className={cn(
-                      "cursor-pointer transition-colors hover:bg-lift [&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md",
-                      selected === index && "bg-lift",
-                      row.isNew &&
-                        index >= rows.length - NEW_ROWS &&
-                        "animate-rise motion-reduce:animate-none",
-                    )}
-                  >
-                    <td className={tableCell}>
-                      <RowDot row={row} />
-                      <span className={monoDim}>{index + 1}</span>
-                    </td>
-                    <Tip content={input}>
-                      <td className={cn(tableCell, "max-w-none text-ink")}>{input}</td>
-                    </Tip>
-                    {labelled && (
-                      <td className={tableCell}>
-                        {questionCount > 1 ? (
-                          <span className={monoDim}>{questionCount} questions</span>
-                        ) : (
-                          Object.values(row.item.truth)[0]
-                        )}
-                      </td>
-                    )}
-                    {strip ? (
-                      <StripCell row={row} columns={columns} />
-                    ) : (
-                      columns.map((column, k) => {
-                        const side = row.sides[k];
-                        return (
-                          side && (
-                            <ResultCell
-                              key={column}
-                              response={side.response}
-                              truth={row.item.truth}
-                              ms={side.ms}
-                              compact={columns.length > 4}
-                            />
-                          )
-                        );
-                      })
-                    )}
-                  </tr>
+                  row && (
+                    <BatchRow
+                      key={index}
+                      row={row}
+                      index={index}
+                      columns={columns}
+                      labelled={labelled}
+                      strip={strip}
+                      selected={selected === index}
+                      rising={Boolean(row.isNew) && index >= rows.length - NEW_ROWS}
+                      onOpen={onOpen}
+                    />
+                  )
                 );
               })}
               {padBottom > 0 && (
