@@ -6,6 +6,7 @@ stops its children by process group, which native Windows lacks; there, use WSL 
 """
 
 import contextlib
+import ctypes
 import os
 import shutil
 import signal
@@ -17,25 +18,25 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SOURCE = os.path.join(ROOT, "src", "jev")
 WEB = os.path.join(ROOT, "web")
 # The page's package manager, first found: pnpm (its lockfile is committed), npm or bun. Each entry
-# installs the packages, runs a script from package.json, and runs a package's own command.
+# installs the packages and runs a script from package.json.
 MANAGERS = {
-    "pnpm": (["pnpm", "install", "--frozen-lockfile"], ["pnpm", "run"], ["pnpm", "exec"]),
-    "npm": (["npm", "install"], ["npm", "run"], ["npx"]),
-    "bun": (["bun", "install"], ["bun", "run"], ["bunx"]),
+    "pnpm": (["pnpm", "install", "--frozen-lockfile"], ["pnpm", "run"]),
+    "npm": (["npm", "install"], ["npm", "run"]),
+    "bun": (["bun", "install"], ["bun", "run"]),
 }
 NO_NODE = "the page needs Node 20.19+ and one of pnpm, npm or bun; install them, then run this again"
 
 
 def page_tools():
-    """The page's install, script and exec commands, its packages installed first; None without Node."""
+    """The page's script command, its packages installed first; None without Node."""
     name = next((m for m in MANAGERS if shutil.which(m)), None)
     if not name:
         return None
     # the full path, since Windows cannot start pnpm.cmd or npm.cmd by their bare names
-    install, script, run = ([shutil.which(c[0]), *c[1:]] for c in MANAGERS[name])
+    install, script = ([shutil.which(c[0]), *c[1:]] for c in MANAGERS[name])
     if not os.path.isdir(os.path.join(WEB, "node_modules")):
         subprocess.run(install, cwd=WEB, check=True)
-    return script, run
+    return script
 
 
 def newest():
@@ -43,9 +44,17 @@ def newest():
     return max(os.path.getmtime(os.path.join(SOURCE, f)) for f in os.listdir(SOURCE) if f.endswith(".py"))
 
 
+def die_with_parent():
+    """Linux asks the kernel to stop this child when the launcher dies without stopping it (killed,
+    crashed, its window closed); left running, the two held their ports and the next start moved to
+    3001, 3002. macOS has no such call; there Ctrl-C still stops both."""
+    with contextlib.suppress(AttributeError, OSError):
+        ctypes.CDLL(None).prctl(1, signal.SIGTERM)  # 1 is PR_SET_PDEATHSIG
+
+
 def start(command, cwd=ROOT):
     # its own process group, so Ctrl-C reaches only this process, which then stops each child whole
-    return subprocess.Popen(command, cwd=cwd, start_new_session=True)
+    return subprocess.Popen(command, cwd=cwd, start_new_session=True, preexec_fn=die_with_parent)
 
 
 def stop(process):
@@ -66,11 +75,11 @@ def main():
     signal.signal(signal.SIGINT, signal.default_int_handler)
     for stopped in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(stopped, lambda *_: sys.exit(0))
-    tools = page_tools()
-    if not tools:
+    if not page_tools():
         raise SystemExit(NO_NODE)
     serve = [sys.executable, "-c", "from jev.demo import cli; cli(build=False)", *sys.argv[1:]]
-    page = start([*tools[1], "vite"], WEB)
+    # vite itself, not through the package manager, so stopping it cannot leave vite running
+    page = start([os.path.join(WEB, "node_modules", ".bin", "vite")], WEB)
     server, seen = start(serve), newest()
     try:
         while True:

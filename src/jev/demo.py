@@ -1745,7 +1745,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
     if hint := gpu_hint():
         print(hint)
     Thread(target=runs, daemon=True).start()  # summarise the saved runs before Past runs is opened
-    # `kill` ends the server like Ctrl+C does, so exit handlers run and stop llama-server.
+    # `kill` ends the server like Ctrl+C does, and llama-server stops with it.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     # This machine only; JEV_HOST=0.0.0.0 opens the page and its models to the local network.
     server = ThreadingHTTPServer((os.environ.get("JEV_HOST", "127.0.0.1"), port), H)
@@ -1755,6 +1755,11 @@ def main(model_id=DEFAULT_MODEL, port=8080):
         print("\nstopped")
     finally:
         server.server_close()
+        # Exit at once: a normal exit first waits for a model still generating or a download still
+        # fetching, which held Ctrl-C for minutes. Saved runs are written a row at a time.
+        llamaserver.stop()
+        sys.stdout.flush()
+        os._exit(0)
 
 
 def build_page():
@@ -1764,11 +1769,11 @@ def build_page():
     if os.path.exists(index) and not page_is_stale(index):
         return
     try:
-        tools = page_tools()
-        if not tools:
+        script = page_tools()
+        if not script:
             print(NO_NODE)
             return
-        subprocess.run([*tools[0], "build"], cwd=os.path.dirname(WEB), check=True)
+        subprocess.run([*script, "build"], cwd=os.path.dirname(WEB), check=True)
     except (OSError, subprocess.CalledProcessError) as e:
         print(f"the page was not built ({e}); open the server for the steps")
 
