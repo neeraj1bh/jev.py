@@ -50,7 +50,14 @@ function InputCard({ state }: { state: unknown }) {
         />
       </button>
       <Reveal open={open}>
-        <pre className="mx-3 mb-3 max-h-[220px] min-h-0 overflow-auto border-0 bg-panel">
+        {/* Opens at most 220px tall and drags taller from its corner; a new item opens anew. */}
+        <pre
+          key={text}
+          ref={(pre) => {
+            if (pre) pre.style.height = `${Math.min(pre.scrollHeight, 220)}px`;
+          }}
+          className="mx-3 mb-3 max-h-[75vh] min-h-0 resize-y overflow-auto border-0 bg-panel"
+        >
           {text}
         </pre>
       </Reveal>
