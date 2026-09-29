@@ -42,7 +42,8 @@ and the public datasets and models the code uses.
 - **Core v1 stores pointers, not text.** Items are rebuilt from the Hugging Face Hub and checked
   against their fingerprints. Never commit item text. Once a model has run v1, its items never
   change; new items make a v2.
-- **Jev's answers stay private.** No Jev results in the repository, the README or any public page.
+- **Jev is measured, never learned from.** Its Core v1 scores may be published like any model's;
+  its answers never tune, select or build anything here, and no page serves Jev on the owner's key.
 - **Compare like with like.** The same items, labels and scoring for every model; report
   latency with its conditions (device, load, parallel requests).
 - **Local only by default.** Servers bind 127.0.0.1; `JEV_HOST` opens them on purpose. Anything

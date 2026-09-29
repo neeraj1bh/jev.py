@@ -48,16 +48,18 @@ slightly):
 
 | model | right | 95% range | cost of the run |
 |---|---:|---:|---:|
+| TypeSafe's Jev | 84.7% | 82.7–86.7 | about $0.07 |
 | Gemma 4 31B | 83.8% | 81.7–85.8 | $0.20 |
 | DeepSeek V4.1 Flash | 83.4% | 81.4–85.4 | about $0.11 |
 | Qwen3-Next 80B | 78.2% | 75.9–80.3 | $0.21 |
 | GPT-4o-mini | 75.8% | 73.3–78.1 | $0.23 |
 | Llama 3.1 8B | 63.6% | 60.8–66.3 | $0.10 |
 
-On the 2,478 questions all five answered. Costs are what the provider billed, cached input
-included; DeepSeek's is read from its balance. All five are overconfident: on the questions where
-they gave a probability for every option, each scored worse than spreading its answer evenly
-across the options would have.
+On the 2,478 questions all six answered. The top three are within each other's ranges. Jev's
+probabilities are the only ones worth a threshold: the other five are overconfident, and on the
+questions where they gave a probability for every option, each scored worse than spreading its
+answer evenly across the options would have. Costs are what the provider billed, cached input
+included; DeepSeek's is read from its balance, Jev's worked out from its reported tokens.
 
 How the questions were picked, how to run it, and earlier results: [docs/benchmark.md](docs/benchmark.md).
 
