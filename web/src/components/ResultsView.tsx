@@ -127,7 +127,12 @@ export function ResultsView(props: ResultsViewProps) {
       </div>
       {props.stage ??
         (props.scoreboard ? (
-          <Scoreboard rows={props.rows} columns={props.columns} {...props.scoreboard} />
+          <Scoreboard
+            rows={props.rows}
+            columns={props.columns}
+            priceOf={props.priceOf}
+            {...props.scoreboard}
+          />
         ) : (
           <Summary
             rows={ranked.rows}
