@@ -3,17 +3,17 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 
 @theme static {
-  --color-paper: #fbfbfa;
+  --color-paper: oklch(0.985 0.002 265);
   --color-panel: #ffffff;
-  --color-code: #f3f4f6;
-  --color-lift: #f0f1f3;
-  --color-rule: #e4e5e7;
-  --color-ink: #1a1c1f;
-  --color-ink-2: #1a1c1f;
-  --color-dim: #6b7079;
-  --color-bar: #d9dbdf;
-  --color-good: #1f8a4c;
-  --color-warn: #b4531a;
+  --color-code: #f4f4f5;
+  --color-lift: oklch(0.965 0.003 265);
+  --color-rule: #e4e4e7;
+  --color-ink: oklch(0.17 0.006 265);
+  --color-ink-2: oklch(0.17 0.006 265);
+  --color-dim: oklch(0.46 0.01 265);
+  --color-bar: #d4d4d8;
+  --color-good: oklch(50.8% 0.118 165.612);
+  --color-warn: oklch(51.4% 0.222 16.935);
   --color-shadow: rgb(0 0 0 / 0.12);
   --font-display: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-body: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -76,17 +76,17 @@
     --surface-shadow:
       0 0 0 1px rgb(255 255 255 / 0.05), 0 12px 24px -12px rgb(0 0 0 / 0.6),
       inset 0 1px 0 rgb(255 255 255 / 0.03);
-    --color-paper: #101214;
-    --color-panel: #171a1e;
-    --color-code: #0d0f11;
-    --color-lift: #21252b;
-    --color-rule: #262a30;
-    --color-ink: #e8eaed;
-    --color-ink-2: #e8eaed;
-    --color-dim: #8b929c;
-    --color-bar: #2a2f36;
-    --color-good: #4cc172;
-    --color-warn: #f0a15b;
+    --color-paper: oklch(0.13 0.004 265);
+    --color-panel: oklch(0.16 0.005 265);
+    --color-code: #0c0c0e;
+    --color-lift: oklch(0.19 0.005 265);
+    --color-rule: oklch(0.26 0.003 265);
+    --color-ink: oklch(0.93 0.002 265);
+    --color-ink-2: oklch(0.93 0.002 265);
+    --color-dim: oklch(0.62 0.005 265);
+    --color-bar: #3f3f46;
+    --color-good: oklch(76.5% 0.177 163.223);
+    --color-warn: oklch(71.2% 0.194 13.428);
     --color-shadow: rgb(0 0 0 / 0.4);
   }
   * {
