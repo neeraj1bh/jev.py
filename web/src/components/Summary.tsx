@@ -1,16 +1,23 @@
 import { dollars, dollarText } from "../backends";
 import { answerLabel, percent, scoreResponse } from "../scoring";
-import { cn, inset, labelText, rankChip, shell, tableCell, tableHead } from "../styles";
+import { cn, inset, labelText, rankChip, shell, tableCell } from "../styles";
 import type { Answer, Backend, Row } from "../types";
 import { InfoTip } from "./InfoTip";
 import { Tip } from "./Tip";
 
-interface ColumnStats {
+const DASHES = 60; // a long run is grouped into this many dashes, as a status page groups days
+
+interface Dash {
+  first: number;
+  last: number;
   correct: number;
   total: number;
-  fullyRight: number;
   averageMs: number;
-  medianMs: number;
+}
+
+interface ColumnStats {
+  dashes: Dash[];
+  averageMs: number;
   inputTokens: number;
   outputTokens: number;
   /** Dollars billed, when the provider said so for every answer. */
@@ -18,39 +25,39 @@ interface ColumnStats {
 }
 
 function columnStats(rows: Row[], column: number): ColumnStats {
-  let correct = 0;
-  let total = 0;
-  let fullyRight = 0;
-  const times: number[] = [];
+  const size = Math.ceil(rows.length / DASHES);
+  const dashes: Dash[] = [];
+  let ms = 0;
+  let answered = 0;
   let inputTokens = 0;
   let outputTokens = 0;
   let billed: number | null = null;
   let unbilled = false;
-  for (const row of rows) {
+  rows.forEach((row, index) => {
     const side = row.sides[column];
-    if (!side) continue;
-    times.push(side.ms);
+    if (!side) return;
+    if (index % size === 0)
+      dashes.push({ first: index, last: index, correct: 0, total: 0, averageMs: 0 });
+    const dash = dashes[dashes.length - 1] as Dash;
+    const [c, n] = scoreResponse(side.response, row.item.truth);
+    dash.correct += c;
+    dash.total += n;
+    // a running sum until the dash is closed below
+    dash.averageMs += side.ms;
+    dash.last = index;
+    ms += side.ms;
+    answered++;
     inputTokens += side.response.usage?.input_tokens ?? 0;
     outputTokens += side.response.usage?.output_tokens ?? 0;
     // a failed request has no usage and no bill, so it is left out rather than counted unknown
     const cost = side.response.usage?.cost;
     if (typeof cost === "number") billed = (billed ?? 0) + cost;
     else if (side.response.usage) unbilled = true;
-    const [c, n] = scoreResponse(side.response, row.item.truth);
-    correct += c;
-    total += n;
-    if (c === n) fullyRight++;
-  }
-  times.sort((a, b) => a - b);
-  const averageMs = times.length
-    ? Math.round(times.reduce((sum, ms) => sum + ms, 0) / times.length)
-    : 0;
+  });
+  for (const dash of dashes) dash.averageMs /= dash.last - dash.first + 1;
   return {
-    correct,
-    total,
-    fullyRight,
-    averageMs,
-    medianMs: times[times.length >> 1] ?? 0,
+    dashes,
+    averageMs: answered ? Math.round(ms / answered) : 0,
     inputTokens,
     outputTokens,
     billed: unbilled ? null : billed,
@@ -72,13 +79,26 @@ function agreementRate(rows: Row[]) {
   return percent(same, compared);
 }
 
+/** The middle time of every answer in the run, from every model: what "normal" means here. */
+function runMedianMs(rows: Row[]) {
+  const times = rows.flatMap((row) => row.sides.map((side) => side.ms)).sort((a, b) => a - b);
+  return times[times.length >> 1] || 1;
+}
+
+// How much slower than the run's median a dash is before it changes colour, and to what.
+const PACE = [
+  { upTo: 1.5, fill: "bg-emerald-500", word: "normal" },
+  { upTo: 3, fill: "bg-amber-400", word: "slower" },
+  { upTo: 6, fill: "bg-orange-500", word: "slow" },
+  { upTo: Number.POSITIVE_INFINITY, fill: "bg-rose-500", word: "very slow" },
+];
+const paceOf = (ms: number, normalMs: number) =>
+  PACE.find((pace) => ms / normalMs <= pace.upTo) ?? (PACE.at(-1) as (typeof PACE)[number]);
+
 const INFO = {
-  right:
-    "How often the model's answer matched the dataset's own label, which people wrote. Higher is better.",
-  whole: "Items where every question on it was answered right.",
+  correctness:
+    "One dash per stretch of items, in order. Its height is how often the model matched the dataset's own label there; its colour is how long it took against this run's median time.",
   average: "Time from sending the item to getting every answer back, averaged over the batch.",
-  median:
-    "The middle time: half the items were faster. One slow request moves it less than the average.",
   cost: "What the run cost: the provider's own bill where it gives one (OpenRouter), otherwise ~ its reported tokens at today's list price, which cached input can make lower. Models on this machine are free.",
 };
 
@@ -110,141 +130,46 @@ function bestIndex(values: number[], higherIsBetter: boolean) {
   return values.filter((value) => value === best).length === 1 ? values.indexOf(best) : -1;
 }
 
-function StatLine({
-  label,
-  info,
-  value,
-  best,
+/** A status-page strip: a dash per stretch of items, as tall as the share right, coloured by pace. */
+function DashStrip({
+  dashes,
+  normalMs,
+  labelled,
 }: {
-  label: string;
-  info: string;
-  value: string;
-  best: boolean;
+  dashes: Dash[];
+  normalMs: number;
+  labelled: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-rule py-2 text-[13px]">
-      <span className="inline-flex items-center gap-1 text-dim">
-        {label}
-        <InfoTip>{info}</InfoTip>
-      </span>
-      <span className={cn("font-medium tabular-nums", best ? "text-good" : "text-ink")}>
-        {value}
-      </span>
-    </div>
+    <span className="flex h-7 items-end gap-[2px]">
+      {dashes.map((dash) => {
+        const share = labelled && dash.total ? dash.correct / dash.total : 1;
+        const pace = paceOf(dash.averageMs, normalMs);
+        const items =
+          dash.first === dash.last
+            ? `Item ${dash.first + 1}`
+            : `Items ${dash.first + 1}–${dash.last + 1}`;
+        const right = labelled ? ` · ${dash.correct}/${dash.total} right` : "";
+        return (
+          <Tip
+            key={dash.first}
+            content={`${items}${right} · ${Math.round(dash.averageMs).toLocaleString()} ms, ${pace.word}`}
+          >
+            <span className="flex h-full max-w-3.5 min-w-[3px] flex-1 items-end rounded-[2px] bg-ink/[0.06]">
+              <span
+                className={cn("block w-full rounded-[2px]", pace.fill)}
+                style={{ height: `${Math.max(share * 100, 12)}%` }}
+              />
+            </span>
+          </Tip>
+        );
+      })}
+    </span>
   );
 }
 
-const CARDS = 3; // more models than this read better as one ranked table than as a wall of cards
-
-interface Best {
-  share: number;
-  whole: number;
-  average: number;
-  median: number;
-  cost: number;
-}
-
-interface RankTableProps {
-  rows: Row[];
-  columns: string[];
-  stats: ColumnStats[];
-  costs: (Cost | null)[];
-  best: Best;
-  labelled: boolean;
-  byQuestion: boolean;
-}
-
-/** Many models as one table, best first: the same numbers as the cards, one row each. */
-function RankTable({ rows, columns, stats, costs, best, labelled, byQuestion }: RankTableProps) {
-  const head = (label: string, info: string, right = true) => (
-    <th className={cn(tableHead, right && "text-right")}>
-      <span className="inline-flex items-center gap-1">
-        {label}
-        <InfoTip>{info}</InfoTip>
-      </span>
-    </th>
-  );
-  const number = (value: string, isBest: boolean) => (
-    <td
-      className={cn(
-        tableCell,
-        "text-right font-mono tabular-nums",
-        isBest ? "text-good" : "text-ink",
-      )}
-    >
-      {value}
-    </td>
-  );
-  return (
-    <div className={shell}>
-      <div className={cn(inset, "overflow-x-auto px-4 py-2")}>
-        <table className="w-full min-w-[640px] border-collapse text-[13px]">
-          <thead>
-            <tr>
-              <th className={cn(tableHead, "w-8")}>#</th>
-              <th className={tableHead}>Model</th>
-              {labelled && head("Right", INFO.right)}
-              {labelled && byQuestion && head("Items fully right", INFO.whole)}
-              {head("Average", INFO.average)}
-              {head("Median", INFO.median)}
-              {head("Cost", INFO.cost)}
-            </tr>
-          </thead>
-          <tbody>
-            {columns.map((column, k) => {
-              const s = stats[k];
-              if (!s) return null;
-              const share = s.total ? s.correct / s.total : 0;
-              return (
-                <tr key={column}>
-                  <td className={tableCell}>
-                    <span className={rankChip(k + 1)}>{k + 1}</span>
-                  </td>
-                  <td className={cn(tableCell, "max-w-none font-semibold text-ink")}>{column}</td>
-                  {labelled && (
-                    <td className={cn(tableCell, "w-[34%] max-w-none")}>
-                      <span className="flex items-center justify-end gap-3">
-                        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-bar">
-                          <span
-                            className={cn(
-                              "block h-full rounded-full",
-                              best.share === k ? "bg-good" : "bg-dim",
-                            )}
-                            style={{ width: `${share * 100}%` }}
-                          />
-                        </span>
-                        <span
-                          className={cn(
-                            "w-14 text-right font-mono font-semibold tabular-nums",
-                            best.share === k ? "text-good" : "text-ink",
-                          )}
-                        >
-                          {percent(s.correct, s.total)}
-                        </span>
-                        <span className="w-24 text-right font-mono text-xs text-dim tabular-nums">
-                          {s.correct.toLocaleString()}/{s.total.toLocaleString()}
-                        </span>
-                      </span>
-                    </td>
-                  )}
-                  {labelled &&
-                    byQuestion &&
-                    number(
-                      `${s.fullyRight.toLocaleString()}/${rows.length.toLocaleString()}`,
-                      best.whole === k,
-                    )}
-                  {number(`${s.averageMs.toLocaleString()} ms`, best.average === k)}
-                  {number(`${s.medianMs.toLocaleString()} ms`, best.median === k)}
-                  {number(costText(costs[k] ?? null), best.cost === k)}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+const head =
+  "px-2 py-2 text-left text-[13px] font-semibold text-ink shadow-[inset_0_-1px_0_var(--color-rule)]";
 
 interface SummaryProps {
   rows: Row[];
@@ -253,35 +178,42 @@ interface SummaryProps {
   priceOf: (column: string) => Backend | undefined;
 }
 
-/** One card per model: its share right up front, then the details, the best of each in green. */
+/** Every model in one table, best first: how often it was right, how fast, and what it cost. */
 export function Summary({ rows, columns, dataset, priceOf }: SummaryProps) {
-  const [first] = rows;
-  if (!first) return null;
+  if (rows.length === 0) return null;
   const stats = columns.map((_, k) => columnStats(rows, k));
   const costs = columns.map((column, k) => columnCost(priceOf(column), stats[k] as ColumnStats));
-  const labelled = (stats[0]?.total ?? 0) > 0;
-  const byQuestion = Object.keys(first.item.questions).length > 1;
-  const shares = stats.map((s) => (s.total ? s.correct / s.total : 0));
-  const best = {
-    share: bestIndex(shares, true),
-    whole: bestIndex(
-      stats.map((s) => s.fullyRight),
-      true,
-    ),
-    average: bestIndex(
-      stats.map((s) => s.averageMs),
-      false,
-    ),
-    median: bestIndex(
-      stats.map((s) => s.medianMs),
-      false,
-    ),
-    // an unknown cost never counts as cheapest
-    cost: bestIndex(
-      costs.map((cost) => cost?.dollars ?? Number.POSITIVE_INFINITY),
-      false,
-    ),
-  };
+  const labelled = rows.some((row) => Object.keys(row.item.truth).length > 0);
+  const byQuestion = Object.keys(rows[0]?.item.questions ?? {}).length > 1;
+  const normalMs = runMedianMs(rows);
+  const fastest = bestIndex(
+    stats.map((s) => s.averageMs),
+    false,
+  );
+  // an unknown cost never counts as cheapest
+  const cheapest = bestIndex(
+    costs.map((cost) => cost?.dollars ?? Number.POSITIVE_INFINITY),
+    false,
+  );
+  const heading = (label: string, info: string, right = false) => (
+    <th className={cn(head, right && "text-right")}>
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <InfoTip>{info}</InfoTip>
+      </span>
+    </th>
+  );
+  const number = (value: string, best: boolean) => (
+    <td
+      className={cn(
+        tableCell,
+        "align-middle text-right font-mono tabular-nums",
+        best ? "text-good" : "text-ink",
+      )}
+    >
+      {value}
+    </td>
+  );
 
   return (
     <section className="mb-3.5 animate-fade motion-reduce:animate-none">
@@ -292,98 +224,61 @@ export function Summary({ rows, columns, dataset, priceOf }: SummaryProps) {
             · {rows.length} {rows.length === 1 ? "item" : "items"}
           </span>
         </h2>
-        <p className={cn(labelText, "m-0")}>
-          {columns.length > 2 ? `All ${columns.length} gave` : "They gave"} the same answer on{" "}
-          {agreementRate(rows)} of {byQuestion ? "questions" : "items"}
-        </p>
+        {columns.length > 1 && (
+          <p className={cn(labelText, "m-0")}>
+            {columns.length > 2 ? `All ${columns.length} gave` : "They gave"} the same answer on{" "}
+            {agreementRate(rows)} of {byQuestion ? "questions" : "items"}
+          </p>
+        )}
       </div>
-      {columns.length > CARDS ? (
-        <RankTable
-          rows={rows}
-          columns={columns}
-          stats={stats}
-          costs={costs}
-          best={best}
-          labelled={labelled}
-          byQuestion={byQuestion}
-        />
-      ) : (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
-          {columns.map((column, k) => {
-            const s = stats[k];
-            if (!s) return null;
-            return (
-              <article key={column} className={shell}>
-                <div className="flex items-center gap-2 px-2.5 pt-1 pb-2">
-                  {columns.length > 1 && <span className={rankChip(k + 1)}>{k + 1}</span>}
-                  <Tip content={column}>
-                    <h3 className="m-0 truncate text-sm font-semibold tracking-tight text-ink">
-                      {column}
-                    </h3>
-                  </Tip>
-                </div>
-                <div className={cn(inset, "px-4 pt-3 pb-1.5")}>
-                  {labelled ? (
-                    <>
-                      <p className="mt-2.5 mb-0 flex items-baseline gap-2">
-                        <span
-                          className={cn(
-                            "text-[26px] leading-none font-semibold tabular-nums",
-                            best.share === k ? "text-good" : "text-ink",
-                          )}
-                        >
-                          {percent(s.correct, s.total)}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[13px] whitespace-nowrap text-dim">
-                          {s.correct}/{s.total} right
-                          <InfoTip>{INFO.right}</InfoTip>
-                        </span>
-                      </p>
-                      <span className="mt-2.5 mb-3 block h-1 overflow-hidden rounded-full bg-bar">
-                        <span
-                          className={cn(
-                            "block h-full rounded-full transition-[width] duration-500",
-                            best.share === k ? "bg-good" : "bg-dim",
-                          )}
-                          style={{ width: `${(shares[k] ?? 0) * 100}%` }}
-                        />
-                      </span>
-                      {byQuestion && (
-                        <StatLine
-                          label="Items fully right"
-                          info={INFO.whole}
-                          value={`${s.fullyRight}/${rows.length}`}
-                          best={best.whole === k}
-                        />
-                      )}
-                    </>
-                  ) : (
-                    <p className={cn(labelText, "mt-2 mb-3")}>No labels to score against</p>
-                  )}
-                  <StatLine
-                    label="Average time"
-                    info={INFO.average}
-                    value={`${s.averageMs.toLocaleString()} ms`}
-                    best={best.average === k}
-                  />
-                  <StatLine
-                    label="Median time"
-                    info={INFO.median}
-                    value={`${s.medianMs.toLocaleString()} ms`}
-                    best={best.median === k}
-                  />
-                  <StatLine
-                    label="Cost"
-                    info={INFO.cost}
-                    value={costText(costs[k] ?? null)}
-                    best={best.cost === k}
-                  />
-                </div>
-              </article>
-            );
-          })}
+      <div className={shell}>
+        <div className={cn(inset, "overflow-x-auto px-4 pt-2 pb-3")}>
+          <table className="w-full min-w-[560px] border-collapse text-[13px]">
+            <thead>
+              <tr>
+                <th className={cn(head, "w-8")}>#</th>
+                <th className={cn(head, "w-[28%]")}>Model</th>
+                {heading(labelled ? "Correctness" : "Time per item", INFO.correctness)}
+                {heading("Average time", INFO.average, true)}
+                {heading("Cost", INFO.cost, true)}
+              </tr>
+            </thead>
+            <tbody>
+              {columns.map((column, k) => {
+                const s = stats[k];
+                if (!s) return null;
+                return (
+                  <tr key={column}>
+                    <td className={cn(tableCell, "align-middle")}>
+                      <span className={rankChip(k + 1)}>{k + 1}</span>
+                    </td>
+                    <Tip content={column}>
+                      <td className={cn(tableCell, "align-middle font-semibold text-ink")}>
+                        {column}
+                      </td>
+                    </Tip>
+                    <td className={cn(tableCell, "w-[52%] max-w-none py-2 align-middle")}>
+                      <DashStrip dashes={s.dashes} normalMs={normalMs} labelled={labelled} />
+                    </td>
+                    {number(`${s.averageMs.toLocaleString()} ms`, fastest === k)}
+                    {number(costText(costs[k] ?? null), cheapest === k)}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className={cn(labelText, "mt-2.5 mb-0 flex flex-wrap items-center gap-x-3 gap-y-1")}>
+            {labelled && <span>Taller is more often right.</span>}
+            {PACE.map((pace) => (
+              <span key={pace.word} className="inline-flex items-center gap-1.5">
+                <span className={cn("size-2 rounded-[2px]", pace.fill)} />
+                {pace.word}
+              </span>
+            ))}
+            <span>against the run's median of {normalMs.toLocaleString()} ms</span>
+          </p>
         </div>
-      )}
+      </div>
     </section>
   );
 }
