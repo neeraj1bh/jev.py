@@ -112,7 +112,7 @@ export const fastestIndexes = (ms: number[]) => {
   return ms.filter((x) => x === min).length === 1 ? [ms.indexOf(min)] : [];
 };
 
-/** Column indexes best first: share of questions right, then the faster average on a tie. */
+/** Column indexes fastest first, then the larger share right on a tie. */
 export function rankColumns(rows: Row[], count: number) {
   const score = Array.from({ length: count }, (_, k) => {
     let correct = 0;
@@ -128,5 +128,5 @@ export function rankColumns(rows: Row[], count: number) {
     }
     return { k, share: total ? correct / total : 0, ms };
   });
-  return score.sort((a, b) => b.share - a.share || a.ms - b.ms).map(({ k }) => k);
+  return score.sort((a, b) => a.ms - b.ms || b.share - a.share).map(({ k }) => k);
 }
