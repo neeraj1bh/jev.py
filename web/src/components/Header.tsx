@@ -16,6 +16,7 @@ import { cn } from "../styles";
 import type { Mode } from "../types";
 import { Icon, type IconGlyph } from "./Icon";
 import { SegmentPill, segmentTrack } from "./Segment";
+import { ShareMenu } from "./ShareMenu";
 import { Tip } from "./Tip";
 
 const TABS: { mode: Mode; name: string; icon: IconGlyph }[] = [
@@ -81,6 +82,7 @@ export function Header({
             <Icon icon={Stop} size={14} />
           </button>
         )}
+        <ShareMenu />
         <Tip content="Keys and tokens">
           <button
             type="button"

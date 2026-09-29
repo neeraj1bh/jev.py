@@ -51,6 +51,8 @@ interface DropdownProps {
   /** Something is chosen; the trigger's icon tile fills in. */
   active?: boolean;
   compact?: boolean;
+  /** An icon-only round trigger, like the header's other buttons; `button` is the icon. */
+  round?: boolean;
   icon?: IconGlyph;
   buttonClassName?: string;
   menuClassName?: string;
@@ -64,6 +66,7 @@ export function Dropdown({
   title,
   active,
   compact,
+  round,
   icon,
   buttonClassName,
   menuClassName,
@@ -99,19 +102,30 @@ export function Dropdown({
           type="button"
           aria-haspopup="listbox"
           aria-expanded={open}
+          aria-label={round ? title : undefined}
           onClick={() => onOpenChange(!open)}
           onKeyDown={(event) => open && moveFocus(event, list.current)}
           className={cn(
-            "inline-flex max-w-full items-center gap-2 rounded-full border-0 bg-panel shadow-[0_1px_2px_var(--color-shadow)] ring-1 ring-rule transition-shadow hover:ring-dim aria-expanded:ring-dim",
-            compact ? "py-1 pr-2.5 text-[13.5px]" : "py-1.5 pr-3 text-sm",
-            icon ? "pl-1" : compact ? "pl-3" : "pl-3.5",
-            active || !compact ? "text-ink" : "text-dim",
+            round
+              ? "grid size-8 place-items-center rounded-full border border-rule bg-transparent text-dim transition-colors hover:border-dim hover:text-ink aria-expanded:border-dim aria-expanded:text-ink"
+              : cn(
+                  "inline-flex max-w-full items-center gap-2 rounded-full border-0 bg-panel shadow-[0_1px_2px_var(--color-shadow)] ring-1 ring-rule transition-shadow hover:ring-dim aria-expanded:ring-dim",
+                  compact ? "py-1 pr-2.5 text-[13.5px]" : "py-1.5 pr-3 text-sm",
+                  icon ? "pl-1" : compact ? "pl-3" : "pl-3.5",
+                  active || !compact ? "text-ink" : "text-dim",
+                ),
             buttonClassName,
           )}
         >
-          {icon && <IconTile icon={icon} tone={active ? "ink" : "idle"} />}
-          <span className="flex min-w-0 items-baseline gap-2 truncate">{button}</span>
-          <Icon icon={CaretUpDown} size={12} className="text-dim" />
+          {round ? (
+            button
+          ) : (
+            <>
+              {icon && <IconTile icon={icon} tone={active ? "ink" : "idle"} />}
+              <span className="flex min-w-0 items-baseline gap-2 truncate">{button}</span>
+              <Icon icon={CaretUpDown} size={12} className="text-dim" />
+            </>
+          )}
         </button>
       </Tip>
       {open && (
