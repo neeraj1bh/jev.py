@@ -48,7 +48,7 @@ With an NVIDIA GPU, install the CUDA build once (uv picks the one that matches t
 uv from switching it back; `jev` and `prod` print this when they see an NVIDIA GPU with the CPU build:
 
 ```sh
-uv pip install torch --torch-backend auto
+uv pip install --reinstall torch --torch-backend cu128
 uv run --no-sync jev          # --no-sync goes before the command; plain uv run restores the CPU build
 ```
 

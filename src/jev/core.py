@@ -272,7 +272,7 @@ def gpu_hint():
         return ""
     return (
         "An NVIDIA GPU is here, but PyTorch is the CPU build. To use the GPU, run once\n"
-        "  uv pip install torch --torch-backend auto\n"
+        "  uv pip install --reinstall torch --torch-backend cu128\n"
         "then start commands with uv run --no-sync (plain uv run puts the CPU build back)."
     )
 
