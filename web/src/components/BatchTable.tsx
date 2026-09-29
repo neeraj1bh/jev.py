@@ -299,7 +299,13 @@ export function BatchTable({
       }
     >
       <div className="relative">
-        <div ref={scrollRef} onScroll={onScroll} className="max-h-[460px] overflow-auto">
+        {/* One screen tall, and its scroll stays its own: handed on to the page at the end, a
+            trackpad's bounce shook the table and the page together. */}
+        <div
+          ref={scrollRef}
+          onScroll={onScroll}
+          className="max-h-[calc(100dvh-9rem)] overflow-auto overscroll-contain"
+        >
           <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px]">
             <colgroup>
               <col className="w-16" />
