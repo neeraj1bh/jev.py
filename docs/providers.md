@@ -20,6 +20,9 @@ instead of reasoning first. Checked against each provider's API reference on 202
 | Anthropic (Claude) | none | no | the Messages API returns no probabilities |
 | Mistral, Qwen (Alibaba), Ollama | unconfirmed | no | not stated in the documentation checked |
 
+Of the 139 OpenRouter models checked, only 44 really return probabilities, so the page tests each
+one and lists only those.
+
 Two limits follow from reading letters. A question can have at most 26 options, and a provider
 that returns fewer than 20 alternatives can only report that many options per question.
 

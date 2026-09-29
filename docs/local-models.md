@@ -137,7 +137,7 @@ uv run jev-remote llamacpp     # self-check through llama.cpp
 
 ## Models in the published results
 
-The llama.cpp results in the README used Q4_K_M quantizations of
+The llama.cpp results in [benchmark.md](benchmark.md) used Q4_K_M quantizations of
 [Qwen2.5-7B](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF),
 [Qwen2.5-14B](https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF) and
 [Qwen3-30B-A3B](https://huggingface.co/unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF).
