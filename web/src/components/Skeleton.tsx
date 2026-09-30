@@ -1,12 +1,13 @@
 import { cn } from "../styles";
 
-/** A soft placeholder block while something loads; still for people who turn motion off. */
+/** A soft placeholder block while something loads, a blue glint crossing it; still for people who
+ * turn motion off. */
 export function Skeleton({ className }: { className?: string }) {
   return (
     <span
       aria-hidden
       className={cn(
-        "block h-3 animate-pulse rounded bg-lift motion-reduce:animate-none",
+        "relative block h-3 overflow-hidden rounded bg-lift after:absolute after:inset-y-0 after:left-0 after:w-1/2 after:animate-sheen after:bg-linear-to-r after:from-transparent after:via-flux-glow/40 after:to-transparent motion-reduce:after:hidden",
         className,
       )}
     />

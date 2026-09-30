@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useCountUp } from "../hooks/useCountUp";
 import { cn, inset, shell } from "../styles";
 import type { Backend, Row } from "../types";
+import { FluxBar } from "./FluxBar";
 import { IconTile } from "./Icon";
 import { SummaryTable } from "./Summary";
 
@@ -76,12 +77,7 @@ export function Scoreboard({
       </div>
       <div className={inset}>
         <div className="px-4 pt-3 pb-2">
-          <span className="block h-1 overflow-hidden rounded-full bg-bar">
-            <span
-              className="block h-full rounded-full bg-ink/70 transition-[width] duration-300"
-              style={{ width: `${total ? (rows.length / total) * 100 : 0}%` }}
-            />
-          </span>
+          <FluxBar share={total ? rows.length / total : 0} label="Items done" className="h-2" />
           <div className="mt-1 overflow-x-auto">
             <SummaryTable rows={rows} columns={columns} priceOf={priceOf} live />
           </div>

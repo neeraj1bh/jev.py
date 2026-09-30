@@ -15,6 +15,8 @@
   --color-good: oklch(50.8% 0.118 165.612);
   --color-warn: oklch(51.4% 0.222 16.935);
   --color-shadow: rgb(0 0 0 / 0.12);
+  --color-flux: #1d6ffb;
+  --color-flux-glow: #74e1ff;
   --font-display: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-body: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -33,6 +35,7 @@
   --animate-rise: rise 0.25s var(--ease-out);
   --animate-from-r: from-r 0.2s var(--ease-out);
   --animate-from-l: from-l 0.2s var(--ease-out);
+  --animate-sheen: sheen 1.6s linear infinite;
 
   @keyframes pop {
     from {
@@ -54,6 +57,15 @@
     from {
       opacity: 0;
       transform: translateY(4px);
+    }
+  }
+  /* A highlight half as wide as its box crosses it from just off one end to just off the other. */
+  @keyframes sheen {
+    from {
+      transform: translateX(-110%);
+    }
+    to {
+      transform: translateX(210%);
     }
   }
   @keyframes from-r {
@@ -78,6 +90,11 @@
       0 6px 6px -3px rgb(41 41 41 / 0.04), 0 12px 12px -6px rgb(41 41 41 / 0.04),
       0 24px 24px -12px rgb(41 41 41 / 0.04), 0 48px 48px -24px rgb(41 41 41 / 0.04),
       0 0 0 1px rgb(41 41 41 / 0.04), inset 0 -1px 1px -0.5px rgb(51 51 51 / 0.06);
+    /* The fill glows in its own colours, lit along the top edge and shaded along the bottom. */
+    --flux-shadow:
+      0 0 18px color-mix(in oklab, var(--color-flux) 55%, transparent),
+      0 0 32px color-mix(in oklab, var(--color-flux-glow) 40%, transparent),
+      inset 0 1.5px 0 rgb(255 255 255 / 0.5), inset 0 -2px 3px rgb(0 40 120 / 0.35);
   }
   :root[data-theme="dark"] {
     --surface-shadow:

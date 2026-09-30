@@ -1,5 +1,6 @@
 import type { Progress } from "../hooks/useDownloads";
 import { cn, ghostButton, inset, shell } from "../styles";
+import { FluxBar } from "./FluxBar";
 
 const gb = (bytes: number) => (bytes / 1e9).toFixed(1);
 
@@ -33,12 +34,7 @@ export function DownloadBar({ progress, label, onStop }: DownloadBarProps) {
               </span>
             </p>
             <div className={cn(inset, "px-3.5 py-3")}>
-              <span className="block h-1.5 overflow-hidden rounded-full bg-bar">
-                <span
-                  className="block h-full rounded-full bg-good transition-[width] duration-300"
-                  style={{ width: `${Math.max(4, share * 100)}%` }}
-                />
-              </span>
+              <FluxBar share={share} label={`Downloading ${label(key)}`} />
               <div className="mt-2 flex items-center justify-between gap-3">
                 <p className="m-0 font-mono text-xs text-dim tabular-nums">
                   {detail} · resumes if stopped
