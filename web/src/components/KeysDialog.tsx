@@ -23,6 +23,7 @@ import { Skeleton } from "./Skeleton";
 /** Settings that are addresses or paths, typed in the open rather than as secrets. */
 const HINTS: Record<string, string> = {
   LLAMACPP_URL: "The llama-server address, e.g. http://localhost:8081/v1/chat/completions",
+  LAYA_URL: "The laya-serve address, e.g. http://localhost:8000/v1/systemone",
 };
 
 /** What each key reaches, at a glance: the real Jev, a hosted API, a gateway, a server. */
@@ -32,6 +33,7 @@ const ICONS: Record<string, PhosphorIcon> = {
   AI_GATEWAY_API_KEY: Triangle,
   HF_TOKEN: Smiley,
   LLAMACPP_URL: HardDrives,
+  LAYA_URL: HardDrives,
 };
 
 const quiet =

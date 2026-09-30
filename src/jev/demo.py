@@ -37,7 +37,7 @@ from jev import cache, downloads, folders, hub, llamaserver
 from jev.core import DEFAULT_MODEL, ROOT, SYSTEM, Jev, _options, _text, gpu_hint
 from jev.dev import NO_NODE, page_tools
 from jev.eval import typesafe_rows
-from jev.remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env, total
+from jev.remote import ADDRESS, BACKENDS, EXTRAS, NoProbabilities, Remote, env, total
 
 WEB = os.path.join(ROOT, "web", "dist")  # the built page; see web/
 MODELS = os.environ.get("JEV_MODELS") or os.path.join(ROOT, "models")
@@ -890,6 +890,21 @@ def llamacpp_url():
     return env("LLAMACPP_URL") or BACKENDS["llamacpp"][1]
 
 
+def laya_url():
+    return env("LAYA_URL") or BACKENDS["laya"][1]
+
+
+def laya_up(url, timeout=0.5):
+    """Whether a laya-serve answers at this address. Its health reply lists the checkpoints it
+    holds, which tells it from whatever else may be listening on so common a port."""
+    try:
+        with urllib.request.urlopen(url.split("/v1/")[0] + "/health", timeout=timeout) as r:
+            reply = json.loads(r.read())
+        return reply.get("status") == "ok" and "loaded" in reply
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"
 GATEWAY = {"at": 0.0, "models": []}  # OpenRouter's catalog, refetched every few hours
 VERCEL_MODELS = "https://ai-gateway.vercel.sh/v1/models"
@@ -1156,6 +1171,12 @@ def backends(extra):
                 "max": 26,
             }
         )
+    laya, laya_answers = laya_url(), laya_up(laya_url())
+    # Like the llama-server above: listed only when one answers or its address was set under Keys.
+    if laya_answers or env("LAYA_URL"):
+        out.append(
+            {"id": "remote:laya", "group": "server", "label": "Laya", "ready": laya_answers, "url": laya}
+        )
     prices = live_prices()
     for b, label in HOSTED.items():
         var = BACKENDS[b][0]
@@ -1239,6 +1260,7 @@ KEYS = {
         "https://huggingface.co/settings/tokens",
     ),
     "LLAMACPP_URL": ("llama.cpp server", "a llama-server address instead of the default", ""),
+    "LAYA_URL": ("Laya server", "a laya-serve address instead of the default", ""),
 }
 HF_WHOAMI = "https://huggingface.co/api/whoami-v2"
 
@@ -1273,6 +1295,9 @@ def check_key(name, key):
         with urllib.request.urlopen(key.split("/v1/")[0] + "/health", timeout=5) as r:
             if json.loads(r.read()).get("status") != "ok":
                 raise ValueError("that address answered, but not as a llama-server")
+    elif name == "LAYA_URL":
+        if not laya_up(key, timeout=5):
+            raise ValueError("that address did not answer as a laya-serve")
     elif name == "remote:openrouter":  # its key endpoint checks the key alone, whatever a model can do
         request = urllib.request.Request(OPENROUTER_KEY_URL, headers={"Authorization": "Bearer " + key})
         urllib.request.urlopen(request, timeout=15).close()
@@ -1320,8 +1345,9 @@ def set_key(name, key, save):
     old = os.environ.get(var)
     os.environ[var] = key
     LOADED.pop(bid, None)
-    if var == "LLAMACPP_URL":
-        LOADED.pop("remote:llamacpp", None)
+    for backend, address in ADDRESS.items():  # a new address must not keep answering from the old one
+        if var == address:
+            LOADED.pop("remote:" + backend, None)
 
     def undo():
         if old is None:
@@ -1356,7 +1382,8 @@ def set_key(name, key, save):
             f.write("\n".join(lines) + "\n")
 
 
-TEXTLESS = {"remote:typesafe", "remote:vercel"}  # Jev returns probabilities only; it never writes text
+# Jev and Laya return probabilities only; they never write text
+TEXTLESS = {"remote:typesafe", "remote:vercel", "remote:laya"}
 
 
 def messages(state, questions):
@@ -1679,7 +1706,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     return self._send(200, json.dumps(answer).encode())
                 if self.path.endswith("/generate"):
                     if (body.get("backend") or model_id) in TEXTLESS:
-                        raise ValueError("Jev returns probabilities only; it does not write text")
+                        raise ValueError("This model returns probabilities only; it does not write text")
                     make = generate if isinstance(jev, Jev) else generate_remote
                     t = time.time()
                     pieces = make(jev, body["state"], body["questions"])

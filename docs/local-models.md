@@ -1,6 +1,7 @@
 # Local models
 
-jev.py runs local models in two ways. Both appear in the page's model menu.
+jev.py runs local models in two ways. Both appear in the page's model menu. A third kind of
+local model, [Laya](#laya), is its own server.
 
 | | Hugging Face model | llama.cpp server |
 |---|---|---|
@@ -134,6 +135,29 @@ networkingMode=mirrored
 curl localhost:8081/health     # {"status":"ok"}
 uv run jev-remote llamacpp     # self-check through llama.cpp
 ```
+
+## Laya
+
+[Laya](https://github.com/NandhaKishorM/laya) is an open encoder that answers the same typed
+questions in one pass, with no text generated. It runs as its own server and speaks TypeSafe's
+request and answer shapes, so jev.py passes each item straight through and reads nothing by letter.
+
+```sh
+pip install "laya[serve]"
+LAYA_HOST=127.0.0.1 laya-serve     # port 8000; downloads a checkpoint on first use
+curl localhost:8000/health         # {"status":"ok","loaded":[...], ...}
+uv run jev-remote laya             # self-check through Laya
+```
+
+The page lists **Laya** under Local server while a `laya-serve` answers on port 8000. For another
+address, set it under Keys or as `LAYA_URL` in `.env`. The model is Laya's English checkpoint;
+`remote:laya:typed-decisions` and `remote:laya:multilingual` pin its other two. Two things to know
+when comparing it with the other models:
+
+- Its `confidence` is one minus the normalised entropy of the answer, not the margin jev.py and Jev
+  report, so a confidence threshold does not carry over. The probabilities do.
+- Its makers list spam, phishing and news-topic sets as training data, so its score on those says
+  less than on sets it has not seen.
 
 ## Models in the published results
 

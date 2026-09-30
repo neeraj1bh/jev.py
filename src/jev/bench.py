@@ -703,7 +703,7 @@ def reads_wide(model):
 def system(model, backend):
     """What answers a run, stored with each of its rows so results say which system produced them."""
     about = {"id": model, "model": backend.model_id, "device": getattr(backend, "device", None)}
-    if isinstance(backend, remote.Remote) and backend.backend in ("typesafe", "vercel"):
+    if isinstance(backend, remote.Remote) and backend.backend in (*remote.TYPED, "vercel"):
         return about | {"readout": "the provider's own typed API"}  # no letter prompt is sent
     if isinstance(backend, remote.Remote):
         request = remote.EXTRAS.get(backend.backend, {"temperature": 0})

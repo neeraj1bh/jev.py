@@ -1,10 +1,10 @@
 import type { Backend, BackendGroup, Dataset } from "./types";
 
-/** Jev returns probabilities only; it never writes text. */
 export const OPENROUTER = "remote:openrouter";
-export const TEXTLESS = new Set(["remote:typesafe", "remote:vercel"]);
+/** Jev and Laya return probabilities only; they never write text. */
+export const TEXTLESS = new Set(["remote:typesafe", "remote:vercel", "remote:laya"]);
 
-/** A llama.cpp server that is not running, or a GGUF file with no llama-server program set. */
+/** A local server that is not running, or a GGUF file with no llama-server program set. */
 export const isOffline = (backend: Backend) =>
   !backend.ready && (backend.group === "server" || backend.group === "gguf");
 
@@ -41,7 +41,7 @@ export function pickerSubtitle(backend?: Backend) {
 
 export function location(backend?: Backend) {
   if (!backend) return "";
-  if (backend.group === "server") return `llama.cpp at ${backend.url}`;
+  if (backend.group === "server") return `${backend.label} at ${backend.url}`;
   if (backend.group === "gguf") return `${backend.path}, run by llama-server`;
   if (backend.group === "hosted") return `Key from ${backend.key}`;
   const need =

@@ -2,7 +2,8 @@
 
 Any OpenAI-compatible endpoint that returns `top_logprobs` works: the options are lettered,
 the model is asked for one token, and the probability of each letter is read from the
-returned log-probabilities. `typesafe` is passed straight through to the real Jev API.
+returned log-probabilities. `typesafe` is passed straight through to the real Jev API, and
+`laya` to a laya-serve on this machine, which answers in the same shape.
 
 Keys come from .env (see .env.example) or the environment.
 
@@ -45,7 +46,13 @@ BACKENDS = {
     ),
     # llama.cpp's llama-server on this machine or the LAN; no key, LLAMACPP_URL overrides the address
     "llamacpp": ("", "http://localhost:8081/v1/chat/completions", "local"),
+    # Laya's laya-serve at its own default port: an encoder that scores every option in one pass
+    # and answers in TypeSafe's shape; no key, LAYA_URL overrides the address. "laya" is its
+    # English checkpoint; remote:laya:typed-decisions or :multilingual pins another.
+    "laya": ("", "http://localhost:8000/v1/systemone", "laya"),
 }
+ADDRESS = {"llamacpp": "LLAMACPP_URL", "laya": "LAYA_URL"}  # servers found by address, not by key
+TYPED = ("typesafe", "laya")  # speak TypeSafe's own request and answer shapes: nothing to read by letter
 LETTER_SYSTEM = "You are a calibrated decision engine. Reply with one letter."
 TOP_LOGPROBS = 20  # alternatives asked for with the answer token
 PROMPT_VERSION = "letter-1"  # bump whenever LETTER_SYSTEM or letter_prompt changes; fingerprints hash it
@@ -98,13 +105,13 @@ class Remote:
         var, self.url, default = BACKENDS[backend]
         self.patient = patient
         self.backend, self.model_id, self.key = backend, model or default, env(var) if var else "none"
-        self.url = env("LLAMACPP_URL") or self.url if backend == "llamacpp" else self.url
+        self.url = (backend in ADDRESS and env(ADDRESS[backend])) or self.url
         self.device = backend
         if not self.key:
             raise SystemExit(f"{var} is not set: copy .env.example to .env and fill it in")
 
     def ask(self, state, questions):
-        if self.backend == "typesafe":
+        if self.backend in TYPED:
             body = {"model": self.model_id, "state": state, "questions": questions}
             return post(self.url, self.key, body, patient=self.patient)
         if self.backend == "vercel":
