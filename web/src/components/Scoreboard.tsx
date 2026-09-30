@@ -5,7 +5,6 @@ import { useCountUp } from "../hooks/useCountUp";
 import { cn, inset, shell } from "../styles";
 import type { Backend, Row } from "../types";
 import { Aurora } from "./Aurora";
-import { FluxBar } from "./FluxBar";
 import { IconTile } from "./Icon";
 import { SummaryTable } from "./Summary";
 
@@ -53,9 +52,9 @@ export function Scoreboard({
   const done = useCountUp(rows.length, 120);
 
   return (
-    <section className={cn(shell, "mb-3.5")}>
-      <div className="relative flex flex-wrap items-center justify-between gap-x-6 gap-y-2 overflow-hidden rounded-2xl px-4 pt-3 pb-3">
-        <Aurora className="opacity-30 [mask-image:linear-gradient(to_right,transparent,black)]" />
+    <section className={cn(shell, "relative mb-3.5 overflow-hidden")}>
+      <Aurora className="opacity-30 [mask-image:linear-gradient(to_bottom,black,transparent_14rem)]" />
+      <div className="relative flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 pt-3 pb-3">
         <div className="relative flex min-w-0 items-center gap-2">
           <IconTile icon={Lightning} tone="ink" />
           <span className="truncate text-[15px] font-semibold tracking-tight text-ink">
@@ -77,12 +76,9 @@ export function Scoreboard({
           </span>
         </div>
       </div>
-      <div className={inset}>
-        <div className="px-4 pt-3 pb-2">
-          <FluxBar share={total ? rows.length / total : 0} label="Items done" className="h-2" />
-          <div className="mt-1 overflow-x-auto">
-            <SummaryTable rows={rows} columns={columns} priceOf={priceOf} live />
-          </div>
+      <div className={cn(inset, "relative")}>
+        <div className="overflow-x-auto px-4 py-2">
+          <SummaryTable rows={rows} columns={columns} priceOf={priceOf} live />
         </div>
       </div>
     </section>

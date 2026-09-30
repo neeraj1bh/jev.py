@@ -20,6 +20,7 @@ import { ConfirmDialog, type ConfirmRequest } from "./components/ConfirmDialog";
 import { DownloadBar } from "./components/DownloadBar";
 import { EditDialog } from "./components/EditDialog";
 import { EmptyState } from "./components/EmptyState";
+import { FluxLoader } from "./components/FluxLoader";
 import { GenerateReplay } from "./components/GenerateReplay";
 import { Header } from "./components/Header";
 import { Icon } from "./components/Icon";
@@ -128,6 +129,10 @@ export default function App() {
   const [logFile, setLogFile] = useState({ text: "", path: "" });
   const [recording, setRecording] = useState<Recording | null>(null);
   const [busy, setBusy] = useState(false);
+  // The step a run is waiting on before its first request, and the downloads that measure it.
+  const [waiting, setWaiting] = useState<{ label: string; downloads: string[] } | null>(null);
+  // Models loaded from this page already; loading them again is quick and needs no loader.
+  const loaded = useRef(new Set<string>());
   const [replaying, setReplaying] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
@@ -548,15 +553,24 @@ export default function App() {
       );
       if (!ok) return false;
       setVerdict(`Downloading ${names}. First time only; this can take minutes.`);
+      setWaiting({ label: "downloading", downloads: missing.map((backend) => backend.id) });
     }
     // A download changes what is on disk; a GGUF model starts llama-server, shown in the header.
     const refresh = missing.length > 0 || picked.some((backend) => backend.group === "gguf");
     try {
       await Promise.all(missing.map((backend) => loadModel(backend.id)));
       for (const backend of picked) {
-        if (backend.group === "local") setVerdict(`Loading ${backend.label}…`);
-        if (backend.group === "gguf") setVerdict(`Starting llama-server with ${backend.label}…`);
+        const cold = !backend.running && !loaded.current.has(backend.id);
+        if (backend.group === "local") {
+          setVerdict(`Loading ${backend.label}…`);
+          if (cold) setWaiting({ label: "loading the model", downloads: [] });
+        }
+        if (backend.group === "gguf") {
+          setVerdict(`Starting llama-server with ${backend.label}…`);
+          if (cold) setWaiting({ label: "starting llama.cpp", downloads: [] });
+        }
         const { stopped } = await loadModel(backend.id);
+        loaded.current.add(backend.id);
         if (stopped?.length) toast.show(`Stopped ${stopped.join(", ")} to make room.`);
       }
     } catch (error) {
@@ -564,6 +578,8 @@ export default function App() {
       toast.show(errorMessage(error));
       if (refresh) await reload();
       return false;
+    } finally {
+      setWaiting(null);
     }
     if (refresh) await reload();
     return true;
@@ -1015,6 +1031,11 @@ export default function App() {
       : backend;
   });
   const noModel = isCompare ? compareModels.length === 0 : !generateModel;
+  const waitingOn = (waiting?.downloads ?? []).flatMap((id) => downloads[id] ?? []);
+  const waitingTotal = waitingOn.reduce((sum, part) => sum + part.total, 0);
+  const waitingShare = waitingTotal
+    ? waitingOn.reduce((sum, part) => sum + part.done, 0) / waitingTotal
+    : undefined;
   const runningModels = backendList.filter((backend) => backend.running);
   // Memory a local model needs per GB of weights here, as the server works it out.
   const localModel = backendList.find((backend) => backend.group === "local" && backend.gb);
@@ -1282,7 +1303,13 @@ export default function App() {
               </div>
             </div>
 
-            <p className="mt-[18px] mb-0 min-h-[26px] text-sm text-ink [&_b]:font-semibold [&_b]:text-good">
+            {waiting && <FluxLoader label={waiting.label} share={waitingShare} />}
+            <p
+              className={cn(
+                "mt-[18px] mb-0 min-h-[26px] text-sm text-ink [&_b]:font-semibold [&_b]:text-good",
+                waiting && "text-center text-dim",
+              )}
+            >
               {verdict}
             </p>
 

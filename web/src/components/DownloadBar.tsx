@@ -34,7 +34,7 @@ export function DownloadBar({ progress, label, onStop }: DownloadBarProps) {
               </span>
             </p>
             <div className={cn(inset, "px-3.5 py-3")}>
-              <FluxBar share={share} label={`Downloading ${label(key)}`} />
+              <FluxBar share={Math.max(share, 0.04)} label={`Downloading ${label(key)}`} />
               <div className="mt-2 flex items-center justify-between gap-3">
                 <p className="m-0 font-mono text-xs text-dim tabular-nums">
                   {detail} · resumes if stopped

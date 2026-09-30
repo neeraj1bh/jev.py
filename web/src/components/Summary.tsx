@@ -1,10 +1,12 @@
 import { motion } from "motion/react";
 
 import { dollars, dollarText } from "../backends";
+import { makerIcon } from "../logos";
 import { answerLabel, percent, scoreResponse } from "../scoring";
 import { cn, inset, labelText, rankChip, shell, tableCell } from "../styles";
 import type { Answer, Backend, Row } from "../types";
-import { CrayonBar } from "./CrayonBar";
+import { FluxBar } from "./FluxBar";
+import { Icon } from "./Icon";
 import { InfoTip } from "./InfoTip";
 import { Tip } from "./Tip";
 
@@ -69,10 +71,9 @@ function agreementRate(rows: Row[]) {
 
 const INFO = {
   correctness:
-    "How often the model's answer matched the dataset's own label, which people wrote. The box is filled that far out of 100%.",
-  average:
-    "Time from sending the item to getting every answer back, averaged over the batch. The slowest model fills its box.",
-  cost: "What the run cost: the provider's own bill where it gives one (OpenRouter), otherwise ~ its reported tokens at today's list price, which cached input can make lower. Models on this machine are free. The dearest model fills its box.",
+    "How often the model's answer matched the dataset's own label, which people wrote. The bar is filled that far out of 100%.",
+  average: "Time from sending the item to getting every answer back, averaged over the batch.",
+  cost: "What the run cost: the provider's own bill where it gives one (OpenRouter), otherwise ~ its reported tokens at today's list price, which cached input can make lower. Models on this machine are free.",
 };
 
 interface Cost {
@@ -97,13 +98,12 @@ function costText(cost: Cost | null) {
   return cost.estimate ? `~${text}` : text;
 }
 
-/** Where a value sits in the run, 0 at the best and 1 at the worst; 0 when all are equal. */
-function toneOf(value: number, values: number[], higherIsBetter: boolean) {
-  const low = Math.min(...values);
-  const high = Math.max(...values);
-  if (high === low) return 0;
-  const place = (value - low) / (high - low);
-  return higherIsBetter ? 1 - place : place;
+/** The smallest of 1, 2, 2.5 or 5 times a power of ten that holds the value: what a full bar
+ * stands for. Bars keep this scale while values arrive and only re-scale when one outgrows it. */
+function fullBar(value: number) {
+  if (value <= 0) return 0;
+  const power = 10 ** Math.floor(Math.log10(value));
+  return ([1, 2, 2.5, 5].find((step) => step * power >= value) ?? 10) * power;
 }
 
 const head =
@@ -118,34 +118,44 @@ interface SummaryTableProps {
 }
 
 /** Every model in one row, fastest first: its average time, what it cost and how often it was
- * right, each as a scribbled bar. The same table while a batch runs, replays and once it is done. */
+ * right, each as a bar. The same table while a batch runs, replays and once it is done. */
 export function SummaryTable({ rows, columns, priceOf, live = false }: SummaryTableProps) {
   const stats = columns.map((_, k) => columnStats(rows, k));
   const costs = columns.map((column, k) => columnCost(priceOf(column), stats[k] as ColumnStats));
   const labelled = rows.some((row) => Object.keys(row.item.truth).length > 0);
   const shares = stats.map((s) => (s.total ? s.correct / s.total : 0));
   const times = stats.map((s) => s.averageMs);
-  const slowest = Math.max(1, ...times);
-  // an unknown cost has no bar and no place in the ramp
-  const dollarsKnown = costs.flatMap((cost) => (cost ? [cost.dollars] : []));
-  const dearest = Math.max(0, ...dollarsKnown);
+  const fullTime = fullBar(Math.max(0, ...times));
+  // an unknown cost has no bar
+  const fullCost = fullBar(Math.max(0, ...costs.map((cost) => cost?.dollars ?? 0)));
   // a model with no answer yet waits at the bottom rather than leading on a time of zero
   const order = columns
     .map((_, k) => k)
     .sort(
       (a, b) => (times[a] || Number.POSITIVE_INFINITY) - (times[b] || Number.POSITIVE_INFINITY),
     );
-  const heading = (label: string, info: string) => (
+  /** A column of bars: its name and, once there is one, what a full bar stands for. */
+  const heading = (label: string, info: string, full: string) => (
     <th className={cn(head, "w-[22%]")}>
       <span className="inline-flex items-center gap-1">
         {label}
         <InfoTip>{info}</InfoTip>
+        {full && (
+          <span className="ml-1 font-mono text-[11px] font-normal text-dim tabular-nums">
+            0–{full}
+          </span>
+        )}
       </span>
     </th>
   );
-  const bar = (share: number, tone: number, text: string) => (
-    <td className={cn(tableCell, "max-w-none py-2 align-middle!")}>
-      <CrayonBar share={share} tone={tone} text={text} draw={!live} />
+  const bar = (share: number, text: string) => (
+    <td className={cn(tableCell, "max-w-none py-2.5 align-middle!")}>
+      <span className="flex items-center gap-3">
+        <span aria-hidden className="w-32 flex-none">
+          <FluxBar share={share} label={text} settled={!live} className="h-3" />
+        </span>
+        <span className="font-mono text-xs text-ink tabular-nums">{text}</span>
+      </span>
     </td>
   );
 
@@ -155,9 +165,9 @@ export function SummaryTable({ rows, columns, priceOf, live = false }: SummaryTa
         <tr>
           <th className={cn(head, "w-8")}>#</th>
           <th className={head}>Model</th>
-          {heading("Average time", INFO.average)}
-          {heading("Cost", INFO.cost)}
-          {labelled && heading("Correctness", INFO.correctness)}
+          {heading("Average time", INFO.average, fullTime ? `${fullTime.toLocaleString()} ms` : "")}
+          {heading("Cost", INFO.cost, fullCost ? dollarText(fullCost) : "")}
+          {labelled && heading("Correctness", INFO.correctness, "100%")}
         </tr>
       </thead>
       <tbody>
@@ -166,6 +176,7 @@ export function SummaryTable({ rows, columns, priceOf, live = false }: SummaryTa
           const column = columns[k];
           if (!s || column === undefined) return null;
           const cost = costs[k] ?? null;
+          const Mark = makerIcon(column);
           return (
             <motion.tr
               key={column}
@@ -176,24 +187,19 @@ export function SummaryTable({ rows, columns, priceOf, live = false }: SummaryTa
                 <span className={rankChip(place + 1)}>{place + 1}</span>
               </td>
               <Tip content={column}>
-                <td className={cn(tableCell, "align-middle! font-semibold text-ink")}>{column}</td>
+                <td className={cn(tableCell, "align-middle! font-semibold text-ink")}>
+                  <span className="flex items-center gap-2">
+                    {Mark && <Icon icon={Mark} size={16} />}
+                    <span className="truncate">{column}</span>
+                  </span>
+                </td>
               </Tip>
               {bar(
-                s.averageMs / slowest,
-                toneOf(s.averageMs, times, false),
+                fullTime ? s.averageMs / fullTime : 0,
                 s.averageMs ? `${s.averageMs.toLocaleString()} ms` : "—",
               )}
-              {bar(
-                dearest && cost ? cost.dollars / dearest : 0,
-                cost ? toneOf(cost.dollars, dollarsKnown, false) : 0,
-                costText(cost),
-              )}
-              {labelled &&
-                bar(
-                  shares[k] ?? 0,
-                  toneOf(shares[k] ?? 0, shares, true),
-                  s.total ? percent(s.correct, s.total) : "—",
-                )}
+              {bar(fullCost && cost ? cost.dollars / fullCost : 0, costText(cost))}
+              {labelled && bar(shares[k] ?? 0, s.total ? percent(s.correct, s.total) : "—")}
             </motion.tr>
           );
         })}
