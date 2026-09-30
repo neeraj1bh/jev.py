@@ -1,4 +1,5 @@
 import { cn } from "../styles";
+import { Aurora } from "./Aurora";
 import { Icon, type IconGlyph } from "./Icon";
 
 // Where each surrounding icon sits in a 320 by 160 box and the line that reaches it from the
@@ -24,6 +25,7 @@ export function PathHub({ icon, around }: { icon: IconGlyph; around: IconGlyph[]
   });
   return (
     <div aria-hidden className="relative aspect-2/1 w-full max-w-80">
+      <Aurora className="opacity-25 [mask-image:radial-gradient(closest-side,black,transparent)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle,var(--color-bar)_1px,transparent_1px)] bg-[length:16px_16px] [mask-image:radial-gradient(closest-side,black_45%,transparent)]" />
       <svg aria-hidden className="absolute inset-0 size-full" viewBox="0 0 320 160" fill="none">
         {nodes.map(({ path }, k) => (

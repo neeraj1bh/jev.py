@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useCountUp } from "../hooks/useCountUp";
 import { cn, inset, shell } from "../styles";
 import type { Backend, Row } from "../types";
+import { Aurora } from "./Aurora";
 import { FluxBar } from "./FluxBar";
 import { IconTile } from "./Icon";
 import { SummaryTable } from "./Summary";
@@ -53,8 +54,9 @@ export function Scoreboard({
 
   return (
     <section className={cn(shell, "mb-3.5")}>
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 pt-3 pb-3">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="relative flex flex-wrap items-center justify-between gap-x-6 gap-y-2 overflow-hidden rounded-2xl px-4 pt-3 pb-3">
+        <Aurora className="opacity-30 [mask-image:linear-gradient(to_right,transparent,black)]" />
+        <div className="relative flex min-w-0 items-center gap-2">
           <IconTile icon={Lightning} tone="ink" />
           <span className="truncate text-[15px] font-semibold tracking-tight text-ink">
             {label}
@@ -63,7 +65,7 @@ export function Scoreboard({
             {columns.length} model{columns.length === 1 ? "" : "s"}
           </span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="relative flex items-center gap-4">
           <span className="font-mono text-sm text-dim tabular-nums">
             <span className="text-ink">{Math.round(done).toLocaleString()}</span> /{" "}
             {total.toLocaleString()} items

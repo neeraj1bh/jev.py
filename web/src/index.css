@@ -140,7 +140,15 @@
   }
   body {
     margin: 0;
-    background: var(--color-paper);
+    /* A faint wash of the bar's blue behind the header, gone by the first card. */
+    background:
+      radial-gradient(
+        60rem 22rem at 50% -6rem,
+        color-mix(in oklab, var(--color-flux) 9%, transparent),
+        transparent
+      )
+      no-repeat,
+      var(--color-paper);
     color: var(--color-ink-2);
     font: 15px / 1.5 var(--font-body);
   }
