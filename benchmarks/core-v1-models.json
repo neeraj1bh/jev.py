@@ -143,6 +143,12 @@
    "role": "local GPU, llama.cpp",
    "input_per_m": 0,
    "output_per_m": 0
+  },
+  {
+   "id": "remote:laya:typed-decisions",
+   "role": "open encoder built for typed questions; local, laya-serve",
+   "input_per_m": 0,
+   "output_per_m": 0
   }
  ],
  "llamacpp": "one llama-server model at a time: start it with -hf <gguf>, then jev-bench run <id>"

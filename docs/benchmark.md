@@ -8,13 +8,15 @@ question. The file stores pointers, not text: anyone rebuilds the same items fro
 and a changed item is reported, not used.
 
 Three sets (Banking77, CLINC150, LEDGAR) have more than 26 options, so only models on this machine
-and Jev answer their 328 items. Every other model answers the remaining 2,302, and every comparison
-uses only the questions all its models answered.
+and Jev answer their 328 items. Laya answers two of the three: its server refuses more than 100
+options, which rules out CLINC150. Every other model answers the remaining 2,302, and every
+comparison uses only the questions all its models answered.
 
 ```sh
 uv run jev-bench check                            # offline checks, no key, no cost
 uv run jev-bench run remote:deepseek              # one model; the run appears in Past runs
 uv run jev-bench run Qwen/Qwen2.5-1.5B-Instruct   # a model on this machine
+uv run jev-bench run remote:laya:typed-decisions  # Laya, with a laya-serve running
 uv run jev-bench score <run>.jsonl <run>.jsonl    # scores, ranges and probability quality
 ```
 

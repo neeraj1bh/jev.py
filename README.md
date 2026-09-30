@@ -54,12 +54,20 @@ slightly):
 | Qwen3-Next 80B | 78.2% | 75.9–80.3 | $0.21 |
 | GPT-4o-mini | 75.8% | 73.3–78.1 | $0.23 |
 | Llama 3.1 8B | 63.6% | 60.8–66.3 | $0.10 |
+| Laya (typed-decisions) | 52.0% | 49.2–54.9 | free, on this machine |
 
-On the 2,478 questions all six answered. The top three are within each other's ranges. Jev's
-probabilities are the only ones worth a threshold: the other five are overconfident, and on the
-questions where they gave a probability for every option, each scored worse than spreading its
+On the 2,478 questions all seven answered. The top three are within each other's ranges. Jev's
+probabilities are the only ones worth a threshold: the five chat models are overconfident, and on
+the questions where they gave a probability for every option, each scored worse than spreading its
 answer evenly across the options would have. Costs are what the provider billed, cached input
 included; DeepSeek's is read from its balance, Jev's worked out from its reported tokens.
+
+[Laya](docs/local-models.md#laya) is an open encoder built for these questions, run on 2026-09-30
+on an Apple Silicon Mac, one request at a time. It is the fastest here by far, a median of 60 ms
+an item against Jev's 379 ms over the network, and the least accurate; its probabilities score
+about the same as an even spread. Two things shape its number: its makers list news-topic and spam
+sets as training data (it scores 92% and 86% there), and its server refuses a question with more
+than 100 options, so it answered none of CLINC150.
 
 How the questions were picked, how to run it, and earlier results: [docs/benchmark.md](docs/benchmark.md).
 
