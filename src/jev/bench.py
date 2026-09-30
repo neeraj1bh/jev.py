@@ -745,7 +745,10 @@ def run(model):
             response,
         )
 
-    workers = HOSTED_WORKERS if model.startswith(("remote:", "openrouter:")) else 1
+    # A hosted API answers many requests at once. A model on this machine answers one at a time,
+    # Laya's server included, and its times must not count a wait in its own queue.
+    hosted = model.startswith(("remote:", "openrouter:")) and not model.startswith("remote:laya")
+    workers = HOSTED_WORKERS if hosted else 1
     with ThreadPoolExecutor(workers) as pool:
         for k, _ in enumerate(pool.map(ask, items), 1):
             if k % 100 == 0 or k == len(items):
