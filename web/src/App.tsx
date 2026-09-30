@@ -45,6 +45,7 @@ import { idlePanel, runningPanel, usePanels } from "./hooks/usePanels";
 import { isString, usePersistentState } from "./hooks/usePersistentState";
 import { useTheme } from "./hooks/useTheme";
 import { useToast } from "./hooks/useToast";
+import { backendIcons } from "./icons";
 import { now, runBatchLoop, runEach, timedGenerate, timedReadout } from "./runner";
 import { readoutFooter, writtenAnswers } from "./scoring";
 import { cn, ghostButton, inset, labelText, shell, solidButton } from "./styles";
@@ -1294,6 +1295,7 @@ export default function App() {
                   <div className={cn(inset, "px-5 py-4")}>
                     <EmptyState
                       icon={Columns}
+                      around={backendIcons}
                       title="Pick models to compare"
                       action={{ label: "Choose models", onClick: () => setOpenMenu("models") }}
                     >

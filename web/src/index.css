@@ -36,6 +36,7 @@
   --animate-from-r: from-r 0.2s var(--ease-out);
   --animate-from-l: from-l 0.2s var(--ease-out);
   --animate-sheen: sheen 1.6s linear infinite;
+  --animate-travel: travel 3s linear infinite;
 
   @keyframes pop {
     from {
@@ -66,6 +67,15 @@
     }
     to {
       transform: translateX(210%);
+    }
+  }
+  /* One dash runs the length of a line whose pathLength is 100. */
+  @keyframes travel {
+    from {
+      stroke-dashoffset: 100;
+    }
+    to {
+      stroke-dashoffset: 0;
     }
   }
   @keyframes from-r {

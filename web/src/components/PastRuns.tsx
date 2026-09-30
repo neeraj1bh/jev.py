@@ -1,10 +1,13 @@
 import {
   ArrowDown,
   ArrowsDownUp,
+  ArrowsSplit,
   ArrowUp,
   ClockCounterClockwise,
+  Columns,
   MagnifyingGlass,
   MagnifyingGlassMinus,
+  Trophy,
 } from "@phosphor-icons/react";
 import { useState } from "react";
 
@@ -250,7 +253,11 @@ export function PastRuns(props: PastRunsProps) {
               <tr>
                 <td colSpan={5}>
                   {runs.length === 0 ? (
-                    <EmptyState icon={ClockCounterClockwise} title="No runs yet">
+                    <EmptyState
+                      icon={ClockCounterClockwise}
+                      around={[Columns, ArrowsSplit, Trophy]}
+                      title="No runs yet"
+                    >
                       Every batch you run in Compare, Generate vs readout or Benchmark is saved
                       here, and reopens without sending a request.
                     </EmptyState>

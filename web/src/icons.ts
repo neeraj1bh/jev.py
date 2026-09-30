@@ -20,11 +20,20 @@ import {
 
 import type { Backend } from "./types";
 
+const GROUP_ICONS: Record<string, Icon> = {
+  local: Cpu,
+  gguf: Cube,
+  server: HardDrives,
+  hosted: Cloud,
+  gateway: Globe,
+};
+
+/** Every place a model can run, for a picture of them all. */
+export const backendIcons = Object.values(GROUP_ICONS);
+
 /** Where a model runs, told apart at a glance in menus and headers. */
 export const backendIcon = (backend?: Backend): Icon =>
-  ({ local: Cpu, gguf: Cube, server: HardDrives, hosted: Cloud, gateway: Globe })[
-    backend?.group ?? "local"
-  ] ?? Cpu;
+  GROUP_ICONS[backend?.group ?? "local"] ?? Cpu;
 
 const SET_ICONS: Record<string, Icon> = {
   "Frozen benchmarks": Snowflake,
