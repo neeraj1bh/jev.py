@@ -79,3 +79,11 @@ export function Aurora({ className }: { className?: string }) {
     />
   );
 }
+
+/** The light a card carries while work runs in it: it fills the card from the top and fades out
+ * down it. The card takes `liveCard`, which keeps the light behind its content. */
+export function LiveLight() {
+  return (
+    <Aurora className="-z-10 animate-fade rounded-[inherit] opacity-30 [mask-image:linear-gradient(to_bottom,black,transparent_14rem)] motion-reduce:animate-none" />
+  );
+}

@@ -2,9 +2,9 @@ import { Lightning } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { useCountUp } from "../hooks/useCountUp";
-import { cn, inset, shell } from "../styles";
+import { cn, inset, liveCard, shell } from "../styles";
 import type { Backend, Row } from "../types";
-import { Aurora } from "./Aurora";
+import { LiveLight } from "./Aurora";
 import { IconTile } from "./Icon";
 import { SummaryTable } from "./Summary";
 
@@ -52,10 +52,10 @@ export function Scoreboard({
   const done = useCountUp(rows.length, 120);
 
   return (
-    <section className={cn(shell, "relative mb-3.5 overflow-hidden")}>
-      <Aurora className="opacity-30 [mask-image:linear-gradient(to_bottom,black,transparent_14rem)]" />
-      <div className="relative flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 pt-3 pb-3">
-        <div className="relative flex min-w-0 items-center gap-2">
+    <section className={cn(shell, liveCard, "mb-3.5")}>
+      <LiveLight />
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 pt-3 pb-3">
+        <div className="flex min-w-0 items-center gap-2">
           <IconTile icon={Lightning} tone="ink" />
           <span className="truncate text-[15px] font-semibold tracking-tight text-ink">
             {label}
@@ -64,7 +64,7 @@ export function Scoreboard({
             {columns.length} model{columns.length === 1 ? "" : "s"}
           </span>
         </div>
-        <div className="relative flex items-center gap-4">
+        <div className="flex items-center gap-4">
           <span className="font-mono text-sm text-dim tabular-nums">
             <span className="text-ink">{Math.round(done).toLocaleString()}</span> /{" "}
             {total.toLocaleString()} items
@@ -76,8 +76,8 @@ export function Scoreboard({
           </span>
         </div>
       </div>
-      <div className={cn(inset, "relative")}>
-        <div className="overflow-x-auto px-4 py-2">
+      <div className={inset}>
+        <div className="overflow-x-auto px-5 pt-2 pb-3">
           <SummaryTable rows={rows} columns={columns} priceOf={priceOf} live />
         </div>
       </div>

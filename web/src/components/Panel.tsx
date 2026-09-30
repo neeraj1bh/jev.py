@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 
 import { useElapsed } from "../hooks/useElapsed";
-import { cn, inset, shell } from "../styles";
+import { cn, inset, liveCard, shell } from "../styles";
 import type { PanelState } from "../types";
+import { LiveLight } from "./Aurora";
 import { type IconGlyph, IconTile } from "./Icon";
 import { InfoTip } from "./InfoTip";
 import type { Place } from "./RaceClocks";
@@ -68,8 +69,10 @@ interface PanelProps {
 }
 
 export function Panel({ title, icon, subtitle, info, state, place, children }: PanelProps) {
+  const running = state.status === "running";
   return (
-    <section className={cn(shell, "flex min-h-[260px] min-w-0 flex-col")}>
+    <section className={cn(shell, running && liveCard, "flex min-h-[260px] min-w-0 flex-col")}>
+      {running && <LiveLight />}
       <h2 className="m-0 px-3.5 pt-2 pb-2.5 text-sm font-semibold text-ink">
         <span className="inline-flex items-center gap-1">
           {icon && <IconTile icon={icon} tone={liveTone(state)} className="mr-1" />}

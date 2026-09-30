@@ -286,6 +286,7 @@ export function BatchTable({
   return (
     <Surface
       icon={Rows}
+      live={live}
       className="mt-3.5"
       title={
         <>

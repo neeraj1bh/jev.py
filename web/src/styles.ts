@@ -5,6 +5,8 @@ export const labelText = "text-[13px] text-dim";
 // The raised look: a tinted shell holding a white inset, the header living on the shell.
 export const shell = "rounded-[22px] bg-lift p-1.5 shadow-(--surface-shadow)";
 export const inset = "rounded-2xl bg-panel";
+// A shell that holds a LiveLight: its own stacking layer, so the light stays under the content.
+export const liveCard = "relative isolate";
 export const microLabel = "text-[10.5px] font-medium tracking-[0.08em] text-dim uppercase";
 export const ghostButton =
   "inline-flex items-center justify-center gap-1.5 rounded-full border border-rule bg-transparent px-3.5 py-2 text-ink transition-colors duration-150 hover:enabled:border-dim";

@@ -107,7 +107,7 @@ function fullBar(value: number) {
 }
 
 const head =
-  "px-2 py-2 text-left text-[13px] font-semibold text-ink shadow-[inset_0_-1px_0_var(--color-rule)]";
+  "px-2 py-3 text-left text-[13px] font-semibold text-ink shadow-[inset_0_-1px_0_var(--color-rule)]";
 
 interface SummaryTableProps {
   rows: Row[];
@@ -149,7 +149,7 @@ export function SummaryTable({ rows, columns, priceOf, live = false }: SummaryTa
     </th>
   );
   const bar = (share: number, text: string) => (
-    <td className={cn(tableCell, "max-w-none py-2.5 align-middle!")}>
+    <td className={cn(tableCell, "max-w-none py-4! align-middle!")}>
       <span className="flex items-center gap-3">
         <span aria-hidden className="w-32 flex-none">
           <FluxBar share={share} label={text} settled={!live} className="h-3" />
@@ -236,7 +236,7 @@ export function Summary({ rows, columns, dataset, priceOf }: SummaryProps) {
         )}
       </div>
       <div className={shell}>
-        <div className={cn(inset, "overflow-x-auto px-4 pt-2 pb-2")}>
+        <div className={cn(inset, "overflow-x-auto px-5 pt-2 pb-3")}>
           <SummaryTable rows={rows} columns={columns} priceOf={priceOf} />
         </div>
       </div>

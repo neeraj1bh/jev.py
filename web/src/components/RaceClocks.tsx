@@ -1,6 +1,7 @@
 import { Timer } from "@phosphor-icons/react";
-import { cn, inset, shell } from "../styles";
+import { cn, inset, liveCard, shell } from "../styles";
 import type { PanelState } from "../types";
+import { LiveLight } from "./Aurora";
 import { IconTile } from "./Icon";
 import { Clock, liveTone, PlaceBadge } from "./Panel";
 import { Tip } from "./Tip";
@@ -33,7 +34,11 @@ export function RaceClocks({ names, panels }: { names: string[]; panels: PanelSt
   return (
     <div className="mb-3.5 grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3.5">
       {panels.map((panel, k) => (
-        <section key={names[k]} className={cn(shell, "min-w-0")}>
+        <section
+          key={names[k]}
+          className={cn(shell, panel.status === "running" && liveCard, "min-w-0")}
+        >
+          {panel.status === "running" && <LiveLight />}
           <Tip content={names[k]}>
             <h2 className="m-0 flex items-center gap-2 px-2 pt-1 pb-2 text-sm font-semibold text-ink">
               <IconTile icon={Timer} tone={liveTone(panel)} />

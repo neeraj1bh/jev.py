@@ -4,8 +4,9 @@ import { Fragment, type ReactNode, useState } from "react";
 
 import { useElapsed } from "../hooks/useElapsed";
 import { answerLabel, matchesLabel } from "../scoring";
-import { chipButton, cn, inset, labelText, rankChip, shell, tableHead } from "../styles";
+import { chipButton, cn, inset, labelText, liveCard, rankChip, shell, tableHead } from "../styles";
 import type { Answer, PanelState, Question } from "../types";
+import { LiveLight } from "./Aurora";
 import { Icon } from "./Icon";
 import { Skeleton } from "./Skeleton";
 import { Tip } from "./Tip";
@@ -270,8 +271,11 @@ export function CompareTable({
     return state?.status === "done" && !state.response ? [`${name}: ${state.footer}`] : [];
   });
 
+  const live = !bare && panels.some((panel) => panel.status === "running");
+
   return (
-    <div className={cn(!bare && shell, "animate-fade")}>
+    <div className={cn(!bare && shell, live && liveCard, "animate-fade")}>
+      {live && <LiveLight />}
       <div className={cn(!bare && inset, !bare && "px-5 py-4")}>
         {hasAnswers && (
           <ShowAllButton allOpen={allOpen} onClick={() => setOpen(allOpen ? [] : questionIds)} />
