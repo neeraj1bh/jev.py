@@ -6,7 +6,7 @@ export type IconGlyph = Glyph;
 
 interface IconProps {
   icon: Glyph;
-  size?: 11 | 12 | 14 | 16 | 20;
+  size?: 11 | 12 | 14 | 16 | 20 | 24;
   className?: string;
 }
 

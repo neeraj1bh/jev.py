@@ -2,32 +2,32 @@ import { cn } from "../styles";
 import { Aurora } from "./Aurora";
 import { Icon, type IconGlyph } from "./Icon";
 
-// Where each surrounding icon sits in a 320 by 160 box and the line that reaches it from the
-// centre, ordered so that any count stays balanced around the middle.
+// Where each surrounding icon sits in a 564 by 410 box and the line that reaches it from the
+// centre (282, 205): straight to the sides, up or down then out with one rounded turn to the
+// corners. Ordered so that three make a triangle and six fill both sides evenly.
 const SLOTS = [
-  { x: 72, y: 28, path: "M 152 80 V 38 Q 152 28 142 28 H 72" },
-  { x: 284, y: 80, path: "M 160 80 H 284" },
-  { x: 72, y: 132, path: "M 152 80 V 122 Q 152 132 142 132 H 72" },
-  { x: 248, y: 28, path: "M 168 80 V 38 Q 168 28 178 28 H 248" },
-  { x: 36, y: 80, path: "M 160 80 H 36" },
-  { x: 248, y: 132, path: "M 168 80 V 122 Q 168 132 178 132 H 248" },
+  { x: 160, y: 75, path: "M 262 205 V 90 Q 262 75 247 75 H 160" },
+  { x: 460, y: 205, path: "M 282 205 H 460" },
+  { x: 160, y: 335, path: "M 262 205 V 320 Q 262 335 247 335 H 160" },
+  { x: 404, y: 75, path: "M 302 205 V 90 Q 302 75 317 75 H 404" },
+  { x: 104, y: 205, path: "M 282 205 H 104" },
+  { x: 404, y: 335, path: "M 302 205 V 320 Q 302 335 317 335 H 404" },
 ];
 
 const tile =
   "absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center bg-panel shadow-(--surface-shadow)";
 
-/** An icon joined by lines to what surrounds it, over a dotted ground, a blue pulse running out
- * along each line; the pulses stop for people who turn motion off. */
+/** An icon joined by lines to what surrounds it, lit from behind by the shader, a blue
+ * pulse running out along each line; the pulses stop for people who turn motion off. */
 export function PathHub({ icon, around }: { icon: IconGlyph; around: IconGlyph[] }) {
   const nodes = SLOTS.flatMap((slot, k) => {
     const glyph = around[k];
     return glyph ? [{ ...slot, glyph }] : [];
   });
   return (
-    <div aria-hidden className="relative aspect-2/1 w-full max-w-80">
-      <Aurora className="opacity-25 [mask-image:radial-gradient(closest-side,black,transparent)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle,var(--color-bar)_1px,transparent_1px)] bg-[length:16px_16px] [mask-image:radial-gradient(closest-side,black_45%,transparent)]" />
-      <svg aria-hidden className="absolute inset-0 size-full" viewBox="0 0 320 160" fill="none">
+    <div aria-hidden className="relative aspect-564/410 w-full max-w-[480px]">
+      <Aurora className="opacity-35 [mask-image:radial-gradient(closest-side,black,transparent)]" />
+      <svg aria-hidden className="absolute inset-0 size-full" viewBox="0 0 564 410" fill="none">
         {nodes.map(({ path }, k) => (
           <g key={path}>
             <path d={path} stroke="var(--color-rule)" />
@@ -37,9 +37,9 @@ export function PathHub({ icon, around }: { icon: IconGlyph; around: IconGlyph[]
               stroke="var(--color-flux)"
               strokeWidth={2}
               strokeLinecap="round"
-              strokeDasharray="16 84"
-              className="animate-travel drop-shadow-[0_0_3px_var(--color-flux-glow)] motion-reduce:hidden"
-              style={{ animationDelay: `${k * -0.7}s` }}
+              strokeDasharray="14 86"
+              className="animate-travel drop-shadow-[0_0_4px_var(--color-flux-glow)] motion-reduce:hidden"
+              style={{ animationDelay: `${k * -0.9}s` }}
             />
           </g>
         ))}
@@ -47,14 +47,17 @@ export function PathHub({ icon, around }: { icon: IconGlyph; around: IconGlyph[]
       {nodes.map(({ x, y, path, glyph }) => (
         <span
           key={path}
-          className={cn(tile, "size-9 rounded-lg text-dim")}
-          style={{ left: `${x / 3.2}%`, top: `${y / 1.6}%` }}
+          className={cn(tile, "size-9 rounded-lg text-ink sm:size-12 sm:rounded-xl")}
+          style={{ left: `${(x / 564) * 100}%`, top: `${(y / 410) * 100}%` }}
         >
-          <Icon icon={glyph} size={16} />
+          <Icon icon={glyph} size={24} className="size-4 sm:size-6" />
         </span>
       ))}
-      <span className={cn(tile, "top-1/2 left-1/2 size-11 rounded-xl text-ink")}>
-        <Icon icon={icon} size={20} />
+      <span className={cn(tile, "top-1/2 left-1/2 rounded-xl p-1 sm:rounded-2xl sm:p-1.5")}>
+        <span className="absolute inset-0 animate-breathe rounded-[inherit] border-2 border-flux/40 motion-reduce:hidden" />
+        <span className="grid size-9 place-items-center rounded-lg bg-ink text-paper sm:size-12 sm:rounded-xl">
+          <Icon icon={icon} size={24} className="size-4 sm:size-6" />
+        </span>
       </span>
     </div>
   );

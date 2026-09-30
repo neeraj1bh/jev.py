@@ -20,7 +20,6 @@
   --font-display: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-body: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-hand: "Nanum Pen Script", "Comic Sans MS", cursive;
   --text-xs--line-height: 1.5;
   --text-sm--line-height: 1.5;
   --text-base--line-height: 1.5;
@@ -36,7 +35,9 @@
   --animate-from-r: from-r 0.2s var(--ease-out);
   --animate-from-l: from-l 0.2s var(--ease-out);
   --animate-sheen: sheen 1.6s linear infinite;
-  --animate-travel: travel 3s linear infinite;
+  --animate-travel: travel 4s linear infinite;
+  --animate-sweep: sweep 1.4s ease-in-out infinite;
+  --animate-breathe: breathe 3s ease-in-out infinite;
 
   @keyframes pop {
     from {
@@ -76,6 +77,26 @@
     }
     to {
       stroke-dashoffset: 0;
+    }
+  }
+  /* A fill two fifths as wide as its track crosses it from off one end to off the other. */
+  @keyframes sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(250%);
+    }
+  }
+  @keyframes breathe {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    50% {
+      transform: scale(1.18);
+      opacity: 0;
     }
   }
   @keyframes from-r {

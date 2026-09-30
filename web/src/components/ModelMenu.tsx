@@ -14,6 +14,7 @@ import { Fragment, type ReactNode, useMemo, useState } from "react";
 
 import { dollarText, groupBackends, providerName, runDollars } from "../backends";
 import { backendIcon } from "../icons";
+import { makerIcon } from "../logos";
 import { cn } from "../styles";
 import type { Backend } from "../types";
 import { Icon, IconTile } from "./Icon";
@@ -244,7 +245,9 @@ export function ModelMenu(props: ModelMenuProps) {
                   return (
                     <Fragment key={provider}>
                       <MenuAction expanded={isOpen} onClick={() => toggleProvider(provider)}>
-                        <IconTile icon={provider === FREE ? Gift : Globe} />
+                        <IconTile
+                          icon={provider === FREE ? Gift : (makerIcon(provider) ?? Globe)}
+                        />
                         <span className="text-ink">
                           {provider === FREE ? "Free to run" : providerName(provider)}
                         </span>
