@@ -41,7 +41,12 @@ def page_tools():
 
 def newest():
     """When the server's code last changed."""
-    return max(os.path.getmtime(os.path.join(SOURCE, f)) for f in os.listdir(SOURCE) if f.endswith(".py"))
+    return max(
+        os.path.getmtime(os.path.join(folder, f))
+        for folder, _, files in os.walk(SOURCE)
+        for f in files
+        if f.endswith(".py")
+    )
 
 
 def die_with_parent():
