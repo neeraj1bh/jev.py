@@ -10,10 +10,10 @@ results/typesafe/
 results/errors/
 .vscode/
 .specstory/
-models/
+/models/
 results/eval-set.json
-data/
-local/
+/data/
+/local/
 
 # model weights, wherever they are saved
 *.gguf
