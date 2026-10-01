@@ -1,0 +1,4 @@
+{
+  "*.py": ["uvx ruff format --check", "uvx ruff check"],
+  "web/**/*.{ts,tsx,css,json}": "sh -c 'cd web && node_modules/.bin/biome check --no-errors-on-unmatched \"$@\"' biome"
+}

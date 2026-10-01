@@ -62,6 +62,9 @@ uvx ruff format . && uvx ruff check .
 cd web && pnpm check                      # Biome, the type check and the build
 ```
 
+`pnpm install` in `web/` sets up a pre-commit hook that runs ruff and Biome on the staged files, so
+an unformatted or failing file stops the commit.
+
 A change to the page is checked in a browser at 390 and 1440 px wide: no console errors, no
 horizontal scroll. Report what was run and what it printed; never claim a check that was not run.
 
