@@ -39,8 +39,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from jev.bench.datasets import typesafe_rows
 from jev.core import DEFAULT_MODEL, ROOT, Jev
-from jev.datasets import typesafe_rows
 
 
 def get(url):

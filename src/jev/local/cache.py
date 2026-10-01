@@ -7,7 +7,7 @@ import shutil
 
 from huggingface_hub import scan_cache_dir
 
-from jev.hub import CAUSAL
+from jev.local.hub import CAUSAL
 
 
 def _read(path):

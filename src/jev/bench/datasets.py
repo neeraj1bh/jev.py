@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from jev.core import ROOT
-from jev.downloads import PROGRESS
+from jev.local.downloads import PROGRESS
 from jev.remote import env
 
 DATA = os.path.join(ROOT, "data")  # rows fetched from the Hub, git-ignored

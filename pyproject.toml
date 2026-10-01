@@ -11,9 +11,9 @@ dependencies = ["torch>=2.4", "transformers>=4.45", "httpx>=0.27"]
 jev = "jev.core:cli"
 prod = "jev.page.server:cli"
 dev = "jev.dev:main"
-jev-bench = "jev.bench:cli"
-jev-eval = "jev.eval:cli"
-jev-readout = "jev.readout:cli"
+jev-bench = "jev.bench.core_v1:cli"
+jev-eval = "jev.bench.eval:cli"
+jev-readout = "jev.bench.readout:cli"
 jev-remote = "jev.remote:cli"
 
 [tool.uv.sources]

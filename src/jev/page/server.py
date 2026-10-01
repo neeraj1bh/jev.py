@@ -26,11 +26,12 @@ from threading import Lock, Thread
 
 from huggingface_hub.constants import HF_HUB_CACHE
 
-from jev import bench, cache, datasets, downloads, folders, llamaserver
+from jev.bench import core_v1, datasets
+from jev.bench.datasets import SETS, dataset_path, typesafe_item, typesafe_rows
 from jev.core import DEFAULT_MODEL, ROOT, Jev, gpu_hint
-from jev.datasets import SETS, dataset_path, typesafe_item, typesafe_rows
 from jev.dev import NO_NODE, page_tools
-from jev.downloads import PROGRESS
+from jev.local import cache, downloads, folders, llamaserver
+from jev.local.downloads import PROGRESS
 from jev.page.keys import clear_key, keys, set_key
 from jev.page.models import (
     CHECKED,
@@ -56,7 +57,7 @@ from jev.remote import BACKENDS, NoProbabilities, env
 
 WEB = os.path.join(ROOT, "web", "dist")  # the built page; see web/
 
-CORE = ("Core v1",)  # frozen benchmarks, see bench.py
+CORE = ("Core v1",)  # frozen benchmarks, see bench/core_v1.py
 try:  # input tokens per item, measured by `jev-bench tokens`, for the page's cost estimates
     with open(os.path.join(ROOT, "benchmarks", "core-v1-tokens.json")) as f:
         SIZES = json.load(f)["per_item"]
@@ -86,7 +87,7 @@ def sample(name, fresh=False, wide=False):
     if name in CORE:
         deck = f"{name} + wide" if wide else name  # wide: every picked model reads over 26 options
         if deck not in CORE_ITEMS:
-            CORE_ITEMS[deck] = bench.load("main") + (bench.load("wide") if wide else [])
+            CORE_ITEMS[deck] = core_v1.load("main") + (core_v1.load("wide") if wide else [])
         items = CORE_ITEMS[deck]
         return items[deal(deck, len(items), fresh)] | {"pool": len(items), "left": len(DECKS[deck])}
     if name == "TypeSafe cases":
@@ -102,12 +103,12 @@ def sample(name, fresh=False, wide=False):
 def dataset_menu():
     """Every set the page offers, with what its menu shows, in the order of its headings."""
     hf_token = bool(env("HF_TOKEN"))
-    fetch = bench.pages_to_fetch()
+    fetch = core_v1.pages_to_fetch()
     sets = [
         {
             "name": name, "options": 26, "yes_no": False, "frozen": True,
-            "local": not fetch["pages"], "fetch": fetch, "items": bench.size(),
-            "fetch_wide": bench.pages_to_fetch("wide"),
+            "local": not fetch["pages"], "fetch": fetch, "items": core_v1.size(),
+            "fetch_wide": core_v1.pages_to_fetch("wide"),
             "needs_token": any(s.gated for s in SETS.values()) and not hf_token,  # GPQA is in Core v1
         }
         for name in CORE
@@ -327,7 +328,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
             body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
             try:
                 if self.path.endswith("/stop") and body.get("backend") in CORE:  # Core v1's rows, not a model
-                    bench.STOP.set()
+                    core_v1.STOP.set()
                     return self._send(200, b"{}")
                 if self.path.endswith("/sample"):
                     with SAMPLE_LOCK:  # batches ask in parallel; one download and one deck per set
@@ -379,7 +380,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     return self._send(200, b"{}")
                 was_running = set(llamaserver.running())
                 jev = get(bid)
-                SYSTEMS[bid] = bench.system(bid, jev)
+                SYSTEMS[bid] = core_v1.system(bid, jev)
                 by_path = {m["path"]: m for m in backends([]) if m["group"] == "gguf"}
                 gone = was_running - set(llamaserver.running())
                 stopped_for_room = [by_path[p]["label"] for p in gone if p in by_path]

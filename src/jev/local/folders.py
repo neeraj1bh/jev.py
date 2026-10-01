@@ -10,8 +10,8 @@ import re
 import shutil
 import subprocess
 
-from jev.cache import on_disk, runnable
 from jev.core import ROOT
+from jev.local.cache import on_disk, runnable
 
 PATH = os.path.join(ROOT, "data", "model-folders.json")
 

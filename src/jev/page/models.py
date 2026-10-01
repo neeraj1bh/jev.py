@@ -13,10 +13,10 @@ import torch
 from huggingface_hub.constants import HF_HUB_CACHE
 from transformers import TextIteratorStreamer
 
-from jev import cache, downloads, folders, hub, llamaserver
+from jev.bench.datasets import DATA
 from jev.core import ROOT, SYSTEM, Jev, _options, _text
-from jev.datasets import DATA
-from jev.downloads import PROGRESS
+from jev.local import cache, downloads, folders, hub, llamaserver
+from jev.local.downloads import PROGRESS
 from jev.remote import BACKENDS, EXTRAS, NoProbabilities, Remote, env
 
 MODELS = os.environ.get("JEV_MODELS") or os.path.join(ROOT, "models")

@@ -32,10 +32,11 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
-from jev import datasets, remote
+from jev import remote
+from jev.bench import datasets
+from jev.bench.datasets import SETS, MultipleChoice
 from jev.core import ROOT
-from jev.datasets import SETS, MultipleChoice
-from jev.downloads import PROGRESS
+from jev.local.downloads import PROGRESS
 from jev.page import models, runs
 from jev.remote import PROMPT_VERSION
 
@@ -808,7 +809,7 @@ def check():
 
 def check_scoring():
     """The scorer's weighting, probability eligibility and failures, on made-up counts."""
-    from jev import score
+    from jev.bench import score
 
     sets = {
         "A": {"track": "headline", "group": "one"},
@@ -853,7 +854,7 @@ def cli():
     elif args[:1] == ["export"]:
         export()
     elif args[:1] == ["score"] and len(args) > 1:
-        from jev.score import score
+        from jev.bench.score import score
 
         score(args[1:])
     elif args[:1] == ["check"]:

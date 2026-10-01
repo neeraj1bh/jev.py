@@ -14,9 +14,10 @@ uv run dev                              # the server and the page, reloading as 
 |---|---|
 | `src/jev/core.py` | the readout, the HTTP server and the self-check |
 | `src/jev/remote.py` | hosted models and llama.cpp, read by letter |
-| `src/jev/bench.py`, `benchmarks/` | Core v1: the frozen questions, models and token sizes |
+| `src/jev/bench/`, `benchmarks/` | the labelled sets, Core v1 and its scoring |
+| `src/jev/local/` | local models: downloading, finding and running them |
 | `src/jev/page/`, `web/` | the web page's server and its React front end |
-| `src/jev/eval.py`, `results/` | the earlier evaluation and its summaries |
+| `src/jev/bench/eval.py`, `results/` | the earlier evaluation and its summaries |
 | `docs/` | the API by example, hosted providers, and local models on each system |
 
 Saved runs, downloaded models and datasets stay on your machine and out of git.

@@ -16,8 +16,8 @@ import random
 import sys
 import time
 
+from jev.bench.eval import AG, COMMIT_TYPES, KIND_DESC, NLI, load_set
 from jev.core import DEFAULT_MODEL, ROOT, Jev
-from jev.eval import AG, COMMIT_TYPES, KIND_DESC, NLI, load_set
 
 
 def items(data):
@@ -92,7 +92,7 @@ def main(model=DEFAULT_MODEL):
         return max(p, key=p.get)
 
     print(
-        f"# python readout.py {model}   {len(rows) // 2} items, "
+        f"# jev-readout {model}   {len(rows) // 2} items, "
         f"{(time.time() - t0) / len(rows) * 2000:.0f} ms each (both readouts, both orders)\n"
     )
     print(f"{'task':8} {'readout':7} {'n':>4}  acc fwd  acc rev  flip   mean|Δp true|")

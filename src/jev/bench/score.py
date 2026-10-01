@@ -18,8 +18,8 @@ import random
 import re
 from collections import Counter, defaultdict
 
-from jev import bench
-from jev.bench import PATH
+from jev.bench import core_v1
+from jev.bench.core_v1 import PATH
 from jev.core import _options
 from jev.page import runs
 
@@ -60,7 +60,7 @@ def check_run(system, rows, frozen):
     allowed |= {step["sha"] for step in frozen["typesafe"]}
     seen = set()
     for row in rows:
-        sha = bench.fingerprint(row)
+        sha = core_v1.fingerprint(row)
         if sha not in allowed:
             raise ValueError(f"{system}: {row['source']} is not a Core v1 item as frozen")
         if sha in seen:
@@ -72,9 +72,9 @@ def check_run(system, rows, frozen):
 def row_fields(sets):
     """For the sets in ROW_FIELDS, each picked row's field (article, subset, question id), from the
     rows Core v1 keeps on this machine; nothing is downloaded just to score."""
-    cache, fields = bench.cached_rows(), {}
+    cache, fields = core_v1.cached_rows(), {}
     for name, field in ROW_FIELDS.items():
-        rows = bench.local_rows(name, sets[name], cache)
+        rows = core_v1.local_rows(name, sets[name], cache)
         if rows is None:
             raise ValueError(
                 f"{name}'s rows are not on this machine: open Core v1 once, or run jev-bench export"
@@ -305,7 +305,7 @@ def score(paths):
     families = {s: f for f, subsets in sets["RewardBench"]["families"].items() for s in subsets}
     fields = row_fields(sets)
     runs = read_runs(paths)
-    main, wide = bench.size("main"), bench.size("wide")
+    main, wide = core_v1.size("main"), core_v1.size("wide")
     coverage = {}
     for system, rows in runs.items():
         items = check_run(system, rows, frozen)
