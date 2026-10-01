@@ -1,4 +1,4 @@
-"""Core v1: a frozen pick of items from every set in the demo, stored as pointers.
+"""Core v1: a frozen pick of items from every set in the page, stored as pointers.
 
 Each set gives 50 items, or one per topic when it has more topics than that. The picks take turns
 across the set's own topics (MMLU's subjects, RewardBench's subsets) and keep its answers even, so
@@ -17,7 +17,7 @@ answer them, and keeping them apart keeps the main comparison paired across ever
     uv run jev-bench score <run.jsonl> ...         # Core v1 scores of saved runs, by track
     uv run jev-bench check                         # offline self-checks of the readout
 
-Each run is saved like a demo batch, so Past runs lists it and can compare runs side by side.
+Each run is saved like a batch from the page, so Past runs lists it and can compare runs side by side.
 """
 
 import hashlib
@@ -32,10 +32,11 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
-from jev import datasets, demo, remote
+from jev import datasets, remote
 from jev.core import ROOT
 from jev.datasets import SETS, MultipleChoice
 from jev.downloads import PROGRESS
+from jev.page import models, runs
 from jev.remote import PROMPT_VERSION
 
 NAME = "core-v1"
@@ -636,7 +637,7 @@ def reads_wide(model):
     if model.startswith(("openrouter:", "gguf:")):
         return False
     kind, _, name = model.partition(":")
-    return kind != "remote" or name.split(":")[0] not in demo.LETTER
+    return kind != "remote" or name.split(":")[0] not in models.LETTER
 
 
 def system(model, backend):
@@ -660,7 +661,7 @@ def system(model, backend):
 
 def run(model):
     items = load("main") + (load("wide") if reads_wide(model) else [])
-    backend = demo.get(model)
+    backend = models.get(model)
     stamp = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime())
     log = f"{stamp}-{NAME}-{model.split(':')[-1].split('/')[-1]}"
     dataset = DATASET
@@ -675,7 +676,7 @@ def run(model):
             print(f"  {item['source']}: {e}")
             response = {"answers": {}, "error": str(e)}
         ms = round((time.time() - started) * 1000)
-        demo.log_row(
+        runs.log_row(
             {"log": log, "dataset": dataset, "sides": [model], "system": about}
             | {k: item[k] for k in ("set", "source", "state", "questions", "truth")},
             model,

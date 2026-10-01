@@ -77,7 +77,7 @@ def main():
         signal.signal(stopped, lambda *_: sys.exit(0))
     if not page_tools():
         raise SystemExit(NO_NODE)
-    serve = [sys.executable, "-c", "from jev.demo import cli; cli(build=False)", *sys.argv[1:]]
+    serve = [sys.executable, "-c", "from jev.page.server import cli; cli(build=False)", *sys.argv[1:]]
     # vite itself, not through the package manager, so stopping it cannot leave vite running
     page = start([os.path.join(WEB, "node_modules", ".bin", "vite")], WEB)
     server, seen = start(serve), newest()

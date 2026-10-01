@@ -18,9 +18,10 @@ import random
 import re
 from collections import Counter, defaultdict
 
-from jev import bench, demo
+from jev import bench
 from jev.bench import PATH
 from jev.core import _options
+from jev.page import runs
 
 RESAMPLES, SEED = 2000, 0
 CLIP = 1e-6  # log loss clips probabilities here; how often is reported
@@ -108,7 +109,7 @@ def outcomes(row, fields, families):
             "key": (row["source"], qid),
             "family": re.sub(r"\d+", "N", qid),
             "answered": bool(answer),
-            "right": bool(answer) and demo.right(answer, truth),
+            "right": bool(answer) and runs.right(answer, truth),
             "p": distribution(answer, labels),
             "score": answer.get("score") if answer else None,
             "y": labels.index(truth),
