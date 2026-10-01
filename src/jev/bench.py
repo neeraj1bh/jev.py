@@ -32,14 +32,16 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
-from jev import demo, remote
+from jev import datasets, demo, remote
 from jev.core import ROOT
+from jev.datasets import SETS, MultipleChoice
+from jev.downloads import PROGRESS
 from jev.remote import PROMPT_VERSION
 
 NAME = "core-v1"
 PATH = os.path.join(ROOT, "benchmarks", f"{NAME}.json")
 TOKENS_PATH = os.path.join(ROOT, "benchmarks", f"{NAME}-tokens.json")
-ROWS_PATH = os.path.join(demo.DATA, f"{NAME}-rows.json")  # picked rows fetched from the Hub, git-ignored
+ROWS_PATH = os.path.join(datasets.DATA, f"{NAME}-rows.json")  # picked rows fetched from the Hub, git-ignored
 STOP = Event()  # set by the page's Stop: the download ends before its next page
 TOKENIZER = "Qwen/Qwen2.5-0.5B-Instruct"
 PER_SET = 50  # items a set gives, unless it has more topics: then one per topic
@@ -96,74 +98,6 @@ AUXILIARY = {  # reported beside the headline, not in it
     "IMDB", "AG News topic", "DBpedia-14", "Arena votes", "MuSR murder mysteries",
     "Global-MMLU-Lite English",
 }  # fmt: skip
-KNOWLEDGE = {  # sets that need outside knowledge by design; the rest are answered from the state
-    "MMLU", "MMLU-Pro", "ARC-Challenge", "OpenBookQA", "CommonsenseQA", "MedQA", "GPQA Diamond",
-    "TruthfulQA", "Global-MMLU-Lite Hindi", "Global-MMLU-Lite Chinese", "Global-MMLU-Lite English",
-    "LegalBench hearsay",
-}  # fmt: skip
-PROVENANCE = {  # who wrote the text, who made the labels, and any filtering
-    "SST-2 sentiment": "movie-review sentences; labels by crowd workers",
-    "IMDB": "user movie reviews; labels from the reviewer's rating",
-    "Tweet sentiment": "tweets; labels by annotators",
-    "Tweet emotion": "tweets; labels by annotators",
-    "Tweet irony": "tweets; labels by annotators",
-    "Tweet hate": "tweets; labels by annotators",
-    "Tweet offensive": "tweets; labels by annotators",
-    "RTE entailment": "news and Wikipedia sentences; labels by annotators",
-    "SNLI": "image captions and crowd-written hypotheses; labels by crowd workers",
-    "MultiNLI mismatched": "text from five genres and crowd-written hypotheses; labels by crowd workers",
-    "ANLI round 3": "hypotheses written by people to fool models; labels by their writers, checked by others",
-    "BoolQ": "real search questions and Wikipedia passages; answers by annotators",
-    "MultiRC": "paragraphs from several sources; questions and answers by crowd workers",
-    "WinoGrande": "crowd-written sentences, filtered by an algorithm; answers by their writers",
-    "RAGTruth": "responses by six language models; unsupported spans marked by people; truncated "
-    "responses and wrong refusals left out",
-    "SQuAD v2": "Wikipedia paragraphs; questions by crowd workers, unanswerable ones written to look "
-    "answerable",
-    "MuSR murder mysteries": "stories written by a language model from a synthetic construction; "
-    "answers by construction",
-    "BBH causal judgement": "stories from studies of how people judge causes; labels from people's answers",
-    "BBH date understanding": "questions and answers written for BIG-bench",
-    "XNLI Hindi": "MultiNLI-style pairs translated by people; labels from the English pairs",
-    "Global-MMLU-Lite Hindi": "MMLU questions translated or post-edited by people; cultural "
-    "sensitivity marked by annotators",
-    "Global-MMLU-Lite Chinese": "MMLU questions translated or post-edited by people; cultural "
-    "sensitivity marked by annotators",
-    "Global-MMLU-Lite English": "MMLU questions in English; cultural sensitivity marked by annotators",
-    "Banking77": "banking customer-service queries; intent labels from the released Banking77 dataset",
-    "CLINC150": "crowd-written assistant requests; labels from collection tasks and curator checks, "
-    "including out-of-scope requests",
-    "AG News topic": "news titles and descriptions; topic labels inherited from the AG News corpus",
-    "DBpedia-14": "Wikipedia abstracts; labels from DBpedia's ontology (metadata)",
-    "MMLU": "exam questions from public sources; only those MMLU-Redux 2.0 re-checked and marked ok",
-    "MMLU-Pro": "MMLU and other academic problems; distractors added using GPT-4 and reviewed by people",
-    "ARC-Challenge": "grade-school science exam questions; keys from the exams; four-option items only",
-    "OpenBookQA": "crowd-written science questions; answers by their writers",
-    "CommonsenseQA": "crowd-written questions; answers by their writers",
-    "GoldenSwag": "HellaSwag source continuations and model-generated distractors; filtered using model "
-    "annotations and quality checks",
-    "TruthfulQA": "questions and answers written by the authors",
-    "MedQA": "medical licensing exam and mock-test questions; answer keys from the source",
-    "PubMedQA": "PubMed abstracts and their titles as questions; labels by experts",
-    "GPQA Diamond": "questions written by domain experts; answers checked by other experts",
-    "ToxicChat": "real user messages to a chatbot; labels by people, people-annotated rows only",
-    "SMS spam": "real text messages; labels from the collection",
-    "Jailbreak attempts": "real user messages to a chatbot; labels by people, people-annotated rows "
-    "only; ordinary messages matched in length",
-    "BBQ race and ethnicity": "templated contexts and questions written by the authors; answers by "
-    "construction",
-    "Arena votes": "real user prompts and chatbot responses; one person's recorded vote; single-turn only",
-    "RewardBench": "response pairs from several sources; rankings from source-specific human, model or "
-    "correctness criteria, with manual and metadata-based filtering",
-    "HelpSteer2": "prompts and model responses; helpfulness rated by annotators; single-turn only",
-    "ContractNLI": "non-disclosure agreement text; labels by a computational linguistics researcher with "
-    "crowd-worker assistance",
-    "LEDGAR": "contract provisions from SEC filings; labels from their headings (metadata)",
-    "LegalBench hearsay": "hand-written legal fact patterns inspired by casebooks and exercises; labels "
-    "from the task authors",
-    "LegalBench definitions": "sentences from US Supreme Court opinions; hand-coded definition labels from "
-    "the task authors",
-}
 REWARDBENCH_FAMILIES = {  # its score is the mean of these, each the mean of its items
     "Chat": ["alpacaeval-easy", "alpacaeval-length", "alpacaeval-hard", "mt-bench-easy", "mt-bench-med"],
     "Chat Hard": [
@@ -190,7 +124,7 @@ def typesafe_step(case, node, doc, qs, truth, omit=()):
     unknown = set(omit) - set(qs)
     if unknown:
         raise ValueError(f"TypeSafe {case} {node} has no question {', '.join(sorted(unknown))}")
-    item = demo.typesafe_item(case, node, doc, qs, truth)
+    item = datasets.typesafe_item(case, node, doc, qs, truth)
     return item | {
         "questions": {k: v for k, v in item["questions"].items() if k not in omit},
         "truth": {k: v for k, v in item["truth"].items() if k not in omit},
@@ -200,7 +134,7 @@ def typesafe_step(case, node, doc, qs, truth, omit=()):
 def answer_group(name, item):
     """What the pick balances on: the label, or for multiple choice the right answer's position."""
     truth = item["truth"]["answer"]
-    if name in demo.MC and name not in demo.SCORED:
+    if isinstance(SETS[name], MultipleChoice) and not SETS[name].scored:
         return list(item["questions"]["answer"]["criteria"]).index(truth)
     return truth
 
@@ -397,7 +331,7 @@ def redux_ok(subjects):
     """(subject, question) of each MMLU question that MMLU-Redux 2.0 re-checked and marked ok."""
     ok = set()
     for subject in subjects:
-        for r in demo.rows_page(REDUX, subject, "test", 0)["rows"]:
+        for r in datasets.rows_page(REDUX, subject, "test", 0)["rows"]:
             if r["row"]["error_type"] == "ok":
                 ok.add((subject, r["row"]["question"].strip()))
     return ok
@@ -412,8 +346,10 @@ def usable(name, pairs):
         pairs = [(r, item) for r, item in pairs if (r["row"]["subject"], r["row"]["question"].strip()) in ok]
     seen, kept = set(), []
     for r, item in pairs:
-        if name in demo.MC:
-            options = [re.sub(r"[^\w\s]", "", str(o)).lower().strip() for o in demo.MC[name][5](r["row"])[0]]
+        if isinstance(SETS[name], MultipleChoice):
+            options = [
+                re.sub(r"[^\w\s]", "", str(o)).lower().strip() for o in SETS[name].options_of(r["row"])[0]
+            ]
             if len(set(options)) < len(options):
                 continue
         decision = json.dumps([item["state"], item["questions"]], ensure_ascii=False)
@@ -469,12 +405,12 @@ def manifest(name, options):
     """How a set is reported: its track, group, provenance and whether it needs outside knowledge."""
     if options > LETTER_LIMIT:
         track = "wide"
-    elif name in demo.SCORED:
+    elif SETS[name].scored:
         track = "ordinal"
     else:
         track = "auxiliary" if name in AUXILIARY else "headline"
-    group = next(g for g, names in demo.GROUPS.items() if name in names)
-    out = {"track": track, "group": group, "knowledge": name in KNOWLEDGE, "provenance": PROVENANCE[name]}
+    s = SETS[name]
+    out = {"track": track, "group": s.group, "knowledge": s.knowledge, "provenance": s.provenance}
     return out | ({"families": REWARDBENCH_FAMILIES} if name == "RewardBench" else {})
 
 
@@ -484,27 +420,28 @@ def freeze():
     if os.path.exists(PATH):
         with open(PATH) as f:
             frozen = json.load(f)["sets"]
-    names = [*demo.DATASETS, *demo.MC]
+    names = list(SETS)
     names = [*FIRST, *(n for n in names if n not in FIRST)]
     sets, before = {}, {}
     for name in [*(n for n in frozen if n in names), *(n for n in names if n not in frozen)]:
-        hub, config, split = (demo.DATASETS.get(name) or demo.MC[name])[:3]
-        pool = demo.download(name, hub, config, split) if name not in frozen or name in FIRST else None
+        pool = datasets.download(name) if name not in frozen or name in FIRST else None
         if name in frozen:
             sets[name] = frozen[name]
             if name in FIRST:  # the sets that depend on it read its rows
                 rows = {i["row"] for i in frozen[name]["items"]}
                 before[name] = [(r, None) for r in pool["rows"] if r["row_idx"] in rows]
             continue
-        pairs = usable(name, [(r, demo.row_item(name, pool, r)) for r in demo.labelled_rows(name, pool)])
+        pairs = usable(
+            name, [(r, datasets.row_item(name, pool, r)) for r in datasets.labelled_rows(name, pool)]
+        )
         picked, extra = pick(name, pairs, before)
         before[name] = picked
-        options = demo.OPTIONS.get(name, 2)
+        options = SETS[name].options
         record = {k: pool[k] for k in ("rule", "seed", "total", "revision", "starts", "size")}
         sets[name] = {
-            "hub": hub,
-            "config": config,
-            "split": split,
+            "hub": SETS[name].hub,
+            "config": SETS[name].config,
+            "split": SETS[name].split,
             "part": "wide" if options > LETTER_LIMIT else "main",
             "options": options,
             "pool": record,
@@ -517,7 +454,7 @@ def freeze():
         }
         print(f"{name}: {len(picked)} items", flush=True)
     steps = []
-    for case, node, doc, qs, truth in demo.typesafe_rows():
+    for case, node, doc, qs, truth in datasets.typesafe_rows():
         omit = TYPESAFE_OMIT.get((case, node), [])
         sha = fingerprint(typesafe_step(case, node, doc, qs, truth, omit))
         steps.append({"case": case, "node": node, "sha": sha} | ({"omit": omit} if omit else {}))
@@ -572,7 +509,8 @@ def on_disk(name, spec, cache):
     these sets from disk, without asking the Hub, and fetches the others."""
     recorded = spec["pool"]["revision"]
     return (
-        cache.get(name, {}).get("revision") == recorded or pool_revision(demo.dataset_path(name)) == recorded
+        cache.get(name, {}).get("revision") == recorded
+        or pool_revision(datasets.dataset_path(name)) == recorded
     )
 
 
@@ -601,7 +539,7 @@ def local_rows(name, spec, cache):
     entry = cache.get(name)
     if entry and entry.get("revision") == recorded:
         return entry
-    path = demo.dataset_path(name)
+    path = datasets.dataset_path(name)
     if pool_revision(path) != recorded:
         return None
     try:
@@ -617,7 +555,7 @@ def local_items(name, spec, local, path):
     items = []
     for pointer in spec["items"]:
         row = rows.get(pointer["row"])
-        item = demo.row_item(name, local, row) if row else None
+        item = datasets.row_item(name, local, row) if row else None
         if not item or fingerprint(item) != pointer["sha"]:
             raise ValueError(
                 f"{name} row {pointer['row']} is missing or changed in the copy on this machine "
@@ -637,7 +575,7 @@ def load(part="main"):
         frozen = json.load(f)
     cache = cached_rows()
     STOP.clear()
-    demo.PROGRESS[DATASET] = [0, pages_to_fetch(part)["pages"], "pages"]
+    PROGRESS[DATASET] = [0, pages_to_fetch(part)["pages"], "pages"]
     items = []
     try:
         for name, spec in frozen["sets"].items():
@@ -645,10 +583,10 @@ def load(part="main"):
                 continue
             local = local_rows(name, spec, cache)
             if local:
-                path = ROWS_PATH if local is cache.get(name) else demo.dataset_path(name)
+                path = ROWS_PATH if local is cache.get(name) else datasets.dataset_path(name)
                 items += local_items(name, spec, local, path)
                 continue
-            recorded, now = spec["pool"]["revision"], demo.revision(spec["hub"])
+            recorded, now = spec["pool"]["revision"], datasets.revision(spec["hub"])
             pages, rows = {}, []
             for pointer in spec["items"]:
                 start = pointer["row"] - pointer["row"] % 100
@@ -657,30 +595,31 @@ def load(part="main"):
                         raise ValueError(
                             "download stopped; the rows so far are kept, and it resumes next time"
                         )
-                    pages[start] = demo.rows_page(spec["hub"], spec["config"], spec["split"], start)
-                    demo.PROGRESS[DATASET][0] += 1
+                    pages[start] = datasets.rows_page(spec["hub"], spec["config"], spec["split"], start)
+                    PROGRESS[DATASET][0] += 1
                 page = pages[start]
                 row = next(r for r in page["rows"] if r["row_idx"] == pointer["row"])
                 rows.append(row)
-                item = demo.row_item(name, page, row)
+                item = datasets.row_item(name, page, row)
                 if fingerprint(item) != pointer["sha"]:
                     raise ValueError(
                         f"{name} row {pointer['row']} changed on the Hub since {frozen['frozen']}"
                     )
                 items.append(item | {"set": name})
-            if now != recorded or demo.revision(spec["hub"], fresh=True) != recorded:
+            if now != recorded or datasets.revision(spec["hub"], fresh=True) != recorded:
                 print(f"{name}: the Hub revision moved since {frozen['frozen']}; every item still matches")
             else:  # kept after each set, so a stopped download resumes where it stopped
                 features = next(iter(pages.values()))["features"]
                 cache[name] = {"revision": recorded, "features": features, "rows": rows}
-                os.makedirs(demo.DATA, exist_ok=True)
+                os.makedirs(datasets.DATA, exist_ok=True)
                 with open(ROWS_PATH, "w") as f:
                     json.dump(cache, f)
     finally:
-        demo.PROGRESS.pop(DATASET, None)
+        PROGRESS.pop(DATASET, None)
     if part == "main":
         steps = {
-            (case, node): (case, node, doc, qs, truth) for case, node, doc, qs, truth in demo.typesafe_rows()
+            (case, node): (case, node, doc, qs, truth)
+            for case, node, doc, qs, truth in datasets.typesafe_rows()
         }
         for pointer in frozen["typesafe"]:
             item = typesafe_step(*steps[(pointer["case"], pointer["node"])], pointer.get("omit", ()))

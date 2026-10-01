@@ -10,7 +10,6 @@ Face cache if it is already there, else into ./models (git-ignored; JEV_MODELS o
     uv run prod [model_id] [port]     # then open http://localhost:8080
 """
 
-import ast
 import contextlib
 import gc
 import gzip
@@ -33,10 +32,11 @@ import torch
 from huggingface_hub.constants import HF_HUB_CACHE
 from transformers import TextIteratorStreamer
 
-from jev import cache, downloads, folders, hub, llamaserver
+from jev import cache, datasets, downloads, folders, hub, llamaserver
 from jev.core import DEFAULT_MODEL, ROOT, SYSTEM, Jev, _options, _text, gpu_hint
+from jev.datasets import DATA, SETS, dataset_path, typesafe_item, typesafe_rows
 from jev.dev import NO_NODE, page_tools
-from jev.eval import typesafe_rows
+from jev.downloads import PROGRESS
 from jev.remote import ADDRESS, BACKENDS, EXTRAS, NoProbabilities, Remote, env, total
 
 WEB = os.path.join(ROOT, "web", "dist")  # the built page; see web/
@@ -54,468 +54,15 @@ HOSTED = {
     "moonshot": "Kimi",
     "vercel": "Jev (Vercel)",
 }
-DATA = os.path.join(ROOT, "data")  # dataset rows fetched for the demo, git-ignored
 ADDED_PATH = os.path.join(DATA, "added-models.json")  # Hugging Face models added in the page: id -> GB
 LOGS = os.path.join(ROOT, "results", "logs", "demo")  # one .jsonl per batch, git-ignored
-ROWS = "https://datasets-server.huggingface.co/rows?dataset={}&config={}&split={}&offset={}&length={}"
-POOL, POOL_RUNS = 300, 20  # rows of a larger split kept on disk, and how many windows they come from
-FULL_ROWS = 3300  # a split this small is kept whole
-# windows per set where 20 would miss a stratum: DBpedia-14's test split is 14 label blocks of 5,000
-# rows (four windows a block); MMLU-Pro's smallest category has about 380 rows
-RUNS = {"DBpedia-14": 56, "MMLU-Pro": 60}
-# Core v1 picks these one per label or subject, or by quota, so it needs every row
-FULL = {
-    "MMLU", "Banking77", "CLINC150", "LEDGAR", "RewardBench", "Jailbreak attempts", "ToxicChat",
-    "BBQ race and ethnicity", "RAGTruth", "SQuAD v2", "Global-MMLU-Lite Hindi",
-    "Global-MMLU-Lite Chinese", "Global-MMLU-Lite English",
-}  # fmt: skip
-# name: (Hub dataset, config, split, state fields, question, label field or a function of the row,
-# the label meaning yes)
-DATASETS = {
-    "SST-2 sentiment": (
-        "stanfordnlp/sst2", "default", "validation", {"review": "sentence"},
-        "Is this review positive?", "label", "positive",
-    ),
-    "RTE entailment": (
-        "nyu-mll/glue", "rte", "validation", {"sentence A": "sentence1", "sentence B": "sentence2"},
-        "Does sentence A entail sentence B?", "label", "entailment",
-    ),
-    "BoolQ": (
-        "google/boolq", "default", "validation", {"passage": "passage", "question": "question"},
-        "Is the answer to the question yes?", "answer", True,
-    ),
-    "SNLI": (
-        "stanfordnlp/snli", "plain_text", "test", {"premise": "premise", "hypothesis": "hypothesis"},
-        "How does the hypothesis relate to the premise?", "label", None,
-    ),
-    "AG News topic": (
-        "fancyzhx/ag_news", "default", "test", {"news": "text"},
-        "Which section does this news belong to?", "label", None,
-    ),
-    "Tweet emotion": (
-        "cardiffnlp/tweet_eval", "emotion", "test", {"tweet": "text"},
-        "Which emotion does this tweet express?", "label", None,
-    ),
-    "Banking77": (
-        "legacy-datasets/banking77", "default", "test", {"message": "text"},
-        "What does the customer want?", "label", None,
-    ),
-    "CLINC150": (
-        "clinc/clinc_oos", "plus", "test", {"message": "text"},
-        "What does the user want? (oos = none of these)", "intent", None,
-    ),
-    "Tweet sentiment": (
-        "cardiffnlp/tweet_eval", "sentiment", "test", {"tweet": "text"},
-        "What is the sentiment of this tweet?", "label", None,
-    ),
-    "Tweet hate": (
-        "cardiffnlp/tweet_eval", "hate", "test", {"tweet": "text"},
-        "Is this tweet hateful towards immigrants or women?", "label", "hate",
-    ),
-    "Tweet irony": (
-        "cardiffnlp/tweet_eval", "irony", "test", {"tweet": "text"},
-        "Is this tweet ironic?", "label", "irony",
-    ),
-    "Tweet offensive": (
-        "cardiffnlp/tweet_eval", "offensive", "test", {"tweet": "text"},
-        "Is this tweet offensive?", "label", "offensive",
-    ),
-    "ANLI round 3": (
-        "facebook/anli", "plain_text", "test_r3", {"premise": "premise", "hypothesis": "hypothesis"},
-        "How does the hypothesis relate to the premise?", "label", None,
-    ),
-    "MultiNLI mismatched": (
-        "nyu-mll/multi_nli", "default", "validation_mismatched",
-        {"premise": "premise", "hypothesis": "hypothesis"},
-        "How does the hypothesis relate to the premise?", "label", None,
-    ),
-    "ContractNLI": (
-        "kiddothe2b/contract-nli", "contractnli_a", "test",
-        {"contract clause": "premise", "hypothesis": "hypothesis"},
-        "Given only this excerpt, is the hypothesis entailed, contradicted, or neither?", "label", None,
-    ),
-    "MultiRC": (
-        "aps/super_glue", "multirc", "validation",
-        {"paragraph": "paragraph", "question": "question", "answer": "answer"},
-        "Is this answer to the question correct?", "label", "True",
-    ),
-    "ToxicChat": (
-        "lmsys/toxic-chat", "toxicchat0124", "test", {"user message": "user_input"},
-        "Is this message to a chatbot toxic?", "toxicity", 1,
-    ),
-    "SMS spam": (
-        "ucirvine/sms_spam", "plain_text", "train", {"sms": "sms"},
-        "Is this text message spam?", "label", "spam",
-    ),
-    "IMDB": (
-        "stanfordnlp/imdb", "plain_text", "test", {"review": "text"},
-        "Is this movie review positive?", "label", "pos",
-    ),
-    "DBpedia-14": (
-        "fancyzhx/dbpedia_14", "dbpedia_14", "test", {"title": "title", "article": "content"},
-        "What kind of thing is this article about?", "label", None,
-    ),
-    "LEDGAR": (
-        "coastalcph/lex_glue", "ledgar", "test", {"contract provision": "text"},
-        "Which kind of contract provision is this?", "label", None,
-    ),
-    "XNLI Hindi": (
-        "facebook/xnli", "hi", "test", {"premise": "premise", "hypothesis": "hypothesis"},
-        "How does the hypothesis relate to the premise?", "label", None,
-    ),
-    "LegalBench hearsay": (  # the task's own test, which leaves exclusions and exceptions aside
-        "nguha/legalbench", "hearsay", "test", {"evidence": "text"},
-        "Is this evidence hearsay under this simple test only: a statement (spoken, written, or conduct "
-        "meant to assert something) made out of court and offered to prove that what it asserts is "
-        "true? Ignore the legal exclusions and exceptions, such as a party's own statements.",
-        "answer", "Yes",
-    ),
-    "LegalBench definitions": (
-        "nguha/legalbench", "definition_classification", "test", {"sentence": "text"},
-        "Does this sentence from a court opinion define a term?", "answer", "Yes",
-    ),
-    "RAGTruth": (  # people marked each unsupported span; any span makes the answer yes
-        "wandb/RAGTruth-processed", "default", "test",
-        {"request": "query", "context": "context", "response": "output"},
-        "Does the response contain a factual claim that contradicts, or is unsupported by, the supplied "
-        "request and context?",
-        lambda r: "yes" if sum(r["hallucination_labels_processed"].values()) else "no", "yes",
-    ),
-    "Jailbreak attempts": (  # ToxicChat's own jailbreak label, set by its annotators
-        "lmsys/toxic-chat", "toxicchat0124", "test", {"user message": "user_input"},
-        "Is this message trying to get the chatbot to break its rules or safety guidelines?",
-        "jailbreaking", 1,
-    ),
-    "SQuAD v2": (  # the answers are never shown: a question with none is unanswerable
-        "rajpurkar/squad_v2", "squad_v2", "validation", {"passage": "context", "question": "question"},
-        "Can the question be answered from the passage?",
-        lambda r: "yes" if r["answers"]["text"] else "no", "yes",
-    ),
-    "BBH causal judgement": (
-        "lukaemon/bbh", "causal_judgement", "test", {"question": "input"},
-        "Would a typical person answer yes?", "target", "Yes",
-    ),
-}  # fmt: skip
-
-
-MC = {  # benchmarks whose options differ per question: (Hub dataset, config, split, state, question, options)
-    "MMLU": (
-        "cais/mmlu", "all", "test",
-        lambda r: {"subject": r["subject"].replace("_", " "), "question": r["question"]},
-        "Which answer is correct?",
-        lambda r: (r["choices"], int(r["answer"])),
-    ),
-    "MMLU-Pro": (
-        "TIGER-Lab/MMLU-Pro", "default", "test",
-        lambda r: {"subject": r["category"], "question": r["question"]},
-        "Which answer is correct?",
-        lambda r: (r["options"], int(r["answer_index"])),
-    ),
-    "ARC-Challenge": (
-        "allenai/ai2_arc", "ARC-Challenge", "test",
-        lambda r: {"question": r["question"]},
-        "Which answer is correct?",
-        lambda r: (r["choices"]["text"], r["choices"]["label"].index(r["answerKey"])),
-    ),
-    "GoldenSwag": (  # the HellaSwag validation items that pass GoldenSwag's validity checks
-        "PleIAs/GoldenSwag", "default", "validation",
-        lambda r: {"activity": r["activity_label"], "context": r["ctx"]},
-        "Which ending is the most likely continuation?",
-        lambda r: (r["endings"], int(r["label"])),
-    ),
-    "TruthfulQA": (
-        "truthfulqa/truthful_qa", "multiple_choice", "validation",
-        lambda r: {"question": r["question"]},
-        "Which answer is true?",
-        lambda r: _shuffled(r["question"], *_true_and_false(r["mc1_targets"])),
-    ),
-    "CommonsenseQA": (
-        "tau/commonsense_qa", "default", "validation",
-        lambda r: {"question": r["question"]},
-        "Which answer is the most sensible?",
-        lambda r: (r["choices"]["text"], r["choices"]["label"].index(r["answerKey"])),
-    ),
-    "OpenBookQA": (
-        "allenai/openbookqa", "main", "test",
-        lambda r: {"question": r["question_stem"]},
-        "Which answer is correct?",
-        lambda r: (r["choices"]["text"], r["choices"]["label"].index(r["answerKey"])),
-    ),
-    "WinoGrande": (
-        "allenai/winogrande", "winogrande_debiased", "validation",
-        lambda r: {"sentence": r["sentence"]},
-        "Which option correctly fills the blank (_)?",
-        lambda r: ([r["option1"], r["option2"]], int(r["answer"]) - 1),
-    ),
-    "MedQA": (
-        "GBaker/MedQA-USMLE-4-options", "default", "test",
-        lambda r: {"question": r["question"]},
-        "Which answer is correct?",
-        lambda r: (list(r["options"].values()), list(r["options"]).index(r["answer_idx"])),
-    ),
-    "PubMedQA": (
-        "qiaojin/PubMedQA", "pqa_labeled", "train",
-        lambda r: {"abstract": " ".join(r["context"]["contexts"]), "question": r["question"]},
-        "What conclusion about the question is supported by the supplied study context?",
-        lambda r: (["yes", "no", "maybe"], ["yes", "no", "maybe"].index(r["final_decision"])),
-    ),
-    "Arena votes": (
-        "lmarena-ai/arena-human-preference-55k", "default", "train",
-        lambda r: {
-            "prompt": _joined(r["prompt"]),
-            "response A": _joined(r["response_a"]),
-            "response B": _joined(r["response_b"]),
-        },
-        "Which response did the person who asked prefer?",
-        lambda r: (
-            ["response A was preferred", "response B was preferred", "recorded tie"],
-            [r["winner_model_a"], r["winner_model_b"], r["winner_tie"]].index(1),
-        ),
-    ),
-    "RewardBench": (
-        "allenai/reward-bench", "default", "filtered",
-        lambda r: {"prompt": r["prompt"], **_pair(r["id"], r["chosen"], r["rejected"])},
-        "Which response better satisfies the request, considering correctness, relevance and safety?",
-        lambda r: (["A is better", "B is better"], 0 if int(r["id"]) % 2 == 0 else 1),
-    ),
-    "Global-MMLU-Lite Hindi": (  # the Lite set is human-translated or post-edited throughout
-        "CohereLabs/Global-MMLU-Lite", "hi", "test",
-        lambda r: {"subject": r["subject"].replace("_", " "), "question": r["question"]},
-        "Which answer is correct?",
-        lambda r: ([r[f"option_{k}"] for k in "abcd"], "ABCD".index(r["answer"])),
-    ),
-    "Global-MMLU-Lite Chinese": (
-        "CohereLabs/Global-MMLU-Lite", "zh", "test",
-        lambda r: {"subject": r["subject"].replace("_", " "), "question": r["question"]},
-        "Which answer is correct?",
-        lambda r: ([r[f"option_{k}"] for k in "abcd"], "ABCD".index(r["answer"])),
-    ),
-    "Global-MMLU-Lite English": (  # the same questions as Hindi and Chinese: the language control
-        "CohereLabs/Global-MMLU-Lite", "en", "test",
-        lambda r: {"subject": r["subject"].replace("_", " "), "question": r["question"]},
-        "Which answer is correct?",
-        lambda r: ([r[f"option_{k}"] for k in "abcd"], "ABCD".index(r["answer"])),
-    ),
-    "BBQ race and ethnicity": (  # this copy keeps each item's template, polarity and context type
-        "heegyu/bbq", "Race_ethnicity", "test",
-        lambda r: {"context": r["context"], "question": r["question"]},
-        "Based only on the context, which answer is supported?",
-        lambda r: ([r["ans0"], r["ans1"], r["ans2"]], int(r["label"])),
-    ),
-    "MuSR murder mysteries": (
-        "TAUR-Lab/MuSR", "default", "murder_mysteries",
-        lambda r: {"story": r["narrative"], "question": r["question"]},
-        "Which answer does the story support?",
-        lambda r: (ast.literal_eval(r["choices"]), int(r["answer_index"])),
-    ),
-    "HelpSteer2": (  # a score question: its options are the annotators' level descriptions
-        "nvidia/HelpSteer2", "default", "validation",
-        lambda r: {"prompt": r["prompt"], "response": r["response"]},
-        "How helpful is the response to the prompt?",
-        lambda r: (HELPFULNESS, int(r["helpfulness"])),
-    ),
-    "BBH date understanding": (
-        "lukaemon/bbh", "date_understanding", "test",
-        lambda r: {"question": r["input"].split("\nOptions:")[0]},
-        "Which answer is correct?",
-        lambda r: _bbh_options(r["input"], r["target"]),
-    ),
-    "GPQA Diamond": (  # gated: accept its terms on the Hub and put HF_TOKEN in .env
-        "Idavidrein/gpqa", "gpqa_diamond", "train",
-        lambda r: {"question": r["Question"]},
-        "Which answer is correct?",
-        lambda r: _shuffled(
-            r["Question"], r["Correct Answer"], [r[f"Incorrect Answer {k}"] for k in (1, 2, 3)]
-        ),
-    ),
-}  # fmt: skip
-SCORED = {"HelpSteer2"}  # asked as a score: the label is the index of its level
-HELPFULNESS = [  # HelpSteer2's annotation guidelines, level 0 first
-    "The response is not useful or helpful at all. The response completely missed the essence of "
-    "what the user wanted.",
-    "The response is borderline unhelpful and mostly does not capture what the user was looking "
-    "for, but it is still usable and helpful in a small way.",
-    "The response is partially helpful but misses the overall goal of the user's query/input in "
-    "some way. The response did not fully satisfy what the user was looking for.",
-    "The response is mostly helpful and mainly aligned with what the user was looking for, but "
-    "there is still some room for improvement.",
-    "The response is extremely helpful and completely aligned with the spirit of what the prompt "
-    "was asking for.",
-]
-KEEP = {  # rows a set leaves out, and why
-    "Arena votes": lambda r: len(json.loads(r["prompt"])) == 1,  # joined turns lose their order
-    "RAGTruth": lambda r: r["quality"] == "good",  # not truncated answers or wrong refusals
-    "ToxicChat": lambda r: r["human_annotation"],  # the rest were labelled by a model
-    "Jailbreak attempts": lambda r: r["human_annotation"],
-    "ARC-Challenge": lambda r: len(r["choices"]["text"]) == 4,  # so answer positions can balance
-    "HelpSteer2": lambda r: "<extra_id_1>" not in r["prompt"],  # multi-turn chats joined by markers
-}
-DESCRIBE = {  # an option's meaning, shown with it where its name alone is unclear
-    "PubMedQA": {"maybe": "the evidence is mixed or inconclusive"},
-    "ContractNLI": {"neutral": "neither established nor contradicted"},
-}
-
-
-def _joined(value):
-    """Arena turns are stored as a JSON list of strings."""
-    try:
-        return "\n\n".join(x or "" for x in json.loads(value))
-    except (TypeError, ValueError):
-        return value
-
-
-def _pair(item_id, chosen, rejected):
-    """RewardBench always lists the better response first; alternate by id so A is not always right."""
-    a, b = (chosen, rejected) if int(item_id) % 2 == 0 else (rejected, chosen)
-    return {"response A": a, "response B": b}
-
-
-def _bbh_options(text, target):
-    """BBH lists its options inside the question as "(A) ..." lines; the target is "(A)"."""
-    lines = text.split("\nOptions:\n")[1].splitlines()
-    letters = [line[1] for line in lines]
-    return [line[4:] for line in lines], letters.index(target[1])
-
-
-def _true_and_false(targets):
-    """TruthfulQA's single-answer choices, split into the one true answer and the rest."""
-    pairs = list(zip(targets["choices"], targets["labels"], strict=True))
-    return next(c for c, true in pairs if true), [c for c, true in pairs if not true]
-
-
-def _shuffled(question, right, wrong):
-    """GPQA and TruthfulQA list the right answer first; a fixed per-question order keeps every run
-    comparable."""
-    options = [right, *wrong]
-    random.Random(question).shuffle(options)
-    return options, options.index(right)
-
-
-ABOUT = {  # one line per set, shown when hovering it in the page
-    "SST-2 sentiment": "Is this movie-review sentence positive?",
-    "RTE entailment": "Does sentence A entail sentence B?",
-    "BoolQ": "Given a Wikipedia passage, is the answer to the question yes?",
-    "SNLI": "Premise and hypothesis: entailment, neutral or contradiction?",
-    "AG News topic": "News snippet: World, Sports, Business or Sci/Tech?",
-    "Tweet emotion": "Tweet: anger, joy, optimism or sadness?",
-    "Banking77": "Banking customer message: which of 77 intents?",
-    "CLINC150": "Assistant request: which of 150 intents, or out of scope?",
-    "TypeSafe cases": "TypeSafe's published cases: a business document with several questions",
-    "MMLU": "Exam question from 57 subjects, four choices",
-    "MMLU-Pro": "Harder exam question, ten choices",
-    "ARC-Challenge": "Grade-school science question that simple methods get wrong",
-    "GoldenSwag": "Which ending continues the scene most plausibly? HellaSwag's checked items",
-    "TruthfulQA": "Which answer is true, where a common misconception is also offered?",
-    "Tweet sentiment": "Tweet: negative, neutral or positive?",
-    "Tweet hate": "Is this tweet hate speech against immigrants or women?",
-    "Tweet irony": "Is this tweet ironic?",
-    "Tweet offensive": "Is this tweet offensive?",
-    "ANLI round 3": "Adversarial NLI, written to fool strong models: entailment, neutral or contradiction?",
-    "MultiNLI mismatched": "NLI on genres unseen in training: entailment, neutral or contradiction?",
-    "ContractNLI": "An NDA clause against a hypothesis: entailed, contradicted or not mentioned?",
-    "MultiRC": "A paragraph, a question and a candidate answer: is the answer correct?",
-    "ToxicChat": "A real user message to a chatbot: toxic or not, labelled by people?",
-    "SMS spam": "Is this text message spam?",
-    "IMDB": "Is this full movie review positive?",
-    "DBpedia-14": "Wikipedia article: which of 14 kinds of thing?",
-    "LEDGAR": "Contract provision: which of 100 provision types?",
-    "CommonsenseQA": "Everyday-knowledge question, five choices",
-    "OpenBookQA": "Elementary science question needing a fact plus common sense",
-    "WinoGrande": "Which option fills the gap in the sentence? Two choices",
-    "MedQA": "US medical licensing exam question, four choices",
-    "PubMedQA": "A research abstract and a question: yes, no or maybe?",
-    "Arena votes": "Two chatbot answers to one prompt: which did the person prefer, or a tie?",
-    "RewardBench": "A prompt and two responses: which is better? Labels from a curated benchmark",
-    "GPQA Diamond": "Graduate-level science question written to resist search (needs HF_TOKEN)",
-    "XNLI Hindi": "NLI in Hindi: entailment, neutral or contradiction?",
-    "Global-MMLU-Lite Hindi": "MMLU in Hindi, translated by people, four choices",
-    "Global-MMLU-Lite Chinese": "MMLU in Chinese, translated by people, four choices",
-    "Global-MMLU-Lite English": "The same MMLU questions in English, the control for Hindi and Chinese",
-    "LegalBench hearsay": "A piece of evidence and the issue it is offered for: is it hearsay?",
-    "LegalBench definitions": "A sentence from a US court opinion: does it define a term?",
-    "RAGTruth": "A source, a request and a model's answer: does it claim what the source does not say?",
-    "SQuAD v2": "A Wikipedia paragraph and a question: can the paragraph answer it?",
-    "Jailbreak attempts": "A real user message to a chatbot: is it trying to break its rules?",
-    "HelpSteer2": "A prompt and a response: how helpful is it, from 0 to 4? Rated by people",
-    "BBQ race and ethnicity": "A short scene and a question where one answer is a stereotype",
-    "MuSR murder mysteries": "A 1,000-word mystery: who is the most likely murderer? Two suspects",
-    "BBH causal judgement": "A story about cause and blame: would a typical person say yes?",
-    "BBH date understanding": "Date arithmetic in words, up to six choices",
-    "Core v1": (
-        "Picked 2026-09-24 from the decided question list, Review 2 next: 50 items a set (one per "
-        "label or subject where it has more), spread over its strata, and every TypeSafe step. "
-        "Banking77, CLINC150 and LEDGAR join only when every picked model reads over 26 options"
-    ),
-}
 CORE = ("Core v1",)  # frozen benchmarks, see bench.py
 try:  # input tokens per item, measured by `jev-bench tokens`, for the page's cost estimates
     with open(os.path.join(ROOT, "benchmarks", "core-v1-tokens.json")) as f:
         SIZES = json.load(f)["per_item"]
 except (OSError, ValueError):
     SIZES = {}
-GATED = {"GPQA Diamond"}  # need a Hugging Face token and the set's terms accepted
 CORE_ITEMS = {}
-GROUPS = {  # menu headings, in order; every set belongs to one
-    "Frozen benchmarks": list(CORE),
-    "Sentiment and tone": [
-        "SST-2 sentiment", "IMDB", "Tweet sentiment", "Tweet emotion", "Tweet irony",
-    ],
-    "Meaning and reading": [
-        "RTE entailment", "SNLI", "MultiNLI mismatched", "ANLI round 3", "BoolQ", "MultiRC",
-        "WinoGrande", "RAGTruth", "SQuAD v2",
-    ],
-    "Reasoning": ["MuSR murder mysteries", "BBH causal judgement", "BBH date understanding"],
-    "Other languages": [
-        "XNLI Hindi", "Global-MMLU-Lite Hindi", "Global-MMLU-Lite Chinese", "Global-MMLU-Lite English",
-    ],
-    "Intent and topic": ["Banking77", "CLINC150", "AG News topic", "DBpedia-14"],
-    "Knowledge and exams": [
-        "MMLU", "MMLU-Pro", "ARC-Challenge", "OpenBookQA", "CommonsenseQA", "GoldenSwag",
-        "TruthfulQA", "MedQA", "PubMedQA", "GPQA Diamond",
-    ],
-    "Safety and spam": [
-        "ToxicChat", "Tweet hate", "Tweet offensive", "SMS spam", "Jailbreak attempts",
-        "BBQ race and ethnicity",
-    ],
-    "Which answer is better": ["Arena votes", "RewardBench", "HelpSteer2"],
-    "Contracts and business": [
-        "ContractNLI", "LEDGAR", "LegalBench hearsay", "LegalBench definitions", "TypeSafe cases",
-    ],
-}  # fmt: skip
-OPTIONS = {
-    "MMLU": 4,
-    "MMLU-Pro": 10,
-    "ARC-Challenge": 4,
-    "GoldenSwag": 4,
-    "TruthfulQA": 13,
-    "SNLI": 3,
-    "AG News topic": 4,
-    "Tweet emotion": 4,
-    "Banking77": 77,
-    "CLINC150": 151,
-    "Tweet sentiment": 3,
-    "ANLI round 3": 3,
-    "MultiNLI mismatched": 3,
-    "ContractNLI": 3,
-    "DBpedia-14": 14,
-    "LEDGAR": 100,
-    "CommonsenseQA": 5,
-    "OpenBookQA": 4,
-    "WinoGrande": 2,
-    "MedQA": 4,
-    "PubMedQA": 3,
-    "Arena votes": 3,
-    "RewardBench": 2,
-    "GPQA Diamond": 4,
-    "XNLI Hindi": 3,
-    "Global-MMLU-Lite Hindi": 4,
-    "Global-MMLU-Lite Chinese": 4,
-    "Global-MMLU-Lite English": 4,
-    "HelpSteer2": 5,
-    "BBQ race and ethnicity": 3,
-    "MuSR murder mysteries": 2,
-    "BBH date understanding": 6,
-}  # the rest are yes/no
 LETTER = {
     "deepseek",
     "moonshot",
@@ -523,12 +70,7 @@ LETTER = {
     "openai",
     "llamacpp",
 }  # read the answer as a letter: 26 options at most
-PROGRESS = {}  # downloading now: name -> [done, total, unit]; a model is measured on disk as it arrives
 DECKS = {}  # dataset name -> row indices not dealt yet, so a batch never repeats an item
-
-
-def dataset_path(name):
-    return os.path.join(DATA, name.replace(" ", "-").lower() + ".json")
 
 
 class Exhausted(Exception):
@@ -542,157 +84,6 @@ def deal(name, n, fresh):
     if not DECKS[name]:
         raise Exhausted(f"all {n} items of {name} are done")
     return DECKS[name].pop()
-
-
-def rows_page(hub, config, split, offset, length=100):
-    """One page of up to 100 rows; HF_TOKEN, when set, opens sets that need a Hub login."""
-    token = env("HF_TOKEN")
-    req = urllib.request.Request(
-        ROWS.format(hub, config, split, offset, length),
-        headers={"authorization": f"Bearer {token}"} if token else {},
-    )
-    for attempt in range(7):
-        try:
-            with urllib.request.urlopen(req, timeout=30) as r:
-                return json.load(r)
-        except urllib.error.HTTPError as e:
-            if e.code in (401, 403) or (e.code == 404 and token):  # the Hub hides gated sets as 404
-                raise ValueError(
-                    f"{hub} is behind a login: accept its terms at https://huggingface.co/datasets/{hub}"
-                    + ("" if token else ", then add a Hugging Face token under Keys")
-                ) from e
-            if e.code not in (429, 500, 502, 503, 504) or attempt == 6:
-                raise
-            # The Hub rate-limits, and its rows service fails now and then under load. Fetching a
-            # whole split (FULL) takes hundreds of pages, so back off for up to a few minutes.
-            time.sleep(float(e.headers.get("retry-after") or min(60, 5 * 2**attempt)))
-
-
-REVISIONS = {}  # Hub dataset -> its current commit, read once per process
-
-
-def revision(hub, fresh=False):
-    """The dataset's current commit on the Hub, recorded with every pool and pick."""
-    if fresh or hub not in REVISIONS:
-        token = env("HF_TOKEN")
-        req = urllib.request.Request(
-            f"https://huggingface.co/api/datasets/{hub}",
-            headers={"authorization": f"Bearer {token}"} if token else {},
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            REVISIONS[hub] = json.load(r)["sha"]
-    return REVISIONS[hub]
-
-
-def download(name, hub, config, split):
-    """A set's pool, fetched once into DATA with the Hub revision it came from. A split of up to
-    FULL_ROWS rows, or a set in FULL, is kept whole. A larger one is read as seeded windows: a short
-    run of rows from each equal stretch of the split, since some splits are sorted by label."""
-    path = dataset_path(name)
-    if not os.path.exists(path):
-        for _ in range(2):  # a pool read while the dataset changed is read again, once
-            before = revision(hub, fresh=True)
-            pool = read_pool(name, hub, config, split)
-            if revision(hub, fresh=True) == before:
-                break
-        else:
-            raise ValueError(f"{hub} changed on the Hub twice while {name} was downloading; try later")
-        os.makedirs(DATA, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(pool | {"revision": before}, f)
-    with open(path) as f:
-        return json.load(f)
-
-
-def read_pool(name, hub, config, split):
-    first = rows_page(hub, config, split, 0, 1)
-    total = first["num_rows_total"]
-    if total <= FULL_ROWS or name in FULL:
-        rule, seed, size = "full", None, 100
-        starts = list(range(0, total, size))
-    else:
-        runs = RUNS.get(name, POOL_RUNS)
-        rule, seed, size, stretch = f"{runs} seeded windows", f"pool:{name}", POOL // runs, total / runs
-        rng = random.Random(seed)
-        starts = [int(k * stretch + rng.random() * (stretch - size)) for k in range(runs)]
-    PROGRESS[name] = [0, len(starts), "pages"]
-    rows = []
-    try:
-        for start in starts:
-            rows += rows_page(hub, config, split, start, size)["rows"]
-            PROGRESS[name][0] += 1
-    finally:
-        PROGRESS.pop(name, None)
-    return {
-        "features": first["features"], "rows": rows, "rule": rule, "seed": seed, "total": total,
-        "starts": starts, "size": size,
-    }  # fmt: skip
-
-
-def typesafe_item(case, node, doc, qs, truth):
-    """One TypeSafe step: its document and every question on it, each with its consensus label."""
-    return {
-        "state": doc,
-        "questions": qs,
-        "truth": {k: {"true": "yes", "false": "no"}.get(v, v) for k, v in truth.items()},
-        "source": f"TypeSafe · {case} · {node}",
-        "options": None,
-    }
-
-
-def labelled_rows(name, page):
-    """The rows of a downloaded page that carry a label (SNLI marks unlabelled pairs -1) and that
-    the set keeps."""
-    rows = page["rows"]
-    if name in KEEP:
-        rows = [r for r in rows if KEEP[name](r["row"])]
-    if name in MC or callable(DATASETS[name][5]):
-        return rows
-    label = DATASETS[name][5]
-    return [r for r in rows if r["row"][label] != -1]
-
-
-def criteria(name, options):
-    return {o: DESCRIBE.get(name, {}).get(o) for o in options}
-
-
-def row_item(name, page, r):
-    """One downloaded row as a request with its truth, for a set in DATASETS or MC."""
-    if name in MC:
-        hub, _, split, state_of, question, options_of = MC[name]
-        options, answer = options_of(r["row"])
-        if name in SCORED:
-            q, truth = {"type": "score", "instructions": question, "criteria": options}, str(answer)
-        else:
-            q = {"type": "choice", "instructions": question, "criteria": criteria(name, options)}
-            truth = options[answer]
-        return {
-            "state": state_of(r["row"]),
-            "questions": {"answer": q},
-            "truth": {"answer": truth},
-            "source": f"{hub} · {split} row {r['row_idx']}",
-            "options": len(options),
-        }
-    hub, _, split, fields, question, label, yes = DATASETS[name]
-    row = r["row"]
-    if callable(label):
-        names, value = None, label(row)
-    else:
-        names = next(x["type"].get("names") for x in page["features"] if x["name"] == label)
-        value = names[row[label]] if names else row[label]
-    if yes is not None:
-        q = {"type": "noul", "instructions": question}
-        truth = "yes" if value == yes else "no"
-    else:
-        q = {"type": "choice", "instructions": question, "criteria": criteria(name, names)}
-        truth = value
-    return {
-        "state": {k: row[v] for k, v in fields.items()},
-        "questions": {"answer": q},
-        "truth": {"answer": truth},
-        "source": f"{hub} · {split} row {r['row_idx']}",
-        "options": 2 if yes is not None else len(names),
-    }
 
 
 def sample(name, fresh=False, wide=False):
@@ -710,10 +101,9 @@ def sample(name, fresh=False, wide=False):
         cases = typesafe_rows()
         item = typesafe_item(*cases[deal(name, len(cases), fresh)])
         return item | {"pool": len(cases), "left": len(DECKS[name])}
-    hub, config, split = (DATASETS.get(name) or MC[name])[:3]
-    page = download(name, hub, config, split)
-    rows = labelled_rows(name, page)
-    item = row_item(name, page, rows[deal(name, len(rows), fresh)])
+    page = datasets.download(name)
+    rows = datasets.labelled_rows(name, page)
+    item = datasets.row_item(name, page, rows[deal(name, len(rows), fresh)])
     return item | {"pool": len(rows), "left": len(DECKS[name])}
 
 
@@ -870,6 +260,41 @@ def run_rows(name):
                 it["start"] = min(it.get("start", x["at"]), x["at"] - x["ms"])
                 it["at"] = max(it.get("at", 0), x["at"])
     return list(items.values())
+
+
+def dataset_menu():
+    """Every set the page offers, with what its menu shows, in the order of its headings."""
+    from jev import bench  # bench imports this module
+
+    hf_token = bool(env("HF_TOKEN"))
+    fetch = bench.pages_to_fetch()
+    sets = [
+        {
+            "name": name, "options": 26, "yes_no": False, "frozen": True,
+            "local": not fetch["pages"], "fetch": fetch, "items": bench.size(),
+            "fetch_wide": bench.pages_to_fetch("wide"),
+            "needs_token": any(s.gated for s in SETS.values()) and not hf_token,  # GPQA is in Core v1
+        }
+        for name in CORE
+    ]  # fmt: skip
+    sets += [
+        {
+            "name": name,
+            "options": s.options,
+            "yes_no": isinstance(s, datasets.Labelled) and s.yes is not None,
+            "needs_token": s.gated and not hf_token,
+            "local": os.path.exists(dataset_path(name)),
+        }
+        for name, s in SETS.items()
+    ]
+    typesafe = os.path.isdir(os.path.join(ROOT, "results", "typesafe"))
+    sets.append({"name": "TypeSafe cases", "options": None, "local": typesafe})
+    for x in sets:
+        record = SETS.get(x["name"])
+        x["group"], x["about"] = (record.group, record.about) if record else datasets.OTHERS[x["name"]]
+        x |= SIZES.get(x["name"], {})
+    headings = list(dict.fromkeys(x["group"] for x in sets))
+    return sorted(sets, key=lambda x: headings.index(x["group"]))
 
 
 def progress():
@@ -1576,40 +1001,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
             if self.path.endswith("/keys"):
                 return self._send(200, json.dumps(keys()).encode())
             if self.path.endswith("/datasets"):
-                sets = [
-                    {
-                        "name": n,
-                        "options": OPTIONS.get(n, 2),
-                        "yes_no": n in DATASETS and DATASETS[n][6] is not None,
-                        "needs_token": n in GATED and not env("HF_TOKEN"),
-                        "local": os.path.exists(dataset_path(n)),
-                    }
-                    for n in [*DATASETS, *MC]
-                ]
-                frozen = os.path.exists(os.path.join(ROOT, "benchmarks", "core-v1.json"))
-                if frozen:
-                    from jev import bench  # bench imports this module
-
-                    fetch = bench.pages_to_fetch()
-                    sets += [
-                        {
-                            "name": n, "options": 26, "yes_no": False, "frozen": True,
-                            "local": not fetch["pages"], "fetch": fetch, "items": bench.size(),
-                            "fetch_wide": bench.pages_to_fetch("wide"),
-                            "needs_token": bool(GATED) and not env("HF_TOKEN"),  # GPQA is in Core v1
-                        }
-                        for n in CORE
-                    ]  # fmt: skip
-                ts = os.path.isdir(os.path.join(ROOT, "results", "typesafe"))
-                sets.append({"name": "TypeSafe cases", "options": None, "local": ts})
-                group = {n: g for g, names in GROUPS.items() for n in names}
-                order = [n for names in GROUPS.values() for n in names]
-                for x in sets:
-                    x["about"] = ABOUT[x["name"]]
-                    x |= SIZES.get(x["name"], {})
-                    x["group"] = group[x["name"]]
-                sets.sort(key=lambda x: order.index(x["name"]))
-                return self._send(200, json.dumps(sets).encode())
+                return self._send(200, json.dumps(dataset_menu()).encode())
             path = urllib.parse.urlparse(self.path).path
             file = os.path.normpath(os.path.join(WEB, path.lstrip("/")))
             if path != "/" and file.startswith(WEB + os.sep) and os.path.isfile(file):

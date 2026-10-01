@@ -19,6 +19,7 @@ WEIGHTS = ["*.json", "*.safetensors", "*.txt", "*.model", "*.tiktoken", "*.jinja
 CHUNK = 1 << 20
 LOCKS = defaultdict(Lock)  # one download per model; different models download side by side
 STOPPED = set()
+PROGRESS = {}  # downloading now: name -> [done, total, unit]; a model is measured on disk as it arrives
 
 
 class Stopped(Exception):

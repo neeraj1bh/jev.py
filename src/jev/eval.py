@@ -40,6 +40,7 @@ import urllib.parse
 import urllib.request
 
 from jev.core import DEFAULT_MODEL, ROOT, Jev
+from jev.datasets import typesafe_rows
 
 
 def get(url):
@@ -282,50 +283,6 @@ def field_rows(n):
 
 
 PUBLIC_N = 300  # items per Hub task
-TYPESAFE = ("security_incidents", "agent_trace_observability", "invoice_processing", "customer_service")
-
-
-def typesafe_rows():
-    """TypeSafe's published eval cases: document, questions and consensus label.
-
-    Fetched from evals.typesafe.ai on first use into results/typesafe/ (git-ignored). Only the
-    case id and our answers reach the log. The consensus is the mean of the two reference sets.
-    """
-    cache = os.path.join(ROOT, "results", "typesafe")
-    os.makedirs(cache, exist_ok=True)
-    rows = []
-    for wf in TYPESAFE:
-        path = os.path.join(cache, wf + ".js")
-        if not os.path.exists(path):
-            req = urllib.request.Request(
-                f"https://evals.typesafe.ai/{wf}-cases.js", headers={"User-Agent": "Mozilla/5.0"}
-            )
-            with urllib.request.urlopen(req, timeout=60) as r, open(path, "wb") as f:
-                f.write(r.read())
-        with open(path) as f:
-            raw = f.read()
-        ev = json.loads(raw[raw.index("(") + 1 : raw.rindex(")")])["eval"]
-        for cid, case in ev["cases"].items():
-            refs = case["reference_answers"]
-            for node in case["models"]["typesafe"]["nodes"]:
-                if node["doc"] is None or node["node"] not in refs:
-                    continue
-                qs = {
-                    qid: ev["questions"][i]
-                    for qid, i in node["questions"].items()
-                    if qid in refs[node["node"]]
-                }
-                truth = {}
-                for qid in qs:
-                    sets = refs[node["node"]][qid]["sets"]
-                    if all(x.get("probabilities") for x in sets):
-                        keys = {k for x in sets for k in x["probabilities"]}
-                        mean = {k: sum(x["probabilities"].get(k, 0) for x in sets) / len(sets) for k in keys}
-                        truth[qid] = max(mean, key=mean.get)
-                    else:  # a value without a distribution
-                        truth[qid] = str(sets[0]["value"]).lower()
-                rows.append((f"{wf}/{cid}", node["node"], ev["documents"][node["doc"]], qs, truth))
-    return rows
 
 
 def dist(a):
