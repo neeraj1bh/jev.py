@@ -81,6 +81,12 @@ Anything it prints must be a documented default or a placeholder. Also read the 
 One logical change per commit, staged by path. The subject says what, the body says why. No
 AI-attribution trailers, and nothing pushed unless the maintainer asks.
 
+Subjects follow Conventional Commits, `type(scope): subject` with a lower-case subject, and a
+commit-msg hook checks them with commitlint (`web/commitlint.config.js`). Types: `feat`, `fix`,
+`refactor`, `perf`, `docs`, `style`, `test`, `build`, `ci`, `chore`. Scopes: `core`, `remote`,
+`bench`, `local`, `page`, `web`, `dev`, `deps`, `readme`. Commits from before the hook have plain
+sentences as subjects.
+
 ## Writing
 
 Plain, specific, and true today: a comment explains why, not what; docs describe behaviour that
