@@ -29,7 +29,7 @@ and the public datasets and models the code uses.
 | `src/jev/core.py` | the readout, the HTTP server and the self-check |
 | `src/jev/remote.py` | hosted and llama.cpp backends, the letter readout |
 | `src/jev/page/`, `web/` | the comparison page's server and its React page |
-| `src/jev/bench/datasets.py` | every labelled set: where it comes from and how a row becomes a request |
+| `src/jev/bench/sets.py`, `datasets.py` | every labelled set as one record, and reading its rows from the Hub |
 | `src/jev/bench/core_v1.py`, `score.py`, `benchmarks/` | Core v1: frozen item pointers, models, token sizes, scoring |
 | `src/jev/local/` | local models: download, find, run |
 | `src/jev/bench/eval.py`, `readout.py`, `results/` | the older public eval and its committed summaries |

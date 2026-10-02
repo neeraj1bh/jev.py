@@ -34,7 +34,7 @@ from threading import Event
 
 from jev import remote
 from jev.bench import datasets
-from jev.bench.datasets import SETS, MultipleChoice
+from jev.bench.sets import SETS, MultipleChoice
 from jev.core import ROOT
 from jev.local.downloads import PROGRESS
 from jev.page import models, runs

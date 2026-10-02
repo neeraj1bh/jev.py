@@ -27,7 +27,8 @@ from threading import Lock, Thread
 from huggingface_hub.constants import HF_HUB_CACHE
 
 from jev.bench import core_v1, datasets
-from jev.bench.datasets import SETS, dataset_path, typesafe_item, typesafe_rows
+from jev.bench.datasets import dataset_path, typesafe_item, typesafe_rows
+from jev.bench.sets import OTHERS, SETS, Labelled
 from jev.core import DEFAULT_MODEL, ROOT, Jev, gpu_hint
 from jev.dev import NO_NODE, page_tools
 from jev.local import cache, downloads, folders, llamaserver
@@ -117,7 +118,7 @@ def dataset_menu():
         {
             "name": name,
             "options": s.options,
-            "yes_no": isinstance(s, datasets.Labelled) and s.yes is not None,
+            "yes_no": isinstance(s, Labelled) and s.yes is not None,
             "needs_token": s.gated and not hf_token,
             "local": os.path.exists(dataset_path(name)),
         }
@@ -127,7 +128,7 @@ def dataset_menu():
     sets.append({"name": "TypeSafe cases", "options": None, "local": typesafe})
     for x in sets:
         record = SETS.get(x["name"])
-        x["group"], x["about"] = (record.group, record.about) if record else datasets.OTHERS[x["name"]]
+        x["group"], x["about"] = (record.group, record.about) if record else OTHERS[x["name"]]
         x |= SIZES.get(x["name"], {})
     headings = list(dict.fromkeys(x["group"] for x in sets))
     return sorted(sets, key=lambda x: headings.index(x["group"]))
