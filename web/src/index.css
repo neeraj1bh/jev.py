@@ -9,7 +9,6 @@
   --color-lift: oklch(0.965 0.003 265);
   --color-rule: #e4e4e7;
   --color-ink: oklch(0.17 0.006 265);
-  --color-ink-2: oklch(0.17 0.006 265);
   --color-dim: oklch(0.46 0.01 265);
   --color-bar: #d4d4d8;
   --color-good: oklch(50.8% 0.118 165.612);
@@ -32,8 +31,6 @@
   --animate-fade: fade 0.25s ease-out;
   --animate-fill: fill 0.9s var(--ease-out);
   --animate-rise: rise 0.25s var(--ease-out);
-  --animate-from-r: from-r 0.2s var(--ease-out);
-  --animate-from-l: from-l 0.2s var(--ease-out);
   --animate-sheen: sheen 1.6s linear infinite;
   --animate-travel: travel 4s linear infinite;
   --animate-sweep: sweep 1.4s ease-in-out infinite;
@@ -99,18 +96,6 @@
       opacity: 0;
     }
   }
-  @keyframes from-r {
-    from {
-      opacity: 0;
-      transform: translateX(14px);
-    }
-  }
-  @keyframes from-l {
-    from {
-      opacity: 0;
-      transform: translateX(-14px);
-    }
-  }
 }
 
 @layer base {
@@ -137,7 +122,6 @@
     --color-lift: oklch(0.19 0.005 265);
     --color-rule: oklch(0.26 0.003 265);
     --color-ink: oklch(0.93 0.002 265);
-    --color-ink-2: oklch(0.93 0.002 265);
     --color-dim: oklch(0.62 0.005 265);
     --color-bar: #3f3f46;
     --color-good: oklch(76.5% 0.177 163.223);
@@ -170,7 +154,7 @@
       )
       no-repeat,
       var(--color-paper);
-    color: var(--color-ink-2);
+    color: var(--color-ink);
     font: 15px / 1.5 var(--font-body);
   }
   button {

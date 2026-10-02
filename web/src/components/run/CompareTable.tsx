@@ -399,8 +399,6 @@ export function CompareTable({
   );
 }
 
-/** Many models on one item: a row per model and a column per question; a row opens to show
- * every option that model weighed. */
 /** Opens or closes every row's options at once. */
 function ShowAllButton({ allOpen, onClick }: { allOpen: boolean; onClick: () => void }) {
   return (
@@ -413,6 +411,8 @@ function ShowAllButton({ allOpen, onClick }: { allOpen: boolean; onClick: () => 
   );
 }
 
+/** Many models on one item: a row per model and a column per question; a row opens to show
+ * every option that model weighed. */
 export function ModelRowsTable({
   names,
   panels,

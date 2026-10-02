@@ -15,10 +15,11 @@ import { PastRuns, runTime } from "./components/past/PastRuns";
 import { GenerateReplay } from "./components/results/GenerateReplay";
 import { ItemDialog } from "./components/results/ItemDialog";
 import { ResultsView } from "./components/results/ResultsView";
+import { CompareTable } from "./components/run/CompareTable";
 import { EditDialog } from "./components/run/EditDialog";
 import { InputBar, type InputSource } from "./components/run/InputBar";
 import { RaceClocks } from "./components/run/RaceClocks";
-import { CompareView, GenerateView } from "./components/run/ResultPanels";
+import { GenerateView } from "./components/run/ResultPanels";
 import { ConfirmDialog } from "./components/ui/ConfirmDialog";
 import { EmptyState } from "./components/ui/EmptyState";
 import { FluxLoader } from "./components/ui/FluxLoader";
@@ -1294,7 +1295,7 @@ export default function App() {
                   </div>
                 </div>
               ) : isCompare ? (
-                <CompareView
+                <CompareTable
                   names={compareNames}
                   panels={panels}
                   questionIds={questionIds}

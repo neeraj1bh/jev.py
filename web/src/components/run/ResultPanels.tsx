@@ -1,9 +1,8 @@
 import { ChartBar, PencilSimpleLine } from "@phosphor-icons/react";
 import { panelSubtitle } from "../../lib/backends";
-import type { PanelState, Question } from "../../lib/types";
+import type { PanelState } from "../../lib/types";
 import { AnswerSkeleton } from "../ui/Skeleton";
 import { Answers } from "./Answers";
-import { CompareTable } from "./CompareTable";
 import { Panel } from "./Panel";
 import { finishOrder } from "./RaceClocks";
 
@@ -29,27 +28,6 @@ function PanelAnswers({ state, truth }: { state?: PanelState; truth?: Record<str
   if (!state?.response) return null;
   // Keyed by run so the probability bars grow again on every new result.
   return <Answers key={`${state.startedAt}-${state.ms}`} response={state.response} truth={truth} />;
-}
-
-interface CompareViewProps {
-  names: string[];
-  panels: PanelState[];
-  questionIds: string[];
-  asked?: Record<string, Question>;
-  truth?: Record<string, string>;
-}
-
-/** Every compare, one model or six, uses one table: a column per model, a row per question. */
-export function CompareView({ names, panels, questionIds, asked, truth }: CompareViewProps) {
-  return (
-    <CompareTable
-      names={names}
-      panels={panels}
-      questionIds={questionIds}
-      asked={asked}
-      truth={truth}
-    />
-  );
 }
 
 interface GenerateViewProps {

@@ -53,7 +53,7 @@ function compare(a: SavedRun, b: SavedRun, column: SortColumn) {
   return a.name.localeCompare(b.name);
 }
 
-export /** Whether two runs have an item in common; a big run and a small one are checked when opened. */
+/** Whether two runs have an item in common; a big run and a small one are checked when opened. */
 function shareItems(a: SavedRun, b: SavedRun) {
   if (a.dataset !== b.dataset) return false;
   if (a.keys && b.keys) return a.keys.some((key) => b.keys?.includes(key));
