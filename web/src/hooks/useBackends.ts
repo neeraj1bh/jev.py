@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { fetchBackends, fetchDatasets, fetchGateway } from "../api";
-import { isUsable, TEXTLESS } from "../backends";
-import type { Backend, Dataset } from "../types";
+import { fetchBackends, fetchDatasets, fetchGateway } from "../lib/api";
+import { isUsable, TEXTLESS } from "../lib/backends";
+import type { Backend, Dataset } from "../lib/types";
 
 export function useBackends() {
   const [backends, setBackends] = useState<Record<string, Backend>>({});

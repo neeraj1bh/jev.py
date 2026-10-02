@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { Row } from "../types";
+import type { Row } from "../lib/types";
 
 /** A fixed pace, or FIT: whatever pace makes the whole replay last FIT_MS, for short clips. */
 export type ReplaySpeed = 1 | 4 | 10 | 50 | 100 | "fit";

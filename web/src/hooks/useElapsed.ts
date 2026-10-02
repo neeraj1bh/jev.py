@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { PanelState } from "../types";
+import type { PanelState } from "../lib/types";
 
 /** Milliseconds shown for a panel: ticking while it runs, capped during a replay, final when done. */
 export function useElapsed(state: PanelState) {

@@ -1,7 +1,37 @@
 import { ArrowCounterClockwise, CircleNotch, Columns, Play } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-
+import { Benchmark } from "./components/benchmark/Benchmark";
+import { Header } from "./components/header/Header";
+import { AddModelDialog } from "./components/models/AddModelDialog";
+import { DownloadBar } from "./components/models/DownloadBar";
+import { KeyDialog } from "./components/models/KeyDialog";
+import { KeysDialog } from "./components/models/KeysDialog";
+import type { LocalModelActions } from "./components/models/ModelMenu";
+import { ModelPicker } from "./components/models/ModelPicker";
+import { MAX_COMPARE, ModelsPicker } from "./components/models/ModelsPicker";
+import { RunningDialog } from "./components/models/RunningDialog";
+import { type KindFilter, PastRuns, runTime } from "./components/past/PastRuns";
+import { GenerateReplay } from "./components/results/GenerateReplay";
+import { ItemDialog } from "./components/results/ItemDialog";
+import { ResultsView } from "./components/results/ResultsView";
+import { EditDialog } from "./components/run/EditDialog";
+import { InputBar, type InputSource } from "./components/run/InputBar";
+import { RaceClocks } from "./components/run/RaceClocks";
+import { CompareView, GenerateView } from "./components/run/ResultPanels";
+import { ConfirmDialog, type ConfirmRequest } from "./components/ui/ConfirmDialog";
+import { EmptyState } from "./components/ui/EmptyState";
+import { FluxLoader } from "./components/ui/FluxLoader";
+import { Icon } from "./components/ui/Icon";
+import { Tip } from "./components/ui/Tip";
+import { Toast } from "./components/ui/Toast";
+import { useBackends } from "./hooks/useBackends";
+import { useBatchReplay } from "./hooks/useBatchReplay";
+import { useDownloads } from "./hooks/useDownloads";
+import { idlePanel, runningPanel, usePanels } from "./hooks/usePanels";
+import { isString, usePersistentState } from "./hooks/usePersistentState";
+import { useTheme } from "./hooks/useTheme";
+import { useToast } from "./hooks/useToast";
 import {
   addModel,
   deleteModel,
@@ -12,44 +42,13 @@ import {
   sampleItem,
   stopDownload,
   stopModel,
-} from "./api";
-import { isHosted } from "./backends";
-import { AddModelDialog } from "./components/AddModelDialog";
-import { Benchmark } from "./components/Benchmark";
-import { ConfirmDialog, type ConfirmRequest } from "./components/ConfirmDialog";
-import { DownloadBar } from "./components/DownloadBar";
-import { EditDialog } from "./components/EditDialog";
-import { EmptyState } from "./components/EmptyState";
-import { FluxLoader } from "./components/FluxLoader";
-import { GenerateReplay } from "./components/GenerateReplay";
-import { Header } from "./components/Header";
-import { Icon } from "./components/Icon";
-import { InputBar, type InputSource } from "./components/InputBar";
-import { ItemDialog } from "./components/ItemDialog";
-import { KeyDialog } from "./components/KeyDialog";
-import { KeysDialog } from "./components/KeysDialog";
-import type { LocalModelActions } from "./components/ModelMenu";
-import { ModelPicker } from "./components/ModelPicker";
-import { MAX_COMPARE, ModelsPicker } from "./components/ModelsPicker";
-import { type KindFilter, PastRuns, runTime } from "./components/PastRuns";
-import { RaceClocks } from "./components/RaceClocks";
-import { CompareView, GenerateView } from "./components/ResultPanels";
-import { ResultsView } from "./components/ResultsView";
-import { RunningDialog } from "./components/RunningDialog";
-import { Tip } from "./components/Tip";
-import { Toast } from "./components/Toast";
-import { EXAMPLES, type ExampleName, isExampleName } from "./examples";
-import { useBackends } from "./hooks/useBackends";
-import { useBatchReplay } from "./hooks/useBatchReplay";
-import { useDownloads } from "./hooks/useDownloads";
-import { idlePanel, runningPanel, usePanels } from "./hooks/usePanels";
-import { isString, usePersistentState } from "./hooks/usePersistentState";
-import { useTheme } from "./hooks/useTheme";
-import { useToast } from "./hooks/useToast";
-import { makerIcons } from "./logos";
-import { now, runBatchLoop, runEach, timedGenerate, timedReadout } from "./runner";
-import { readoutFooter, writtenAnswers } from "./scoring";
-import { cn, ghostButton, inset, labelText, shell, solidButton } from "./styles";
+} from "./lib/api";
+import { isHosted } from "./lib/backends";
+import { EXAMPLES, type ExampleName, isExampleName } from "./lib/examples";
+import { makerIcons } from "./lib/logos";
+import { now, runBatchLoop, runEach, timedGenerate, timedReadout } from "./lib/runner";
+import { readoutFooter, writtenAnswers } from "./lib/scoring";
+import { cn, ghostButton, inset, labelText, shell, solidButton } from "./lib/styles";
 import type {
   Backend,
   Item,
@@ -61,8 +60,8 @@ import type {
   RunKind,
   SavedRun,
   Side,
-} from "./types";
-import { compareVerdict, generateVerdict, rowRecording } from "./verdicts";
+} from "./lib/types";
+import { compareVerdict, generateVerdict, rowRecording } from "./lib/verdicts";
 
 const CREDITS = ["neerxjbhatt", "essdecay"];
 

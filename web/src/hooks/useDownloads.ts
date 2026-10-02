@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { fetchProgress } from "../api";
+import { fetchProgress } from "../lib/api";
 
 export type Progress = Record<string, { done: number; total: number; unit: string }>;
 

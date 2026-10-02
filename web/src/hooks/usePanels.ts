@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import { fastestIndexes } from "../scoring";
-import type { PanelState } from "../types";
+import { fastestIndexes } from "../lib/scoring";
+import type { PanelState } from "../lib/types";
 
 export const idlePanel = (): PanelState => ({ status: "idle", footer: "Waiting to run." });
 export const runningPanel = (footer: string, startedAt: number): PanelState => ({
