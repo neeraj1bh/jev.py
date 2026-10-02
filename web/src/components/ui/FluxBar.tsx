@@ -9,9 +9,6 @@ interface FluxBarProps {
   className?: string;
 }
 
-/** An amount as a glowing fill that runs from sky blue at the start to deep blue at a full bar, so
- * a longer fill also ends darker, with a highlight gliding along it; the glide stops for people
- * who turn motion off. */
 export function FluxBar({ share, label, settled, className }: FluxBarProps) {
   const percent =
     share === undefined ? undefined : Math.round(Math.min(Math.max(share, 0), 1) * 100);

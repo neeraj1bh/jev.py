@@ -10,7 +10,6 @@ interface IconProps {
   className?: string;
 }
 
-/** Phosphor at its bold weight, the way the reference interfaces draw theirs: small and solid. */
 export function Icon({ icon: Glyph, size = 16, className }: IconProps) {
   return <Glyph size={size} weight="bold" aria-hidden className={cn("flex-none", className)} />;
 }
@@ -22,7 +21,6 @@ const TONES = {
   warn: "bg-warn text-paper shadow-sm",
 };
 
-/** An icon on a small rounded tile: tinted while idle, filled once it is the chosen or live one. */
 export function IconTile({
   icon,
   tone = "idle",

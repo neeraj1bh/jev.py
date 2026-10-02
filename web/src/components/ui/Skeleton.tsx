@@ -1,7 +1,5 @@
 import { cn } from "../../lib/styles";
 
-/** A soft placeholder block while something loads, a blue glint crossing it; still for people who
- * turn motion off. */
 export function Skeleton({ className }: { className?: string }) {
   return (
     <span
@@ -14,7 +12,6 @@ export function Skeleton({ className }: { className?: string }) {
   );
 }
 
-/** Placeholder answer rows for a panel that is waiting on a model. */
 const PLACEHOLDER_KEYS = ["first", "second", "third", "fourth", "fifth"];
 
 export function AnswerSkeleton({ rows = 3 }: { rows?: number }) {

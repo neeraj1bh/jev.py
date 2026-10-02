@@ -3,7 +3,6 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { Icon } from "./Icon";
 
-/** One message at the bottom, as a dark capsule that grows out of a dot, with a way to close it. */
 export function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   const reduce = useReducedMotion();
   return (

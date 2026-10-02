@@ -10,8 +10,6 @@ interface DownloadBarProps {
   onStop: (key: string) => void;
 }
 
-/** Models and sets coming down: what, how far, and Stop (each resumes later), pinned where it cannot be
- * missed. */
 export function DownloadBar({ progress, label, onStop }: DownloadBarProps) {
   const entries = Object.entries(progress).filter(([key]) => key !== "gateway");
   if (!entries.length) return null;

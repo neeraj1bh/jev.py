@@ -25,7 +25,6 @@ interface DatasetMenuProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/** The public datasets, with each one's answer shape and whether it is on disk yet. */
 export function DatasetMenu({
   datasets,
   value,

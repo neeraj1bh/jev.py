@@ -25,7 +25,6 @@ interface RunFilterProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/** One menu for which saved runs to show: their kind, then their set, each with its count. */
 export function RunFilter({
   runs,
   kind,

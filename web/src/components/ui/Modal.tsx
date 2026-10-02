@@ -68,7 +68,6 @@ export function Modal({
   );
 }
 
-/** A round icon button for a dialog's header: previous, next, close. */
 export function RoundButton({
   label,
   onClick,
@@ -106,7 +105,6 @@ interface DialogFrameProps {
   children: ReactNode;
 }
 
-/** A dialog on the raised surface: header and footer on the tinted shell, content on the inset. */
 export function DialogFrame(props: DialogFrameProps) {
   const { title, icon, badge, subtitle, actions, footer, bodyClassName, children } = props;
   return (

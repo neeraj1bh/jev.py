@@ -46,7 +46,6 @@ interface ResultsViewProps {
   onBack: () => void;
 }
 
-/** A batch on its own screen: the summary and the items, with a replay that plays it back as it ran. */
 export function ResultsView(props: ResultsViewProps) {
   // A finished batch reads best first; while rows still arrive the columns keep their place.
   const settled = !props.scoreboard && !props.stage;

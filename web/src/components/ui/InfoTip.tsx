@@ -10,7 +10,6 @@ interface InfoTipProps {
   label?: string;
 }
 
-/** A small "i" that explains a term in plain words on hover or focus. */
 export function InfoTip({ children, label = "What this means" }: InfoTipProps) {
   return (
     <Tooltip.Root delayDuration={120}>

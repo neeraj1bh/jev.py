@@ -58,12 +58,9 @@ interface ModelMenuProps {
   isDisabled: (backend: Backend) => boolean;
   detail: (backend: Backend) => string;
   onSelect: (id: string) => void;
-  /** Multi-select shows a check beside each chosen model. */
   showChecks?: boolean;
   hint?: ReactNode;
-  /** Opens the dialog that adds a Hugging Face model. */
   onAddModel?: () => void;
-  /** Deletes a downloaded local model's files. */
   onDelete?: (backend: Backend) => void;
   /** Stops the llama-server of a running GGUF model. */
   onStop?: (backend: Backend) => void;

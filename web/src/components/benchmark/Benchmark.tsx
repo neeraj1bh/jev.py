@@ -75,7 +75,6 @@ interface MakerChipProps {
   onToggle: () => void;
 }
 
-/** Adds or removes every model of one maker; an outline and a check, so a full row stays light. */
 function MakerChip({ label, count, on, onToggle }: MakerChipProps) {
   return (
     <button

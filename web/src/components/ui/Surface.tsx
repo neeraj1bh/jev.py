@@ -7,7 +7,6 @@ import { type IconGlyph, IconTile } from "./Icon";
 interface SurfaceProps {
   title?: ReactNode;
   icon?: IconGlyph;
-  /** Quiet text after the title. */
   note?: ReactNode;
   /** Controls on the right of the header. */
   aside?: ReactNode;
@@ -18,7 +17,6 @@ interface SurfaceProps {
   children: ReactNode;
 }
 
-/** A card on the raised surface: the header sits on the tinted shell, the content on the inset. */
 export function Surface(props: SurfaceProps) {
   const { title, icon, note, aside, live, className, bodyClassName, children } = props;
   return (

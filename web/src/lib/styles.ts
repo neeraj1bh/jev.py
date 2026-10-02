@@ -1,6 +1,9 @@
 export const cn = (...classes: (string | false | null | undefined)[]) =>
   classes.filter(Boolean).join(" ");
 
+/** snake_case names wrap after an underscore instead of mid-word. */
+export const breakable = (name: string) => name.replaceAll("_", "_\u200b");
+
 export const labelText = "text-[13px] text-dim";
 // The raised look: a tinted shell holding a white inset, the header living on the shell.
 export const shell = "rounded-[22px] bg-lift p-1.5 shadow-(--surface-shadow)";
@@ -26,7 +29,6 @@ export const tableCell =
 export const monoDim = "font-mono text-xs text-dim";
 export const numberInput =
   "w-16 rounded-full border border-rule bg-paper px-2 py-1 text-center font-mono text-[13.5px] text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-dim";
-/** A place in a ranking: first is filled, the rest are tinted. */
 export const rankChip = (rank: number) =>
   cn(
     "grid size-5 place-items-center rounded-md font-mono text-[11px] font-medium tabular-nums",

@@ -13,7 +13,6 @@ interface EmptyStateProps {
   action?: { label: string; onClick: () => void };
 }
 
-/** What an empty list means and what to do next, instead of a blank table. */
 export function EmptyState({ icon, around, title, children, action }: EmptyStateProps) {
   return (
     <div className="relative isolate flex flex-col items-center gap-2 px-6 py-10 text-center">

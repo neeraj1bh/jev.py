@@ -8,7 +8,6 @@ import { type IconGlyph, IconTile } from "../ui/Icon";
 import { InfoTip } from "../ui/InfoTip";
 import type { Place } from "./RaceClocks";
 
-/** A side's tile fills while it runs and turns green when it finished first. */
 export const liveTone = (state: PanelState) =>
   state.status === "running" ? "ink" : state.fastest ? "good" : "idle";
 

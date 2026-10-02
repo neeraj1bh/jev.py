@@ -26,7 +26,6 @@ const HINTS: Record<string, string> = {
   LAYA_URL: "The laya-serve address, e.g. http://localhost:8000/v1/systemone",
 };
 
-/** What each key reaches, at a glance: the real Jev, a hosted API, a gateway, a server. */
 const ICONS: Record<string, PhosphorIcon> = {
   TYPESAFE_API_KEY: Sparkle,
   OPENROUTER_API_KEY: Globe,
@@ -115,11 +114,9 @@ function KeyRow({ info, armed, onEdit, onArm, onRemove }: KeyRowProps) {
 interface KeysDialogProps {
   open: boolean;
   onClose: () => void;
-  /** A key changed, so what the pickers can use may have too. */
   onChanged: () => void;
 }
 
-/** Every key and token in one place: which are set, what each unlocks, and a way to set it. */
 export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
   const [keys, setKeys] = useState<KeyInfo[] | null>(null);
   const [editing, setEditing] = useState("");

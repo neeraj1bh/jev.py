@@ -13,9 +13,6 @@ interface FluxLoaderProps {
   share?: number;
 }
 
-/** What the page is waiting on: the step's name flies in from the back, letter by letter, over a
- * glowing bar that fills when the amount is known and sweeps when it is not. The name is plain
- * text for people who turn motion off. */
 export function FluxLoader({ label, share }: FluxLoaderProps) {
   const still = useReducedMotion();
   return (

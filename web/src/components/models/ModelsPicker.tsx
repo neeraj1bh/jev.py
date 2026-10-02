@@ -12,7 +12,6 @@ import type { MenuState } from "./ModelPicker";
 
 export const MAX_COMPARE = 6;
 
-/** A multi-select's trigger: the picked models' tiles stacked like avatars, the count, the names. */
 export function PickedModels({ picked }: { picked: Backend[] }) {
   if (!picked.length) return <>Pick models</>;
   const names = picked.map((backend) => backend.label);
@@ -44,7 +43,6 @@ interface ModelsPickerProps extends MenuState {
   local: LocalModelActions;
 }
 
-/** Up to six models for Compare; the menu stays open between picks. */
 export function ModelsPicker({
   backends,
   selected,

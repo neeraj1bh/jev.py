@@ -126,7 +126,6 @@ export function SummaryTable({ rows, columns, priceOf, live = false }: SummaryTa
   const shares = stats.map((s) => (s.total ? s.correct / s.total : 0));
   const times = stats.map((s) => s.averageMs);
   const fullTime = fullBar(Math.max(0, ...times));
-  // an unknown cost has no bar
   const fullCost = fullBar(Math.max(0, ...costs.map((cost) => cost?.dollars ?? 0)));
   // a model with no answer yet waits at the bottom rather than leading on a time of zero
   const order = columns
@@ -134,7 +133,6 @@ export function SummaryTable({ rows, columns, priceOf, live = false }: SummaryTa
     .sort(
       (a, b) => (times[a] || Number.POSITIVE_INFINITY) - (times[b] || Number.POSITIVE_INFINITY),
     );
-  /** A column of bars: its name and, once there is one, what a full bar stands for. */
   const heading = (label: string, info: string, full: string) => (
     <th className={cn(head, "w-[22%]")}>
       <span className="inline-flex items-center gap-1">
@@ -215,7 +213,6 @@ interface SummaryProps {
   priceOf: (column: string) => Backend | undefined;
 }
 
-/** A finished batch: its name and size, how often the models agreed, and the table. */
 export function Summary({ rows, columns, dataset, priceOf }: SummaryProps) {
   if (rows.length === 0) return null;
   const byQuestion = Object.keys(rows[0]?.item.questions ?? {}).length > 1;

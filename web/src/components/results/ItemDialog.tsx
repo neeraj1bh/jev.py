@@ -19,7 +19,6 @@ const asPanel = (side: Side, fastest: boolean): PanelState => ({
   footer: side.response.error?.message ?? "",
 });
 
-/** The item's input, one line until opened. */
 function InputCard({ state }: { state: unknown }) {
   const [open, setOpen] = useState(false);
   const text = typeof state === "string" ? state : JSON.stringify(state, null, 2);

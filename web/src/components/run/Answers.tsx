@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { answerLabel, matchesLabel } from "../../lib/scoring";
-import { cn } from "../../lib/styles";
+import { breakable, cn } from "../../lib/styles";
 import type { Answer, Response } from "../../lib/types";
 import { CheckMark } from "../ui/CheckMark";
 import { Tip } from "../ui/Tip";
-
-/** snake_case names wrap after an underscore instead of mid-word. */
-const breakable = (name: string) => name.replaceAll("_", "_\u200b");
 
 function ProbabilityBar({ percent, top }: { percent: number; top: boolean }) {
   const [grown, setGrown] = useState(false);

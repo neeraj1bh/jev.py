@@ -5,6 +5,7 @@ import { Fragment, type ReactNode, useState } from "react";
 import { useElapsed } from "../../hooks/useElapsed";
 import { answerLabel, matchesLabel } from "../../lib/scoring";
 import {
+  breakable,
   chipButton,
   cn,
   inset,
@@ -43,7 +44,6 @@ export function Reveal({ open, children }: { open: boolean; children: ReactNode 
   );
 }
 
-/** The answer as a chip, green when it matches the label and orange when it does not. */
 function AnswerChip({
   answer,
   truth,
@@ -87,7 +87,6 @@ function AnswerChip({
   );
 }
 
-/** Every option with its probability, the chosen one first and coloured; the rest fade. */
 function Distribution({
   answer,
   truth,
@@ -228,7 +227,6 @@ function optionsText(question: Question) {
   return options.length > 4 ? `${shown} · +${options.length - 4}` : shown;
 }
 
-/** What a question asks and what it can answer, under its name. */
 function QuestionHint({ question }: { question: Question }) {
   return (
     <span className="mt-0.5 block text-xs text-dim">
@@ -237,15 +235,12 @@ function QuestionHint({ question }: { question: Question }) {
     </span>
   );
 }
-/** snake_case names wrap after an underscore instead of spilling into the next column. */
-const breakable = (name: string) => name.replaceAll("_", "_​");
 
 const rowCell = "border-0 border-b border-rule px-2 py-2.5 align-middle";
 // The row under an open row: no rule until it opens, so a closed one takes no room.
 const detailCell = (open: boolean) =>
   cn("px-2 py-0 align-top", open ? "border-0 border-b border-rule" : "border-0");
 
-/** The caret that opens a row, on a small tile. */
 function Caret({ open }: { open: boolean }) {
   return (
     <span className="grid size-5 flex-none place-items-center rounded-md bg-lift text-dim">
@@ -399,7 +394,6 @@ export function CompareTable({
   );
 }
 
-/** Opens or closes every row's options at once. */
 function ShowAllButton({ allOpen, onClick }: { allOpen: boolean; onClick: () => void }) {
   return (
     <div className="flex justify-end pb-1.5">

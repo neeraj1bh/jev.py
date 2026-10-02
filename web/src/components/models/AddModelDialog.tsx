@@ -15,7 +15,6 @@ const STARTERS = [
   { id: "Qwen/Qwen2.5-7B-Instruct", gb: 15.2 },
 ];
 
-/** The memory a model needs here, when it is more than this machine has. */
 function tooBig(gb: number, perGb?: number, have?: number) {
   if (!perGb || have === undefined) return "";
   const need = Math.round(gb * perGb);
@@ -32,7 +31,6 @@ interface AddModelDialogProps {
   memoryGb?: number;
   onClose: () => void;
   onAdd: (id: string) => Promise<void>;
-  /** A folder was added or removed, so the menu's models changed. */
   onFoldersChanged: () => void;
 }
 

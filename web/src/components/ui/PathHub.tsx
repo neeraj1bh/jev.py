@@ -17,8 +17,6 @@ const SLOTS = [
 const tile =
   "absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center bg-panel shadow-(--surface-shadow)";
 
-/** An icon joined by lines to what surrounds it, lit from behind by the shader, a blue
- * pulse running out along each line; the pulses stop for people who turn motion off. */
 export function PathHub({ icon, around }: { icon: IconGlyph; around: IconGlyph[] }) {
   const nodes = SLOTS.flatMap((slot, k) => {
     const glyph = around[k];

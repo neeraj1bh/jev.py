@@ -83,7 +83,6 @@ const NEW_ROWS = 6; // only the rows that just arrived rise in, not every row sc
 const GLIDE = 0.12; // share of the gap to the newest row closed each frame while following
 const STRIP_AFTER = 6; // more models than this get one square each instead of a column each
 
-/** Green when every model got the item right, orange when any missed or failed, grey unlabelled. */
 function RowDot({ row }: { row: Row }) {
   const scores = row.sides.map((side) => scoreResponse(side.response, row.item.truth));
   const labelled = scores.some(([, total]) => total > 0);
@@ -101,7 +100,6 @@ function RowDot({ row }: { row: Row }) {
   );
 }
 
-/** Every model's result on one item as a row of squares, in the ranked order, details on hover. */
 function StripCell({ row, columns }: { row: Row; columns: string[] }) {
   let right = 0;
   const squares = row.sides.map((side, k) => {
