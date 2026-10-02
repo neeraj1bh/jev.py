@@ -33,9 +33,9 @@ from jev.core import DEFAULT_MODEL, ROOT, Jev, gpu_hint
 from jev.dev import NO_NODE, page_tools
 from jev.local import cache, downloads, folders, llamaserver
 from jev.local.downloads import PROGRESS
+from jev.page.catalog import CHECKED, gateway
 from jev.page.keys import clear_key, keys, set_key
 from jev.page.models import (
-    CHECKED,
     DEVICE,
     LOADED,
     MODELS,
@@ -44,7 +44,6 @@ from jev.page.models import (
     caches,
     download_model,
     folder_state,
-    gateway,
     generate,
     generate_remote,
     get,
