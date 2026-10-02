@@ -51,6 +51,16 @@ export function location(backend?: Backend) {
   return `${backend.ready ? "On disk" : "Downloads to"} ${backend.path}${need}`;
 }
 
+/** Why the picked GGUF models cannot run together: they would take turns, each stopping the last. */
+export function ggufOverBudget(picked: Backend[]) {
+  const gguf = picked.filter((backend) => backend.group === "gguf");
+  const budget = gguf[0]?.budget_gb;
+  const needed = gguf.reduce((sum, backend) => sum + (backend.gb ?? 0), 0);
+  return budget && needed > budget
+    ? `${gguf.length} llama.cpp models need ${needed.toFixed(1)} GB together; this machine allows ${budget} GB. Pick fewer.`
+    : "";
+}
+
 /** A set with more options than a letter-reading backend can take (26) cannot run there. */
 export const blockingBackend = (dataset: Dataset, backends: (Backend | undefined)[]) =>
   backends.find((backend) => backend?.max && dataset.options && dataset.options > backend.max);

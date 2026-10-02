@@ -11,7 +11,7 @@ import type { LocalModelActions } from "./components/models/ModelMenu";
 import { ModelPicker } from "./components/models/ModelPicker";
 import { MAX_COMPARE, ModelsPicker } from "./components/models/ModelsPicker";
 import { RunningDialog } from "./components/models/RunningDialog";
-import { type KindFilter, PastRuns, runTime } from "./components/past/PastRuns";
+import { PastRuns, runTime } from "./components/past/PastRuns";
 import { GenerateReplay } from "./components/results/GenerateReplay";
 import { ItemDialog } from "./components/results/ItemDialog";
 import { ResultsView } from "./components/results/ResultsView";
@@ -19,7 +19,7 @@ import { EditDialog } from "./components/run/EditDialog";
 import { InputBar, type InputSource } from "./components/run/InputBar";
 import { RaceClocks } from "./components/run/RaceClocks";
 import { CompareView, GenerateView } from "./components/run/ResultPanels";
-import { ConfirmDialog, type ConfirmRequest } from "./components/ui/ConfirmDialog";
+import { ConfirmDialog } from "./components/ui/ConfirmDialog";
 import { EmptyState } from "./components/ui/EmptyState";
 import { FluxLoader } from "./components/ui/FluxLoader";
 import { Icon } from "./components/ui/Icon";
@@ -27,9 +27,11 @@ import { Tip } from "./components/ui/Tip";
 import { Toast } from "./components/ui/Toast";
 import { useBackends } from "./hooks/useBackends";
 import { useBatchReplay } from "./hooks/useBatchReplay";
+import { useConfirm } from "./hooks/useConfirm";
 import { useDownloads } from "./hooks/useDownloads";
 import { idlePanel, runningPanel, usePanels } from "./hooks/usePanels";
 import { isString, usePersistentState } from "./hooks/usePersistentState";
+import { useSavedRuns } from "./hooks/useSavedRuns";
 import { useTheme } from "./hooks/useTheme";
 import { useToast } from "./hooks/useToast";
 import {
@@ -37,16 +39,16 @@ import {
   deleteModel,
   downloadModel,
   fetchRun,
-  fetchRuns,
   loadModel,
   sampleItem,
   stopDownload,
   stopModel,
 } from "./lib/api";
-import { isHosted } from "./lib/backends";
+import { ggufOverBudget, isHosted } from "./lib/backends";
 import { EXAMPLES, type ExampleName, isExampleName } from "./lib/examples";
 import { makerIcons } from "./lib/logos";
 import { now, runBatchLoop, runEach, timedGenerate, timedReadout } from "./lib/runner";
+import { mergeRuns } from "./lib/savedRuns";
 import { readoutFooter, writtenAnswers } from "./lib/scoring";
 import { cn, ghostButton, inset, labelText, shell, solidButton } from "./lib/styles";
 import type {
@@ -59,15 +61,12 @@ import type {
   Row,
   RunKind,
   SavedRun,
-  Side,
 } from "./lib/types";
 import { compareVerdict, generateVerdict, rowRecording } from "./lib/verdicts";
 
 const CREDITS = ["neerxjbhatt", "essdecay"];
 
 const FIRST_EXAMPLE: ExampleName = "Support ticket";
-const isKindFilter = (value: unknown): value is KindFilter =>
-  value === "" || value === "cmp" || value === "gen";
 const HOSTED_PARALLEL = 8;
 
 const prettyJson = (value: unknown) => JSON.stringify(value, null, 2);
@@ -107,7 +106,7 @@ export default function App() {
   }, [downloads, reload]);
   const [addingFor, setAddingFor] = useState<"generate" | "compare" | "benchmark" | null>(null);
   const [runningOpen, setRunningOpen] = useState(false);
-  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const confirm = useConfirm();
   const fetchAgreed = useRef(new Set<string>()); // frozen benchmarks the viewer agreed to download
   const [source, setSource] = useState<InputSource>("examples");
   const [example, setExample] = useState<ExampleName | "">(FIRST_EXAMPLE);
@@ -149,10 +148,7 @@ export default function App() {
     open: boolean;
   } | null>(null);
   const [openMenu, setOpenMenu] = useState("");
-  const [savedRuns, setSavedRuns] = useState<SavedRun[]>([]);
-  const [runsPage, setRunsPage] = useState(1);
-  const [runsLoading, setRunsLoading] = useState(false);
-  const [runsKind, setRunsKind] = usePersistentState<KindFilter>("runs-kind", "", isKindFilter);
+  const savedRuns = useSavedRuns();
 
   const rowsRef = useRef<Row[]>([]);
   const batchKey = useRef("");
@@ -276,10 +272,7 @@ export default function App() {
     closeSavedRun();
     setTableVisible(false);
     if (next === "past" || next === "benchmark") {
-      if (!savedRuns.length) setRunsLoading(true); // keep showing the list we have while it refreshes
-      fetchRuns()
-        .then(setSavedRuns)
-        .finally(() => setRunsLoading(false));
+      savedRuns.refresh();
       return;
     }
     clearBatch();
@@ -327,7 +320,7 @@ export default function App() {
   /** A local model picked before it is on disk starts downloading right away, not at the first run. */
   async function downloadIfMissing(backend: Backend) {
     if (backend.group !== "local" || backend.ready || downloads[backend.id]) return;
-    const ok = await askConfirm(
+    const ok = await confirm.ask(
       `Download ${backend.label}?`,
       `About ${backend.gb?.toFixed(1) ?? "?"} GB, saved to ${backend.path?.replace(/models--.*$/, "") ?? "models/"} and used from there next time.`,
       "Download",
@@ -357,7 +350,6 @@ export default function App() {
     warnIfTooManyOptions([id]);
   }
 
-  /** Adds a Hugging Face model to the menu; the new entry is not in `backends` until the reload. */
   /** Adds a Hugging Face model and picks it where the dialog was opened from. */
   async function addLocalModel(id: string) {
     await addModel(id);
@@ -381,7 +373,7 @@ export default function App() {
     const shared = backend.path?.includes(`${"/"}.cache${"/"}huggingface`)
       ? " It is in the shared Hugging Face cache, so other tools lose it too."
       : "";
-    const ok = await askConfirm(
+    const ok = await confirm.ask(
       `Delete ${backend.label}?`,
       `This removes about ${backend.gb ?? "?"} GB from ${backend.path}.${shared} It downloads again if you pick it later.`,
       "Delete",
@@ -447,20 +439,6 @@ export default function App() {
     else if (!dataset) setOpenMenu("dataset");
   }
 
-  /** The page's own confirm box; resolves true on the confirm button. */
-  const askConfirm = (title: string, body: string, confirmLabel: string) =>
-    new Promise<boolean>((resolve) =>
-      setConfirmRequest({
-        title,
-        body,
-        confirmLabel,
-        resolve: (ok) => {
-          setConfirmRequest(null);
-          resolve(ok);
-        },
-      }),
-    );
-
   async function nextItem(name = dataset): Promise<Item | null> {
     const set = datasets.find((d) => d.name === name);
     try {
@@ -498,7 +476,7 @@ export default function App() {
       (chosen?.fetch?.datasets ?? 0) + (wide ? (chosen?.fetch_wide?.datasets ?? 0) : 0);
     const agreedKey = `${name}${wide ? " + wide" : ""}`;
     if (pages && !fetchAgreed.current.has(agreedKey)) {
-      const ok = await askConfirm(
+      const ok = await confirm.ask(
         `Download ${name}'s items?`,
         `${name} is rebuilt from public Hugging Face datasets the first time: ${pages} pages of rows ` +
           `from ${sources} datasets, kept on this machine afterwards. It can take a while, as Hugging ` +
@@ -531,47 +509,19 @@ export default function App() {
       setVerdict("Pick a model first.");
       return false;
     }
-    // Models that do not fit together would take turns, each stopping the last, so refuse instead.
-    const gguf = picked.filter((backend) => backend.group === "gguf");
-    const budget = gguf[0]?.budget_gb;
-    const needed = gguf.reduce((sum, backend) => sum + (backend.gb ?? 0), 0);
-    if (budget && needed > budget) {
-      const message = `${gguf.length} llama.cpp models need ${needed.toFixed(1)} GB together; this machine allows ${budget} GB. Pick fewer.`;
-      setVerdict(message);
-      toast.show(message);
+    const tooBig = ggufOverBudget(picked);
+    if (tooBig) {
+      setVerdict(tooBig);
+      toast.show(tooBig);
       return false;
     }
     const missing = picked.filter((backend) => backend.group === "local" && !backend.ready);
-    if (missing.length) {
-      const gb = missing.reduce((sum, backend) => sum + (backend.gb ?? 0), 0);
-      const names = missing.map((backend) => backend.label).join(", ");
-      const ok = await askConfirm(
-        missing.length === 1 ? `Download ${names}?` : `Download ${missing.length} models?`,
-        `${missing.length === 1 ? "" : `${names}. `}About ${gb.toFixed(1)} GB, saved to ${missing[0]?.path?.replace(/models--.*$/, "") ?? "models/"} and used from there next time.`,
-        "Download",
-      );
-      if (!ok) return false;
-      setVerdict(`Downloading ${names}. First time only; this can take minutes.`);
-      setWaiting({ label: "downloading", downloads: missing.map((backend) => backend.id) });
-    }
+    if (missing.length && !(await confirmDownloads(missing))) return false;
     // A download changes what is on disk; a GGUF model starts llama-server, shown in the header.
     const refresh = missing.length > 0 || picked.some((backend) => backend.group === "gguf");
     try {
       await Promise.all(missing.map((backend) => loadModel(backend.id)));
-      for (const backend of picked) {
-        const cold = !backend.running && !loaded.current.has(backend.id);
-        if (backend.group === "local") {
-          setVerdict(`Loading ${backend.label}…`);
-          if (cold) setWaiting({ label: "loading the model", downloads: [] });
-        }
-        if (backend.group === "gguf") {
-          setVerdict(`Starting llama-server with ${backend.label}…`);
-          if (cold) setWaiting({ label: "starting llama.cpp", downloads: [] });
-        }
-        const { stopped } = await loadModel(backend.id);
-        loaded.current.add(backend.id);
-        if (stopped?.length) toast.show(`Stopped ${stopped.join(", ")} to make room.`);
-      }
+      for (const backend of picked) await warmUp(backend);
     } catch (error) {
       setVerdict(errorMessage(error));
       toast.show(errorMessage(error));
@@ -582,6 +532,37 @@ export default function App() {
     }
     if (refresh) await reload();
     return true;
+  }
+
+  async function confirmDownloads(missing: Backend[]) {
+    const gb = missing.reduce((sum, backend) => sum + (backend.gb ?? 0), 0);
+    const names = missing.map((backend) => backend.label).join(", ");
+    const ok = await confirm.ask(
+      missing.length === 1 ? `Download ${names}?` : `Download ${missing.length} models?`,
+      `${missing.length === 1 ? "" : `${names}. `}About ${gb.toFixed(1)} GB, saved to ${missing[0]?.path?.replace(/models--.*$/, "") ?? "models/"} and used from there next time.`,
+      "Download",
+    );
+    if (ok) {
+      setVerdict(`Downloading ${names}. First time only; this can take minutes.`);
+      setWaiting({ label: "downloading", downloads: missing.map((backend) => backend.id) });
+    }
+    return ok;
+  }
+
+  /** Loads one picked model before its timed run, with a loader the first time. */
+  async function warmUp(backend: Backend) {
+    const cold = !backend.running && !loaded.current.has(backend.id);
+    if (backend.group === "local") {
+      setVerdict(`Loading ${backend.label}…`);
+      if (cold) setWaiting({ label: "loading the model", downloads: [] });
+    }
+    if (backend.group === "gguf") {
+      setVerdict(`Starting llama-server with ${backend.label}…`);
+      if (cold) setWaiting({ label: "starting llama.cpp", downloads: [] });
+    }
+    const { stopped } = await loadModel(backend.id);
+    loaded.current.add(backend.id);
+    if (stopped?.length) toast.show(`Stopped ${stopped.join(", ")} to make room.`);
   }
 
   /** One log file per mode, input and models; changing any of them starts a new one. */
@@ -637,6 +618,8 @@ export default function App() {
     return written;
   }
 
+  type RunBody = Request & ReturnType<typeof logFields>;
+
   async function run(batchItem?: Item): Promise<boolean> {
     const current = batchItem ?? item;
     let request: Request;
@@ -657,25 +640,28 @@ export default function App() {
     setRecording(null);
     setPanelsVisible(true);
     resetPanelStates(isCompare ? models.length : 2);
+    return isCompare ? runCompare(models, body) : runGenerate(body, request, current);
+  }
 
-    if (isCompare) {
-      const sides = await runEach(models, isLocal, (id, i) =>
-        readoutInto(i, { ...body, backend: id }),
+  async function runCompare(models: string[], body: RunBody) {
+    const sides = await runEach(models, isLocal, (id, i) =>
+      readoutInto(i, { ...body, backend: id }),
+    );
+    const failed = sides.filter((side) => side.failed).length;
+    if (failed > 0) {
+      setVerdict(
+        `${failed === 1 ? "One model" : `${failed} models`} failed; the reason is below the table.`,
       );
-      const failed = sides.filter((side) => side.failed).length;
-      if (failed > 0) {
-        setVerdict(
-          `${failed === 1 ? "One model" : `${failed} models`} failed; the reason is below the table.`,
-        );
-        return false;
-      }
-      const sentence = compareVerdict(models.map(shortName), sides);
-      setVerdict(sentence);
-      markFastest(sides.map((side) => side.ms));
-      setRecording({ sides, verdict: sentence });
-      return true;
+      return false;
     }
+    const sentence = compareVerdict(models.map(shortName), sides);
+    setVerdict(sentence);
+    markFastest(sides.map((side) => side.ms));
+    setRecording({ sides, verdict: sentence });
+    return true;
+  }
 
+  async function runGenerate(body: RunBody, request: Request, current: Item | null) {
     const model = generateModel;
     const hosted = isHosted(backends[model]);
     const readoutBody = { ...body, backend: model };
@@ -867,36 +853,13 @@ export default function App() {
    * runs on one input open as one compare over the items they all have.
    */
   async function openSavedRuns(picked: string[]) {
-    const chosen = savedRuns.filter((run) => picked.includes(run.name));
+    const chosen = savedRuns.runs.filter((run) => picked.includes(run.name));
     const first = chosen[0];
     if (!first) return;
     const name = chosen.map((run) => run.name).join(" + ");
     const kind: RunKind = chosen.length === 1 ? first.mode : "cmp";
     const everyRun = await Promise.all(chosen.map((run) => fetchRun(run.name)));
-    // A model in more than one of the runs gets a column per run, told apart by its time.
-    const repeated = (backend: string) =>
-      chosen.filter((run) => run.backends.includes(backend)).length > 1;
-    const columnsOf = chosen.flatMap((run) =>
-      run.backends.map((backend) => ({
-        run,
-        backend,
-        id: repeated(backend) ? `${backend}@${run.name}` : backend,
-      })),
-    );
-    const itemKey = (item: Item) =>
-      [item.source, JSON.stringify(item.state), JSON.stringify(item.questions)].join("|");
-    const merged = new Map<string, { item: Item; sides: Record<string, Side> }>();
-    everyRun.forEach((stored, k) => {
-      for (const row of stored) {
-        const entry = merged.get(itemKey(row.item)) ?? { item: row.item, sides: {} };
-        for (const column of columnsOf.filter((c) => c.run === chosen[k])) {
-          const side = row.sides[column.backend];
-          if (side) entry.sides[column.id] = side;
-        }
-        merged.set(itemKey(row.item), entry);
-      }
-    });
-    const stored = [...merged.values()];
+    const { columns: columnsOf, rows: stored } = mergeRuns(chosen, everyRun);
     const complete = (row: (typeof stored)[number]) =>
       columnsOf.every((column) => row.sides[column.id]);
     if (chosen.length > 1 && !stored.some(complete)) {
@@ -1058,7 +1021,7 @@ export default function App() {
         onOpenKeys={() => setKeysOpen(true)}
       />
       <KeysDialog open={keysOpen} onClose={() => setKeysOpen(false)} onChanged={reload} />
-      <ConfirmDialog request={confirmRequest} />
+      <ConfirmDialog request={confirm.request} />
       <DownloadBar
         progress={downloads}
         label={(key) => backends[key]?.label ?? key}
@@ -1088,25 +1051,25 @@ export default function App() {
           <Benchmark
             backends={backendList}
             datasets={datasets}
-            runs={savedRuns}
+            runs={savedRuns.runs}
             backendLabel={columnName}
             onSetUp={setUpBenchmark}
             local={localActions("benchmark")}
           />
         ) : mode === "past" ? (
           <PastRuns
-            runs={savedRuns}
-            loading={runsLoading}
-            page={runsPage}
-            kind={runsKind}
+            runs={savedRuns.runs}
+            loading={savedRuns.loading}
+            page={savedRuns.page}
+            kind={savedRuns.kind}
             menuOpen={openMenu === "kind"}
             onMenuOpenChange={menuHandler("kind")}
             onKindChange={(kind) => {
-              setRunsKind(kind);
-              setRunsPage(1);
+              savedRuns.setKind(kind);
+              savedRuns.setPage(1);
               setOpenMenu("");
             }}
-            onPageChange={setRunsPage}
+            onPageChange={savedRuns.setPage}
             onOpenRun={(name) => openSavedRuns([name])}
             onCompareRuns={openSavedRuns}
             backendLabel={columnName}
