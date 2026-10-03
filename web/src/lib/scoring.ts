@@ -71,9 +71,8 @@ export function writtenAnswers(
     if (question.type === "noul") {
       answers[id] = { type: "noul", noul: firstWord === "yes" || firstWord === "true" ? 1 : 0 };
     } else if (question.type === "choice") {
-      const hit = Object.keys(question.criteria ?? {}).find(
-        (option) => value === option.toLowerCase() || value.startsWith(option.toLowerCase()),
-      );
+      const longestFirst = Object.keys(question.criteria ?? {}).sort((a, b) => b.length - a.length);
+      const hit = longestFirst.find((option) => value.startsWith(option.toLowerCase()));
       if (hit !== undefined)
         answers[id] = { type: "choice", choice: hit, probabilities: { [hit]: 1 } };
     } else if (!Number.isNaN(Number.parseFloat(firstWord))) {

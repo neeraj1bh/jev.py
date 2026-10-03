@@ -1,5 +1,5 @@
-"""Offline checks, run by jev-bench check: the hosted letter readout, fingerprints, RAGTruth's
-length pairing and the scorer, on made-up data with no network."""
+"""Offline checks, run by jev-bench check: the hosted letter readout, written answers, fingerprints,
+RAGTruth's length pairing and the scorer, on made-up data with no network."""
 
 import json
 import math
@@ -7,6 +7,7 @@ import math
 from jev import remote
 from jev.bench.core_v1 import fingerprint
 from jev.bench.picks import RAGTRUTH, ragtruth
+from jev.page import runs
 
 
 def check():
@@ -27,6 +28,9 @@ def check():
     probs, cov = letter_probs(top(A=0.2, B=0.3, _=0.4), 2)
     assert cov["status"] == "complete" and abs(probs[0] - 0.4) < 1e-12 and abs(cov["observed"] - 0.5) < 1e-12
     assert abs(sum(probs) - 1) < 1e-12
+    intent = {"intent": {"type": "choice", "instructions": "?", "criteria": dict.fromkeys(["time", "timer"])}}
+    assert runs.text_answers('{"intent": "timer"}', intent)["intent"]["choice"] == "timer"
+    assert runs.text_answers('{"intent": "time"}', intent)["intent"]["choice"] == "time"
     reported = [{"prompt_tokens": 11, "completion_tokens": 1, "prompt_tokens_details": {"cached_tokens": 5}}]
     assert remote.total(reported * 2, "prompt_tokens") == 22
     assert remote.total([*reported, {"prompt_tokens": 9}], "completion_tokens") is None, "unknown, not 0"
@@ -56,7 +60,7 @@ def check():
     except ValueError:
         pass
     check_scoring()
-    print("OK  letter readout, fingerprint, RAGTruth pairing and scoring checks")
+    print("OK  letter readout, written answers, fingerprint, RAGTruth pairing and scoring checks")
 
 
 def check_scoring():

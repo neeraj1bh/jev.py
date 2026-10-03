@@ -29,7 +29,8 @@ def text_answers(text, questions):
         if q["type"] == "noul":
             out[qid] = {"type": "noul", "noul": 1.0 if first in ("yes", "true") else 0.0}
         elif q["type"] == "choice":
-            hit = next((la for la in _options(q)[0] if v == la.lower() or v.startswith(la.lower())), None)
+            longest_first = sorted(_options(q)[0], key=len, reverse=True)
+            hit = next((la for la in longest_first if v.startswith(la.lower())), None)
             if hit is not None:
                 out[qid] = {"type": "choice", "choice": hit, "probabilities": {hit: 1.0}}
         else:
