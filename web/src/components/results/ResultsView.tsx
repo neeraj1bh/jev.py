@@ -101,7 +101,7 @@ export function ResultsView(props: ResultsViewProps) {
                     disabled={props.replaying}
                     onClick={() => props.onSpeedChange(speed)}
                     className={cn(
-                      "relative rounded-full border-0 bg-transparent px-2.5 py-[3px] font-mono text-xs whitespace-nowrap transition-colors",
+                      "relative rounded-full border-0 bg-transparent px-2.5 py-0.75 font-mono text-xs whitespace-nowrap transition-colors",
                       props.speed === speed ? "text-ink" : "text-dim hover:text-ink",
                     )}
                   >

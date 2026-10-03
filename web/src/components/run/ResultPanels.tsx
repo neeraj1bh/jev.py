@@ -70,7 +70,7 @@ export function GenerateView({
             {k === 0 && !writtenAsAnswers ? (
               <pre>{state.text ?? ""}</pre>
             ) : (
-              <div className="max-h-[540px] overflow-auto">
+              <div className="max-h-135 overflow-auto">
                 <PanelAnswers state={state} truth={truth} />
               </div>
             )}

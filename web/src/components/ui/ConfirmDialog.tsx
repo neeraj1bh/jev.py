@@ -18,7 +18,7 @@ export function ConfirmDialog({ request }: { request: ConfirmRequest | null }) {
       className="w-[min(460px,calc(100vw-32px))] px-6 py-5"
     >
       <h2 className="mt-0 mb-2 text-[15px] font-semibold">{request.title}</h2>
-      <p className="mt-0 mb-5 text-sm break-words text-dim">{request.body}</p>
+      <p className="mt-0 mb-5 text-sm wrap-break-word text-dim">{request.body}</p>
       <div className="flex justify-end gap-2">
         <button type="button" className={ghostButton} onClick={() => request.resolve(false)}>
           Cancel

@@ -15,10 +15,10 @@ function ProbabilityBar({ percent, top }: { percent: number; top: boolean }) {
   }, []);
 
   return (
-    <span className="h-[7px] overflow-hidden rounded bg-bar">
+    <span className="h-1.75 overflow-hidden rounded bg-bar">
       <i
         className={cn(
-          "block h-full transition-[width] duration-[450ms] ease-(--ease-out) motion-reduce:transition-none",
+          "block h-full transition-[width] duration-450 ease-out motion-reduce:transition-none",
           top ? "bg-good" : "bg-dim",
         )}
         style={{ width: grown ? `${percent}%` : 0 }}
@@ -60,7 +60,7 @@ function AnswerRow({ id, answer, truth, collapsible, expanded, onToggle }: Answe
     <div
       className={cn(
         "grid gap-3.5 border-t border-rule max-[860px]:grid-cols-1 max-[860px]:gap-1.5",
-        collapsed ? "grid-cols-1 py-[7px]" : "grid-cols-[minmax(0,150px)_minmax(0,1fr)] py-[11px]",
+        collapsed ? "grid-cols-1 py-1.75" : "grid-cols-[minmax(0,150px)_minmax(0,1fr)] py-2.75",
       )}
     >
       <Heading
@@ -70,7 +70,7 @@ function AnswerRow({ id, answer, truth, collapsible, expanded, onToggle }: Answe
           onClick: () => onToggle?.(id),
         })}
         className={cn(
-          "text-[13px] [overflow-wrap:break-word] text-dim",
+          "text-[13px] wrap-break-word text-dim",
           collapsed && "flex items-baseline gap-2.5",
           canToggle &&
             "w-full cursor-pointer rounded-sm border-0 bg-transparent p-0 text-left focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-rule",
@@ -93,7 +93,7 @@ function AnswerRow({ id, answer, truth, collapsible, expanded, onToggle }: Answe
               className={cn(
                 "block overflow-hidden text-[13px]",
                 correct ? "text-good" : "text-warn",
-                collapsed ? "ml-auto max-w-[45%] flex-none" : "mt-[3px]",
+                collapsed ? "ml-auto max-w-[45%] flex-none" : "mt-0.75",
               )}
             >
               label: {truth}&nbsp;

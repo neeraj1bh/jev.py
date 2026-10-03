@@ -16,7 +16,7 @@ export function Toast({ message, onClose }: { message: string; onClose: () => vo
             animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.9, filter: "blur(4px)" }}
             transition={{ type: "spring", stiffness: 420, damping: 30 }}
-            className="pointer-events-auto flex max-w-[560px] items-start gap-2.5 rounded-3xl bg-ink py-2.5 pr-2 pl-3.5 text-sm leading-snug text-paper shadow-(--surface-shadow)"
+            className="pointer-events-auto flex max-w-140 items-start gap-2.5 rounded-3xl bg-ink py-2.5 pr-2 pl-3.5 text-sm leading-snug text-paper shadow-(--surface-shadow)"
           >
             <Icon icon={InfoIcon} size={16} className="mt-px flex-none opacity-60" />
             <span className="min-w-0">{message}</span>

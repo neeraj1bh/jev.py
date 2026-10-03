@@ -17,7 +17,7 @@ export function RunButton({ busy, replaying, noModel, onRun }: RunButtonProps) {
     <Tip content={noModel ? "Pick a model first" : undefined}>
       <button
         type="button"
-        className={cn(solidButton, "min-w-[104px] overflow-hidden")}
+        className={cn(solidButton, "min-w-26 overflow-hidden")}
         disabled={busy || replaying || noModel}
         onClick={onRun}
       >

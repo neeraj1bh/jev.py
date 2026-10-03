@@ -36,7 +36,7 @@ export function IconTile({
     <span
       className={cn(
         "grid flex-none place-items-center transition-colors duration-200",
-        large ? "size-7 rounded-lg" : "size-[22px] rounded-md",
+        large ? "size-7 rounded-lg" : "size-5.5 rounded-md",
         TONES[tone],
         className,
       )}

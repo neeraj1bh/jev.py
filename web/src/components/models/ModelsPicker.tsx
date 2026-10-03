@@ -59,7 +59,7 @@ export function ModelsPicker({
       onOpenChange={onOpenChange}
       icon={selected.length ? undefined : StackIcon}
       buttonClassName={cn("max-w-[min(560px,60vw)]", selected.length > 0 && "pl-1")}
-      menuClassName="w-[360px]"
+      menuClassName="w-90"
       button={
         backends.length === 0 ? (
           <Skeleton className="my-1 w-44" />

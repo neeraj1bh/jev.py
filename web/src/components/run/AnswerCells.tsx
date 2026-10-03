@@ -98,7 +98,7 @@ export function Distribution({
   const best = answerLabel(answer);
   const right = truth === undefined ? null : matchesLabel(best, truth);
   return (
-    <div className="max-w-[340px] space-y-1">
+    <div className="max-w-85 space-y-1">
       {shown.map(([option, probability]) => {
         const chosen = option === best;
         const isLabel = truth !== undefined && matchesLabel(option, truth);

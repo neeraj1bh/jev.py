@@ -2,7 +2,7 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import type { ReactElement, ReactNode } from "react";
 
 export const tipBox =
-  "z-30 max-w-[300px] animate-fade rounded-md border border-rule bg-panel px-3 py-2 text-[13px] leading-[1.45] font-normal text-ink shadow-[0_10px_28px_var(--color-shadow)]";
+  "z-30 max-w-75 animate-fade rounded-md border border-rule bg-panel px-3 py-2 text-[13px] leading-[1.45] font-normal text-ink shadow-[0_10px_28px_var(--color-shadow)]";
 
 interface TipProps {
   content?: ReactNode;

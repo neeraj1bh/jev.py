@@ -39,7 +39,7 @@ export function RunPanels({ ctx, view, input, waiting }: RunPanelsProps) {
       {waiting && <FluxLoader label={waiting.label} share={waitingShare} />}
       <p
         className={cn(
-          "mt-[18px] mb-0 min-h-[26px] text-sm text-ink [&_b]:font-semibold [&_b]:text-good",
+          "mt-4.5 mb-0 min-h-6.5 text-sm text-ink [&_b]:font-semibold [&_b]:text-good",
           waiting && "text-center text-dim",
         )}
       >

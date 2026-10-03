@@ -36,7 +36,7 @@ function moveFocus(event: KeyboardEvent<HTMLElement>, list: HTMLElement | null) 
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="grid h-[18px] min-w-[18px] place-items-center rounded-[5px] border-0 bg-panel px-1 font-mono text-[10.5px] text-dim shadow-[0_1px_1px_var(--color-shadow)] ring-1 ring-rule">
+    <kbd className="grid h-4.5 min-w-4.5 place-items-center rounded-[5px] border-0 bg-panel px-1 font-mono text-[10.5px] text-dim shadow-[0_1px_1px_var(--color-shadow)] ring-1 ring-rule">
       {children}
     </kbd>
   );

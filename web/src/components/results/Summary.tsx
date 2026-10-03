@@ -158,7 +158,7 @@ export function SummaryTable({ rows, columns, priceOf, live = false }: SummaryTa
   );
 
   return (
-    <table className="w-full min-w-[640px] border-collapse text-[13px]">
+    <table className="w-full min-w-160 border-collapse text-[13px]">
       <thead>
         <tr>
           <th className={cn(head, "w-8")}>#</th>

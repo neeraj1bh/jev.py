@@ -93,7 +93,7 @@ function RowDot({ row }: { row: Row }) {
   return (
     <span
       className={cn(
-        "mr-2 inline-block size-[5px] rounded-full align-middle",
+        "mr-2 inline-block size-1.25 rounded-full align-middle",
         missed ? "bg-warn" : labelled ? "bg-good" : "bg-dim",
       )}
     />
@@ -117,7 +117,7 @@ function StripCell({ row, columns }: { row: Row; columns: string[] }) {
       <Tip key={columns[k]} content={`${columns[k]} · ${detail} · ${side.ms.toLocaleString()} ms`}>
         <span
           className={cn(
-            "h-3.5 w-2 flex-none rounded-[2px] transition-transform duration-150 hover:scale-y-[1.3]",
+            "h-3.5 w-2 flex-none rounded-xs transition-transform duration-150 hover:scale-y-[1.3]",
             side.response.error ? "bg-bar" : ok ? "bg-good" : "bg-warn",
           )}
         />
@@ -127,7 +127,7 @@ function StripCell({ row, columns }: { row: Row; columns: string[] }) {
   return (
     <td className={cn(tableCell, "max-w-none")}>
       <span className="flex items-center gap-4">
-        <span className="flex flex-wrap gap-[2px]">{squares}</span>
+        <span className="flex flex-wrap gap-0.5">{squares}</span>
         <span className="ml-auto font-mono text-xs text-dim tabular-nums">
           {right}/{row.sides.length}
         </span>
@@ -305,7 +305,7 @@ export function BatchTable({
           onScroll={onScroll}
           className="max-h-[calc(100dvh-9rem)] overflow-auto overscroll-contain"
         >
-          <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px]">
+          <table className="w-full min-w-160 table-fixed border-collapse text-[13px]">
             <colgroup>
               <col className="w-16" />
               <col className={strip ? "w-[32%]" : columns.length > 3 ? "w-[26%]" : "w-[38%]"} />

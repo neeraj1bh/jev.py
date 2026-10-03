@@ -20,7 +20,7 @@ function ModelHeading({ name, state }: { name: string; state: PanelState }) {
   const written = name.endsWith("· text");
   const ms = useElapsed(state);
   return (
-    <th className={cn(tableHead, "min-w-[150px] align-bottom")}>
+    <th className={cn(tableHead, "min-w-37.5 align-bottom")}>
       <Tip content={name}>
         <span className="line-clamp-2 text-[13px] font-semibold text-ink">{name}</span>
       </Tip>
@@ -147,17 +147,17 @@ export function CompareTable({
                             className="inline-flex max-w-full items-center gap-2 rounded-sm border-0 bg-transparent p-0 text-left font-medium text-ink"
                           >
                             <Caret open={isOpen} />
-                            <span className="min-w-0 break-words">{breakable(id)}</span>
+                            <span className="min-w-0 wrap-break-word">{breakable(id)}</span>
                           </button>
                         ) : (
-                          <span className="font-medium break-words">{breakable(id)}</span>
+                          <span className="font-medium wrap-break-word">{breakable(id)}</span>
                         )}
                         {asked?.[id] && <QuestionHint question={asked[id]} />}
                       </td>
                       {truth && (
                         <Tip content={truth[id]}>
                           <td className={cn(rowCell, "text-dim")}>
-                            <span className="line-clamp-2 break-words">{truth[id] ?? "–"}</span>
+                            <span className="line-clamp-2 wrap-break-word">{truth[id] ?? "–"}</span>
                           </td>
                         </Tip>
                       )}

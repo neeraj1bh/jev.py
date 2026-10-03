@@ -84,6 +84,6 @@ export function Aurora({ className }: { className?: string }) {
  * down it. The card takes `liveCard`, which keeps the light behind its content. */
 export function LiveLight() {
   return (
-    <Aurora className="-z-10 animate-fade rounded-[inherit] opacity-30 [mask-image:linear-gradient(to_bottom,black,transparent_14rem)] motion-reduce:animate-none" />
+    <Aurora className="-z-10 animate-fade rounded-[inherit] opacity-30 mask-[linear-gradient(to_bottom,black,transparent_14rem)] motion-reduce:animate-none" />
   );
 }

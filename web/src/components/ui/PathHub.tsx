@@ -23,8 +23,8 @@ export function PathHub({ icon, around }: { icon: IconGlyph; around: IconGlyph[]
     return glyph ? [{ ...slot, glyph }] : [];
   });
   return (
-    <div aria-hidden className="relative aspect-564/410 w-full max-w-[480px]">
-      <Aurora className="opacity-35 [mask-image:radial-gradient(closest-side,black,transparent)]" />
+    <div aria-hidden className="relative aspect-564/410 w-full max-w-120">
+      <Aurora className="opacity-35 mask-[radial-gradient(closest-side,black,transparent)]" />
       <svg aria-hidden className="absolute inset-0 size-full" viewBox="0 0 564 410" fill="none">
         {nodes.map(({ path }, k) => (
           <g key={path}>

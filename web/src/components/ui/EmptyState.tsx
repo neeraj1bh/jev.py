@@ -19,7 +19,7 @@ export function EmptyState({ icon, around, title, children, action }: EmptyState
       {around && (
         <div
           aria-hidden
-          className="absolute inset-0 -z-10 bg-[radial-gradient(circle,var(--color-bar)_1px,transparent_1px)] bg-[length:24px_24px] bg-center [mask-image:radial-gradient(black_45%,transparent)]"
+          className="absolute inset-0 -z-10 bg-[radial-gradient(circle,var(--color-bar)_1px,transparent_1px)] bg-size-[24px_24px] bg-center mask-[radial-gradient(black_45%,transparent)]"
         />
       )}
       {around ? (

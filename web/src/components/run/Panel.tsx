@@ -70,7 +70,7 @@ interface PanelProps {
 export function Panel({ title, icon, subtitle, info, state, place, children }: PanelProps) {
   const running = state.status === "running";
   return (
-    <section className={cn(shell, running && liveCard, "flex min-h-[260px] min-w-0 flex-col")}>
+    <section className={cn(shell, running && liveCard, "flex min-h-65 min-w-0 flex-col")}>
       {running && <LiveLight />}
       <h2 className="m-0 px-3.5 pt-2 pb-2.5 text-sm font-semibold text-ink">
         <span className="inline-flex items-center gap-1">
@@ -82,7 +82,7 @@ export function Panel({ title, icon, subtitle, info, state, place, children }: P
           {subtitle}
         </small>
       </h2>
-      <div className={cn(inset, "flex flex-1 flex-col px-5 pt-1 pb-[18px]")}>
+      <div className={cn(inset, "flex flex-1 flex-col px-5 pt-1 pb-4.5")}>
         <Clock state={state} />
         <PlaceBadge place={place} />
         {children}

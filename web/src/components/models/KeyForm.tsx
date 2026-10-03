@@ -70,7 +70,7 @@ export function KeyForm({ target, label, hint, secret = true, onCancel, onSaved 
             type="checkbox"
             checked={saveToEnv}
             onChange={(event) => setSaveToEnv(event.target.checked)}
-            className="size-3.5 accent-(--color-ink)"
+            className="size-3.5 accent-ink"
           />
           Also save to <span className="font-mono">.env</span>
         </label>

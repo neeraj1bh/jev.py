@@ -54,7 +54,7 @@ export function InputBar(props: InputBarProps) {
             type="button"
             onClick={() => props.onSourceChange(option)}
             className={cn(
-              "relative rounded-full border-0 bg-transparent px-3 py-[3px] text-[13px] transition-colors",
+              "relative rounded-full border-0 bg-transparent px-3 py-0.75 text-[13px] transition-colors",
               source === option ? "text-ink" : "text-dim hover:text-ink",
             )}
           >

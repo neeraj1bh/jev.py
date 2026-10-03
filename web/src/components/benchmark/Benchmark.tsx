@@ -195,7 +195,7 @@ export function Benchmark(props: BenchmarkProps) {
             onOpenChange={menuHandler("models")}
             icon={picked.length ? undefined : StackIcon}
             buttonClassName={cn("max-w-[min(560px,80vw)]", picked.length > 0 && "pl-1")}
-            menuClassName="w-[360px]"
+            menuClassName="w-90"
             button={<PickedModels picked={chosen} />}
           >
             <ModelMenu

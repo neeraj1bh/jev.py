@@ -33,7 +33,7 @@ export function ShareMenu() {
       round
       title="Share jev.py"
       button={<Icon icon={ShareNetworkIcon} size={14} />}
-      menuClassName="right-0 left-auto w-[280px] max-[860px]:right-auto max-[860px]:left-0 max-[600px]:fixed max-[600px]:inset-x-4 max-[600px]:top-16 max-[600px]:w-auto"
+      menuClassName="right-0 left-auto w-70 max-[860px]:right-auto max-[860px]:left-0 max-[600px]:fixed max-[600px]:inset-x-4 max-[600px]:top-16 max-[600px]:w-auto"
     >
       <MenuItem
         icon={LinkSimpleIcon}

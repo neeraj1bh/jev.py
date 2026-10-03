@@ -117,7 +117,7 @@ export function ItemDialog(props: ItemDialogProps) {
         if (event.key === "ArrowLeft" && !isFirst) onNavigate(index - 1);
         else if (event.key === "ArrowRight" && !isLast) onNavigate(index + 1);
       }}
-      className="mx-auto h-auto max-h-[calc(92vh-16px)] w-[min(1280px,calc(100vw-32px))] bg-lift p-1.5 [inset:5vh_0_auto] backdrop:animate-fade focus:outline-none open:flex open:animate-pop open:flex-col motion-reduce:animate-none"
+      className="mx-auto h-auto max-h-[calc(92vh-16px)] w-[min(1280px,calc(100vw-32px))] bg-lift p-1.5 inset-[5vh_0_auto] backdrop:animate-fade focus:outline-none open:flex open:animate-pop open:flex-col motion-reduce:animate-none"
     >
       <DialogFrame
         icon={RowsIcon}

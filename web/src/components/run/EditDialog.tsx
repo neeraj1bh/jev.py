@@ -1,7 +1,7 @@
 import { cn, ghostButton, labelText } from "../../lib/styles";
 import { Modal } from "../ui/Modal";
 
-const editor = "max-h-[60vh] min-h-[160px] overflow-auto [field-sizing:content]";
+const editor = "max-h-[60vh] min-h-40 overflow-auto field-sizing-content";
 
 interface EditDialogProps {
   open: boolean;

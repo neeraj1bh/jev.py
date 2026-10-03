@@ -71,7 +71,7 @@ export function Header({
             type="button"
             title={`Running: ${running.labels.join(", ")}`}
             onClick={running.onOpen}
-            className="flex max-w-[220px] shrink-0 items-center gap-1.5 rounded-full border border-rule bg-transparent py-1 pr-2 pl-2.5 text-[13px] whitespace-nowrap text-dim transition-colors hover:border-dim hover:text-ink"
+            className="flex max-w-55 shrink-0 items-center gap-1.5 rounded-full border border-rule bg-transparent py-1 pr-2 pl-2.5 text-[13px] whitespace-nowrap text-dim transition-colors hover:border-dim hover:text-ink"
           >
             <span className="size-1.5 shrink-0 rounded-full bg-good" />
             <span className="min-w-0 truncate">
@@ -113,7 +113,7 @@ export function Header({
           ))}
         </div>
       </header>
-      <nav className="mt-[18px] mb-4 flex gap-[22px] border-b border-rule max-[600px]:overflow-x-auto max-[600px]:overflow-y-hidden max-[600px]:[scrollbar-width:none]">
+      <nav className="mt-4.5 mb-4 flex gap-5.5 border-b border-rule max-[600px]:overflow-x-auto max-[600px]:overflow-y-hidden max-[600px]:scrollbar-none">
         {TABS.map((tab) => {
           const active = tab.mode === mode;
           return (
@@ -123,7 +123,7 @@ export function Header({
               aria-current={active ? "page" : undefined}
               onClick={() => onModeChange(tab.mode)}
               className={cn(
-                "relative flex flex-none items-center gap-1.5 rounded-none border-0 bg-transparent px-0 pt-[9px] pb-2.5 text-sm whitespace-nowrap transition-colors",
+                "relative flex flex-none items-center gap-1.5 rounded-none border-0 bg-transparent px-0 pt-2.25 pb-2.5 text-sm whitespace-nowrap transition-colors",
                 active ? "text-ink" : "text-dim hover:text-ink",
               )}
             >

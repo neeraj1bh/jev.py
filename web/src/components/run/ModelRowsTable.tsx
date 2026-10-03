@@ -41,11 +41,11 @@ export function ModelRowsTable({
         >
           <thead>
             <tr>
-              <th className={cn(tableHead, "sticky left-0 z-[2] w-px align-bottom")}>Model</th>
+              <th className={cn(tableHead, "sticky left-0 z-2 w-px align-bottom")}>Model</th>
               <th className={cn(tableHead, "w-px align-bottom")}>Time</th>
               {questionIds.map((id) => (
                 <th key={id} className={cn(tableHead, "align-bottom")}>
-                  <span className="block break-words text-ink">{breakable(id)}</span>
+                  <span className="block wrap-break-word text-ink">{breakable(id)}</span>
                   {truth?.[id] !== undefined && (
                     <span className="mt-0.5 flex items-center gap-1.5 text-[11px] font-normal">
                       <span className="tracking-[0.08em] uppercase">label</span>
@@ -73,7 +73,7 @@ export function ModelRowsTable({
                     <td
                       className={cn(
                         rowCell,
-                        "sticky left-0 z-[1] bg-panel transition-colors group-hover:bg-lift",
+                        "sticky left-0 z-1 bg-panel transition-colors group-hover:bg-lift",
                       )}
                     >
                       <button

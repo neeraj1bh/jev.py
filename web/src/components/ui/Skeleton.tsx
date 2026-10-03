@@ -20,7 +20,7 @@ export function AnswerSkeleton({ rows = 3 }: { rows?: number }) {
       {PLACEHOLDER_KEYS.slice(0, rows).map((key) => (
         <div
           key={key}
-          className="grid grid-cols-[minmax(0,150px)_minmax(0,1fr)] gap-3.5 border-t border-rule py-[11px]"
+          className="grid grid-cols-[minmax(0,150px)_minmax(0,1fr)] gap-3.5 border-t border-rule py-2.75"
         >
           <Skeleton className="w-24" />
           <div className="space-y-2">

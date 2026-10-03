@@ -185,7 +185,7 @@ export default function App() {
     localModel?.need_gb && localModel.gb ? localModel.need_gb / localModel.gb : undefined;
 
   return (
-    <div className="mx-auto max-w-[1280px] px-6 pt-7 pb-14 max-[600px]:px-4">
+    <div className="mx-auto max-w-7xl px-6 pt-7 pb-14 max-[600px]:px-4">
       <Header
         running={{
           labels: runningModels.map((backend) => backend.label),

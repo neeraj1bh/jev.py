@@ -29,7 +29,7 @@ export function ModelPicker(props: ModelPickerProps) {
       title={location(current)}
       icon={backendIcon(current)}
       active={!!current}
-      menuClassName="w-[360px]"
+      menuClassName="w-90"
       button={
         backends.length === 0 ? (
           <Skeleton className="my-1 w-44" />
