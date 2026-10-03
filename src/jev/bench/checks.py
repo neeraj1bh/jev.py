@@ -1,39 +1,18 @@
-"""Offline checks, run by jev-bench check: the hosted letter readout, written answers, fingerprints,
-RAGTruth's length pairing and the scorer, on made-up data with no network."""
+"""Offline checks, run by jev-bench check: written answers, fingerprints, RAGTruth's length pairing
+and the scorer, on made-up data with no network. The letter readout's are in tests/."""
 
 import json
-import math
 
-from jev import remote
 from jev.bench.core_v1 import fingerprint
 from jev.bench.picks import RAGTRUTH, ragtruth
 from jev.page import runs
 
 
 def check():
-    """Offline asserts on the hosted letter readout; no network."""
-    from jev.remote import letter_probs
-
-    def top(**p):
-        return [{"token": t.replace("_", " "), "logprob": math.log(x)} for t, x in p.items()]
-
-    probs, cov = letter_probs(top(A=0.2, _A=0.2, B=0.3), 2)
-    assert cov["status"] == "complete" and abs(probs[0] - 4 / 7) < 1e-12 and abs(probs[1] - 3 / 7) < 1e-12
-    probs, cov = letter_probs(top(A=0.8, hello=0.1), 2)
-    assert cov["status"] == "partial" and cov["missing"] == ["B"] and probs == [1.0, 0.0]
-    probs, cov = letter_probs(top(hello=0.5, the=0.3), 2)
-    assert cov["status"] == "none" and probs is None
-    for tokens in (top(**{"\n": 0.8}), top(AB=0.8)):  # whitespace and two letters are no option
-        assert letter_probs(tokens, 2) == (None, {"status": "none", "observed": 0, "missing": ["A", "B"]})
-    probs, cov = letter_probs(top(A=0.2, B=0.3, _=0.4), 2)
-    assert cov["status"] == "complete" and abs(probs[0] - 0.4) < 1e-12 and abs(cov["observed"] - 0.5) < 1e-12
-    assert abs(sum(probs) - 1) < 1e-12
+    """Offline asserts on written answers, fingerprints and RAGTruth's pairing; no network."""
     intent = {"intent": {"type": "choice", "instructions": "?", "criteria": dict.fromkeys(["time", "timer"])}}
     assert runs.text_answers('{"intent": "timer"}', intent)["intent"]["choice"] == "timer"
     assert runs.text_answers('{"intent": "time"}', intent)["intent"]["choice"] == "time"
-    reported = [{"prompt_tokens": 11, "completion_tokens": 1, "prompt_tokens_details": {"cached_tokens": 5}}]
-    assert remote.total(reported * 2, "prompt_tokens") == 22
-    assert remote.total([*reported, {"prompt_tokens": 9}], "completion_tokens") is None, "unknown, not 0"
     assert json.loads(json.dumps(0.123456789)) == 0.123456789
     item = {
         "state": {"text": "hi"},
@@ -60,7 +39,7 @@ def check():
     except ValueError:
         pass
     check_scoring()
-    print("OK  letter readout, written answers, fingerprint, RAGTruth pairing and scoring checks")
+    print("OK  written answers, fingerprint, RAGTruth pairing and scoring checks")
 
 
 def check_scoring():

@@ -59,6 +59,7 @@ and the public datasets and models the code uses.
 
 ```sh
 uv run jev                                # self-check against the example ticket
+uv run pytest                             # offline tests, no key, no cost
 uvx ruff format . && uvx ruff check .
 cd web && pnpm check                      # Biome, the type check and the build
 ```
