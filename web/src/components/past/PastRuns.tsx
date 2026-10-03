@@ -1,13 +1,13 @@
 import {
-  ArrowDown,
-  ArrowsDownUp,
-  ArrowsSplit,
-  ArrowUp,
-  ClockCounterClockwise,
-  Columns,
-  MagnifyingGlass,
-  MagnifyingGlassMinus,
-  Trophy,
+  ArrowDownIcon,
+  ArrowsDownUpIcon,
+  ArrowsSplitIcon,
+  ArrowUpIcon,
+  ClockCounterClockwiseIcon,
+  ColumnsIcon,
+  MagnifyingGlassIcon,
+  MagnifyingGlassMinusIcon,
+  TrophyIcon,
 } from "@phosphor-icons/react";
 import { useState } from "react";
 
@@ -152,7 +152,7 @@ export function PastRuns(props: PastRunsProps) {
         >
           {label}
           <Icon
-            icon={active ? (sort.descending ? ArrowDown : ArrowUp) : ArrowsDownUp}
+            icon={active ? (sort.descending ? ArrowDownIcon : ArrowUpIcon) : ArrowsDownUpIcon}
             size={14}
             className={cn(!active && "opacity-40 transition-opacity group-hover:opacity-100")}
           />
@@ -167,7 +167,7 @@ export function PastRuns(props: PastRunsProps) {
 
   return (
     <Surface
-      icon={ClockCounterClockwise}
+      icon={ClockCounterClockwiseIcon}
       bodyClassName="flex flex-col"
       title={
         <>
@@ -195,7 +195,7 @@ export function PastRuns(props: PastRunsProps) {
             </>
           )}
           <label className="flex items-center gap-2 rounded-md border border-rule bg-paper px-2.5 py-1.5 text-dim focus-within:border-dim">
-            <Icon icon={MagnifyingGlass} size={14} />
+            <Icon icon={MagnifyingGlassIcon} size={14} />
             <input
               type="search"
               value={query}
@@ -254,8 +254,8 @@ export function PastRuns(props: PastRunsProps) {
                 <td colSpan={5}>
                   {runs.length === 0 ? (
                     <EmptyState
-                      icon={ClockCounterClockwise}
-                      around={[Columns, ArrowsSplit, Trophy]}
+                      icon={ClockCounterClockwiseIcon}
+                      around={[ColumnsIcon, ArrowsSplitIcon, TrophyIcon]}
                       title="No runs yet"
                     >
                       Every batch you run in Compare, Generate vs readout or Benchmark is saved
@@ -263,7 +263,7 @@ export function PastRuns(props: PastRunsProps) {
                     </EmptyState>
                   ) : (
                     <EmptyState
-                      icon={MagnifyingGlassMinus}
+                      icon={MagnifyingGlassMinusIcon}
                       title="No run matches"
                       action={{
                         label: "Clear search and filters",

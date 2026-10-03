@@ -1,4 +1,4 @@
-import { Key, X } from "@phosphor-icons/react";
+import { KeyIcon, XIcon } from "@phosphor-icons/react";
 
 import { Icon } from "../ui/Icon";
 import { DialogFrame, Modal, RoundButton } from "../ui/Modal";
@@ -32,12 +32,12 @@ export function KeyDialog({
       className="w-[min(460px,calc(100vw-32px))] bg-lift p-1.5 open:flex open:animate-pop open:flex-col"
     >
       <DialogFrame
-        icon={Key}
+        icon={KeyIcon}
         title={label}
         subtitle={subtitle}
         actions={
           <RoundButton label="Close" onClick={onCancel}>
-            <Icon icon={X} size={14} />
+            <Icon icon={XIcon} size={14} />
           </RoundButton>
         }
         bodyClassName="px-4 py-3.5"

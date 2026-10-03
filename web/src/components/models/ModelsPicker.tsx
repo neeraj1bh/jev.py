@@ -1,4 +1,4 @@
-import { Stack } from "@phosphor-icons/react";
+import { StackIcon } from "@phosphor-icons/react";
 
 import { isOffline, statusText } from "../../lib/backends";
 import { backendIcon } from "../../lib/icons";
@@ -57,7 +57,7 @@ export function ModelsPicker({
     <Dropdown
       open={open}
       onOpenChange={onOpenChange}
-      icon={selected.length ? undefined : Stack}
+      icon={selected.length ? undefined : StackIcon}
       buttonClassName={cn("max-w-[min(560px,60vw)]", selected.length > 0 && "pl-1")}
       menuClassName="w-[360px]"
       button={

@@ -1,4 +1,4 @@
-import { ArrowCounterClockwise } from "@phosphor-icons/react";
+import { ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 
 import type { RunContext } from "../../hooks/run/context";
 import type { BatchRun } from "../../hooks/run/useBatchRun";
@@ -88,7 +88,7 @@ export function RunScreen(props: RunScreenProps) {
                 disabled={!recording || replaying || busy}
                 onClick={single.replay}
               >
-                <Icon icon={ArrowCounterClockwise} size={14} />
+                <Icon icon={ArrowCounterClockwiseIcon} size={14} />
                 Replay together
               </button>
               <RunButton busy={busy} replaying={replaying} noModel={noModel} onRun={single.onRun} />

@@ -1,4 +1,4 @@
-import { X } from "@phosphor-icons/react";
+import { XIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { changeFolders, type FolderState, fetchFolders } from "../../lib/api";
@@ -50,7 +50,7 @@ export function ModelFolders({ onChanged }: { onChanged: () => void }) {
                 onClick={() => change({ remove: path })}
                 className="rounded-md border-0 bg-transparent p-1 text-dim transition-colors hover:bg-lift hover:text-ink"
               >
-                <Icon icon={X} size={14} />
+                <Icon icon={XIcon} size={14} />
               </button>
             </li>
           ))}

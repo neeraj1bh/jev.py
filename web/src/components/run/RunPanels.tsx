@@ -1,4 +1,4 @@
-import { Columns } from "@phosphor-icons/react";
+import { ColumnsIcon } from "@phosphor-icons/react";
 
 import type { RunContext } from "../../hooks/run/context";
 import type { Waiting } from "../../hooks/run/usePrepare";
@@ -54,7 +54,7 @@ export function RunPanels({ ctx, view, input, waiting }: RunPanelsProps) {
           <div className={shell}>
             <div className={cn(inset, "overflow-hidden")}>
               <EmptyState
-                icon={Columns}
+                icon={ColumnsIcon}
                 around={makerIcons}
                 title="Pick models to compare"
                 action={{ label: "Choose models", onClick: () => setOpenMenu("models") }}

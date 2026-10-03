@@ -1,4 +1,8 @@
-import { ArrowsInLineVertical, ArrowsOutLineVertical, CaretRight } from "@phosphor-icons/react";
+import {
+  ArrowsInLineVerticalIcon,
+  ArrowsOutLineVerticalIcon,
+  CaretRightIcon,
+} from "@phosphor-icons/react";
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 import { answerLabel, matchesLabel } from "../../lib/scoring";
@@ -180,7 +184,7 @@ export function Caret({ open }: { open: boolean }) {
   return (
     <span className="grid size-5 flex-none place-items-center rounded-md bg-lift text-dim">
       <Icon
-        icon={CaretRight}
+        icon={CaretRightIcon}
         size={11}
         className={cn("transition-transform duration-150", open && "rotate-90")}
       />
@@ -192,7 +196,7 @@ export function ShowAllButton({ allOpen, onClick }: { allOpen: boolean; onClick:
   return (
     <div className="flex justify-end pb-1.5">
       <button type="button" onClick={onClick} className={cn(chipButton(), "text-[12.5px]")}>
-        <Icon icon={allOpen ? ArrowsInLineVertical : ArrowsOutLineVertical} size={12} />
+        <Icon icon={allOpen ? ArrowsInLineVerticalIcon : ArrowsOutLineVerticalIcon} size={12} />
         {allOpen ? "Hide all options" : "Show all options"}
       </button>
     </div>

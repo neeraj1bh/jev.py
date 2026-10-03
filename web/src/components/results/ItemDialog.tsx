@@ -1,4 +1,10 @@
-import { CaretLeft, CaretRight, Rows, TextAlignLeft, X } from "@phosphor-icons/react";
+import {
+  CaretLeftIcon,
+  CaretRightIcon,
+  RowsIcon,
+  TextAlignLeftIcon,
+  XIcon,
+} from "@phosphor-icons/react";
 import { motion, useReducedMotion } from "motion/react";
 import { useMemo, useState } from "react";
 
@@ -32,7 +38,7 @@ function InputCard({ state }: { state: unknown }) {
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-2.5 rounded-xl border-0 bg-transparent px-3 py-2 text-left"
       >
-        <IconTile icon={TextAlignLeft} />
+        <IconTile icon={TextAlignLeftIcon} />
         <span className="text-[10.5px] font-medium tracking-[0.08em] text-dim uppercase">
           Input
         </span>
@@ -45,7 +51,7 @@ function InputCard({ state }: { state: unknown }) {
           {inputSnippet(state)}
         </span>
         <Icon
-          icon={CaretRight}
+          icon={CaretRightIcon}
           size={12}
           className={cn("text-dim transition-transform duration-150", open && "rotate-90")}
         />
@@ -114,7 +120,7 @@ export function ItemDialog(props: ItemDialogProps) {
       className="mx-auto h-auto max-h-[calc(92vh-16px)] w-[min(1280px,calc(100vw-32px))] bg-lift p-1.5 [inset:5vh_0_auto] backdrop:animate-fade focus:outline-none open:flex open:animate-pop open:flex-col motion-reduce:animate-none"
     >
       <DialogFrame
-        icon={Rows}
+        icon={RowsIcon}
         title={`Item ${(index + 1).toLocaleString()}`}
         badge={`${(index + 1).toLocaleString()} / ${rows.length.toLocaleString()}`}
         subtitle={
@@ -132,7 +138,7 @@ export function ItemDialog(props: ItemDialogProps) {
                 disabled={isFirst}
                 onClick={() => onNavigate(index - 1)}
               >
-                <Icon icon={CaretLeft} size={14} />
+                <Icon icon={CaretLeftIcon} size={14} />
               </RoundButton>
             </Tip>
             <Tip content="Next (→)">
@@ -141,13 +147,13 @@ export function ItemDialog(props: ItemDialogProps) {
                 disabled={isLast}
                 onClick={() => onNavigate(index + 1)}
               >
-                <Icon icon={CaretRight} size={14} />
+                <Icon icon={CaretRightIcon} size={14} />
               </RoundButton>
             </Tip>
             <span className="mx-1 h-5 w-px bg-rule" />
             <Tip content="Close (Esc)">
               <RoundButton label="Close" onClick={onClose}>
-                <Icon icon={X} size={14} />
+                <Icon icon={XIcon} size={14} />
               </RoundButton>
             </Tip>
           </>

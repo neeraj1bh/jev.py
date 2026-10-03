@@ -1,4 +1,11 @@
-import { ArrowRight, ChatText, PencilSimple, Queue, Stack, Stop } from "@phosphor-icons/react";
+import {
+  ArrowRightIcon,
+  ChatTextIcon,
+  PencilSimpleIcon,
+  QueueIcon,
+  StackIcon,
+  StopIcon,
+} from "@phosphor-icons/react";
 import { EXAMPLE_NAMES, EXAMPLES, type ExampleName } from "../../lib/examples";
 import { chipButton, cn, numberInput } from "../../lib/styles";
 import type { Backend, Dataset } from "../../lib/types";
@@ -61,7 +68,7 @@ export function InputBar(props: InputBarProps) {
         <Dropdown
           compact
           active={!!props.example}
-          icon={ChatText}
+          icon={ChatTextIcon}
           open={props.exampleMenuOpen}
           onOpenChange={props.onExampleMenuOpenChange}
           button={props.example || "Choose an example"}
@@ -71,7 +78,7 @@ export function InputBar(props: InputBarProps) {
             <MenuItem
               key={name}
               label={name}
-              icon={ChatText}
+              icon={ChatTextIcon}
               detail={`${Object.keys(EXAMPLES[name].questions).length} questions`}
               selected={name === props.example}
               onSelect={() => props.onExampleChange(name)}
@@ -98,7 +105,7 @@ export function InputBar(props: InputBarProps) {
                 disabled={busy}
                 onClick={props.onNextItem}
               >
-                <Icon icon={ArrowRight} size={12} />
+                <Icon icon={ArrowRightIcon} size={12} />
                 Next item
               </button>
               <input
@@ -116,7 +123,7 @@ export function InputBar(props: InputBarProps) {
                 disabled={busy || setExhausted}
                 onClick={() => props.onRunBatch(false)}
               >
-                <Icon icon={Queue} size={12} />
+                <Icon icon={QueueIcon} size={12} />
                 Run batch
               </button>
               <button
@@ -125,12 +132,12 @@ export function InputBar(props: InputBarProps) {
                 disabled={busy || setExhausted}
                 onClick={() => props.onRunBatch(true)}
               >
-                <Icon icon={Stack} size={12} />
+                <Icon icon={StackIcon} size={12} />
                 {allLabel}
               </button>
               {props.batchRunning && (
                 <button type="button" className={chipButton()} onClick={props.onStop}>
-                  <Icon icon={Stop} size={12} />
+                  <Icon icon={StopIcon} size={12} />
                   Stop
                 </button>
               )}
@@ -140,7 +147,7 @@ export function InputBar(props: InputBarProps) {
       )}
 
       <button type="button" className={cn(chipButton(), "ml-auto")} onClick={props.onEdit}>
-        <Icon icon={PencilSimple} size={12} />
+        <Icon icon={PencilSimpleIcon} size={12} />
         Edit input
       </button>
     </div>

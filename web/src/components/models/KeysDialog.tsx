@@ -1,14 +1,14 @@
 import {
-  ArrowSquareOut,
-  Cloud,
-  Globe,
-  HardDrives,
-  Key,
+  ArrowSquareOutIcon,
+  CloudIcon,
+  GlobeIcon,
+  HardDrivesIcon,
+  KeyIcon,
   type Icon as PhosphorIcon,
-  Smiley,
-  Sparkle,
-  Triangle,
-  X,
+  SmileyIcon,
+  SparkleIcon,
+  TriangleIcon,
+  XIcon,
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
@@ -27,12 +27,12 @@ const HINTS: Record<string, string> = {
 };
 
 const ICONS: Record<string, PhosphorIcon> = {
-  TYPESAFE_API_KEY: Sparkle,
-  OPENROUTER_API_KEY: Globe,
-  AI_GATEWAY_API_KEY: Triangle,
-  HF_TOKEN: Smiley,
-  LLAMACPP_URL: HardDrives,
-  LAYA_URL: HardDrives,
+  TYPESAFE_API_KEY: SparkleIcon,
+  OPENROUTER_API_KEY: GlobeIcon,
+  AI_GATEWAY_API_KEY: TriangleIcon,
+  HF_TOKEN: SmileyIcon,
+  LLAMACPP_URL: HardDrivesIcon,
+  LAYA_URL: HardDrivesIcon,
 };
 
 const quiet =
@@ -50,7 +50,7 @@ function KeyRow({ info, armed, onEdit, onArm, onRemove }: KeyRowProps) {
   return (
     <li className="group border-0 border-b border-dashed border-rule last:border-b-0">
       <div className="flex items-center gap-3 px-1 py-2.5" title={info.unlocks}>
-        <IconTile icon={ICONS[info.var] ?? Cloud} tone={info.set ? "ink" : "idle"} large />
+        <IconTile icon={ICONS[info.var] ?? CloudIcon} tone={info.set ? "ink" : "idle"} large />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2 text-sm font-medium text-ink">
             <span className="truncate">{info.label}</span>
@@ -98,7 +98,7 @@ function KeyRow({ info, armed, onEdit, onArm, onRemove }: KeyRowProps) {
                 className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-dim no-underline transition-colors hover:text-ink"
               >
                 Get a key
-                <Icon icon={ArrowSquareOut} size={11} />
+                <Icon icon={ArrowSquareOutIcon} size={11} />
               </a>
             )}
             <button type="button" className={chipButton(true)} onClick={onEdit}>
@@ -156,13 +156,13 @@ export function KeysDialog({ open, onClose, onChanged }: KeysDialogProps) {
       className="max-h-[calc(92vh-16px)] w-[min(620px,calc(100vw-32px))] bg-lift p-1.5 open:flex open:animate-pop open:flex-col"
     >
       <DialogFrame
-        icon={Key}
+        icon={KeyIcon}
         title="Keys and tokens"
         badge={keys ? `${set.length} / ${keys.length} set` : undefined}
         subtitle="Kept on this machine; each is checked with one small request before it is used"
         actions={
           <RoundButton label="Close" onClick={onClose}>
-            <Icon icon={X} size={14} />
+            <Icon icon={XIcon} size={14} />
           </RoundButton>
         }
         bodyClassName="px-4 py-3"

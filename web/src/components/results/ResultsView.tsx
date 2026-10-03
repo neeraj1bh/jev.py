@@ -1,4 +1,4 @@
-import { ArrowLeft, Play, Stop } from "@phosphor-icons/react";
+import { ArrowLeftIcon, PlayIcon, StopIcon } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 
 import { FIT, FIT_MS, type ReplaySpeed } from "../../hooks/useBatchReplay";
@@ -75,7 +75,7 @@ export function ResultsView(props: ResultsViewProps) {
           disabled={props.running}
           className="inline-flex items-center gap-1.5 rounded-md border-0 bg-transparent px-1.5 py-1 text-sm text-dim transition-colors hover:text-ink"
         >
-          <Icon icon={ArrowLeft} size={14} />
+          <Icon icon={ArrowLeftIcon} size={14} />
           Back to setup
         </button>
         {props.running ? (
@@ -118,7 +118,7 @@ export function ResultsView(props: ResultsViewProps) {
               className={cn(chipButton(props.replaying), "inline-flex items-center gap-1.5")}
               onClick={props.replaying ? props.onStopReplay : props.onReplay}
             >
-              <Icon icon={props.replaying ? Stop : Play} size={14} />
+              <Icon icon={props.replaying ? StopIcon : PlayIcon} size={14} />
               {props.replaying ? "Stop replay" : "Replay batch"}
             </button>
           </div>

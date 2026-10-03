@@ -1,4 +1,4 @@
-import { Check, Gauge, Stack, Trophy } from "@phosphor-icons/react";
+import { CheckIcon, GaugeIcon, StackIcon, TrophyIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { fetchPresets, type Preset } from "../../lib/api";
 import {
@@ -86,7 +86,7 @@ function MakerChip({ label, count, on, onToggle }: MakerChipProps) {
         on ? "border-ink text-ink" : "border-rule text-dim hover:border-dim hover:text-ink",
       )}
     >
-      {on && <Icon icon={Check} size={14} />}
+      {on && <Icon icon={CheckIcon} size={14} />}
       {label}
       <span className="font-mono text-xs text-dim tabular-nums">{count}</span>
     </button>
@@ -179,7 +179,7 @@ export function Benchmark(props: BenchmarkProps) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3.5">
       <Surface
-        icon={Gauge}
+        icon={GaugeIcon}
         title={
           <>
             Benchmark{" "}
@@ -193,7 +193,7 @@ export function Benchmark(props: BenchmarkProps) {
           <Dropdown
             open={menu === "models"}
             onOpenChange={menuHandler("models")}
-            icon={picked.length ? undefined : Stack}
+            icon={picked.length ? undefined : StackIcon}
             buttonClassName={cn("max-w-[min(560px,80vw)]", picked.length > 0 && "pl-1")}
             menuClassName="w-[360px]"
             button={<PickedModels picked={chosen} />}
@@ -306,7 +306,7 @@ export function Benchmark(props: BenchmarkProps) {
       </Surface>
 
       <Surface
-        icon={Trophy}
+        icon={TrophyIcon}
         title={
           <>
             Leaderboard{" "}
@@ -349,7 +349,7 @@ export function Benchmark(props: BenchmarkProps) {
               {table.length === 0 && (
                 <tr>
                   <td colSpan={5}>
-                    <EmptyState icon={Trophy} title="Nothing to rank yet">
+                    <EmptyState icon={TrophyIcon} title="Nothing to rank yet">
                       Run a batch on this set and every model in it is ranked here, best first.
                     </EmptyState>
                   </td>

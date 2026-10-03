@@ -1,4 +1,4 @@
-import { CircleNotch, Play } from "@phosphor-icons/react";
+import { CircleNotchIcon, PlayIcon } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 
 import { cn, solidButton } from "../../lib/styles";
@@ -32,7 +32,7 @@ export function RunButton({ busy, replaying, noModel, onRun }: RunButtonProps) {
             transition={{ type: "spring", stiffness: 500, damping: 36 }}
           >
             <Icon
-              icon={busy ? CircleNotch : Play}
+              icon={busy ? CircleNotchIcon : PlayIcon}
               size={14}
               className={busy ? "animate-spin" : undefined}
             />

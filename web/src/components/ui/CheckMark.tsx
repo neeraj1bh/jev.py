@@ -1,4 +1,4 @@
-import { Check, X } from "@phosphor-icons/react";
+import { CheckIcon, XIcon } from "@phosphor-icons/react";
 
 import { Icon } from "./Icon";
 
@@ -9,7 +9,7 @@ export function CheckMark({ ok }: { ok: boolean }) {
       role="img"
       aria-label={ok ? "right" : "wrong"}
     >
-      <Icon icon={ok ? Check : X} size={14} />
+      <Icon icon={ok ? CheckIcon : XIcon} size={14} />
     </span>
   );
 }

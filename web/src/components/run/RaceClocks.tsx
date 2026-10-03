@@ -1,4 +1,4 @@
-import { Timer } from "@phosphor-icons/react";
+import { TimerIcon } from "@phosphor-icons/react";
 import { cn, inset, liveCard, shell } from "../../lib/styles";
 import type { PanelState } from "../../lib/types";
 import { LiveLight } from "../ui/Aurora";
@@ -41,7 +41,7 @@ export function RaceClocks({ names, panels }: { names: string[]; panels: PanelSt
           {panel.status === "running" && <LiveLight />}
           <Tip content={names[k]}>
             <h2 className="m-0 flex items-center gap-2 px-2 pt-1 pb-2 text-sm font-semibold text-ink">
-              <IconTile icon={Timer} tone={liveTone(panel)} />
+              <IconTile icon={TimerIcon} tone={liveTone(panel)} />
               <span className="truncate">{names[k]}</span>
             </h2>
           </Tip>

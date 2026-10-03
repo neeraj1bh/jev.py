@@ -1,14 +1,14 @@
 import {
-  CaretRight,
-  CaretUp,
-  DotsThree,
-  Gift,
-  Globe,
-  ListChecks,
-  MagnifyingGlass,
-  Plus,
-  Stop,
-  Trash,
+  CaretRightIcon,
+  CaretUpIcon,
+  DotsThreeIcon,
+  GiftIcon,
+  GlobeIcon,
+  ListChecksIcon,
+  MagnifyingGlassIcon,
+  PlusIcon,
+  StopIcon,
+  TrashIcon,
 } from "@phosphor-icons/react";
 import { Fragment, type ReactNode, useMemo, useState } from "react";
 
@@ -118,7 +118,7 @@ export function ModelMenu(props: ModelMenuProps) {
             onClick={() => onStop(backend)}
             className="rounded-lg border-0 bg-transparent p-1.5 text-dim transition-colors hover:bg-lift hover:text-ink"
           >
-            <Icon icon={Stop} size={14} />
+            <Icon icon={StopIcon} size={14} />
           </button>
         </div>
       );
@@ -134,7 +134,7 @@ export function ModelMenu(props: ModelMenuProps) {
           onClick={() => onDelete(backend)}
           className="rounded-lg border-0 bg-transparent p-1.5 text-dim transition-colors hover:bg-lift hover:text-warn"
         >
-          <Icon icon={Trash} size={14} />
+          <Icon icon={TrashIcon} size={14} />
         </button>
       </div>
     );
@@ -178,7 +178,7 @@ export function ModelMenu(props: ModelMenuProps) {
   return (
     <>
       <label className="-mx-1.5 -mt-1.5 mb-1 flex items-center gap-2.5 border-0 border-b border-rule px-3.5 py-2.5 text-dim">
-        <Icon icon={MagnifyingGlass} size={14} />
+        <Icon icon={MagnifyingGlassIcon} size={14} />
         <input
           type="search"
           value={query}
@@ -211,7 +211,7 @@ export function ModelMenu(props: ModelMenuProps) {
                 <MenuItem
                   key={list.name}
                   multi
-                  icon={ListChecks}
+                  icon={ListChecksIcon}
                   selected={list.on}
                   onSelect={list.onToggle}
                   label={list.name}
@@ -226,7 +226,7 @@ export function ModelMenu(props: ModelMenuProps) {
               {members.map((member) => item(member))}
               {group === "local" && onAddModel && (
                 <MenuAction onClick={onAddModel}>
-                  <IconTile icon={Plus} />
+                  <IconTile icon={PlusIcon} />
                   Add a model
                 </MenuAction>
               )}
@@ -243,7 +243,7 @@ export function ModelMenu(props: ModelMenuProps) {
                     <Fragment key={provider}>
                       <MenuAction expanded={isOpen} onClick={() => toggleProvider(provider)}>
                         <IconTile
-                          icon={provider === FREE ? Gift : (makerIcon(provider) ?? Globe)}
+                          icon={provider === FREE ? GiftIcon : (makerIcon(provider) ?? GlobeIcon)}
                         />
                         <span className="text-ink">
                           {provider === FREE ? "Free to run" : providerName(provider)}
@@ -252,7 +252,7 @@ export function ModelMenu(props: ModelMenuProps) {
                           {models.length}
                         </span>
                         <Icon
-                          icon={CaretRight}
+                          icon={CaretRightIcon}
                           size={12}
                           className={cn(
                             "text-dim transition-transform duration-150",
@@ -271,7 +271,7 @@ export function ModelMenu(props: ModelMenuProps) {
               )}
               {providers.length > TOP_PROVIDERS && (
                 <MenuAction onClick={() => setAllProviders(!allProviders)}>
-                  <IconTile icon={allProviders ? CaretUp : DotsThree} />
+                  <IconTile icon={allProviders ? CaretUpIcon : DotsThreeIcon} />
                   {allProviders
                     ? "Fewer makers"
                     : `${providers.length - TOP_PROVIDERS} more makers`}

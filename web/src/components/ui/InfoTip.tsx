@@ -1,4 +1,4 @@
-import { Info } from "@phosphor-icons/react";
+import { InfoIcon } from "@phosphor-icons/react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type { ReactNode } from "react";
 
@@ -19,7 +19,7 @@ export function InfoTip({ children, label = "What this means" }: InfoTipProps) {
           aria-label={label}
           className="inline-grid size-5 place-items-center rounded-full border-0 bg-transparent p-0 align-middle text-dim transition-colors hover:text-ink"
         >
-          <Icon icon={Info} size={14} />
+          <Icon icon={InfoIcon} size={14} />
         </button>
       </Tooltip.Trigger>
       <Tooltip.Portal>

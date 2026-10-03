@@ -1,4 +1,4 @@
-import { Lightning } from "@phosphor-icons/react";
+import { LightningIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { useCountUp } from "../../hooks/useCountUp";
@@ -56,7 +56,7 @@ export function Scoreboard({
       <LiveLight />
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 pt-3 pb-3">
         <div className="flex min-w-0 items-center gap-2">
-          <IconTile icon={Lightning} tone="ink" />
+          <IconTile icon={LightningIcon} tone="ink" />
           <span className="truncate text-[15px] font-semibold tracking-tight text-ink">
             {label}
           </span>

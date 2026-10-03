@@ -1,4 +1,4 @@
-import { ChartBar, PencilSimpleLine } from "@phosphor-icons/react";
+import { ChartBarIcon, PencilSimpleLineIcon } from "@phosphor-icons/react";
 import { panelSubtitle } from "../../lib/backends";
 import type { PanelState } from "../../lib/types";
 import { AnswerSkeleton } from "../ui/Skeleton";
@@ -55,7 +55,7 @@ export function GenerateView({
           <Panel
             key={panel.key}
             title={savedName ?? panel.title}
-            icon={k === 0 ? PencilSimpleLine : ChartBar}
+            icon={k === 0 ? PencilSimpleLineIcon : ChartBarIcon}
             subtitle={
               savedName
                 ? panelSubtitle(savedName)

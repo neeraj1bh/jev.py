@@ -1,4 +1,4 @@
-import { ArrowUp, FileMagnifyingGlass, Folder } from "@phosphor-icons/react";
+import { ArrowUpIcon, FileMagnifyingGlassIcon, FolderIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { browse, type Listing } from "../../lib/api";
@@ -60,7 +60,7 @@ export function FolderPicker({ pick, onPick, onCancel, problem, onSearch }: Fold
           onClick={() => listing?.parent && open(listing.parent)}
           className="rounded-md border-0 bg-transparent p-1 text-dim transition-colors hover:bg-lift hover:text-ink disabled:opacity-40"
         >
-          <Icon icon={ArrowUp} size={14} />
+          <Icon icon={ArrowUpIcon} size={14} />
         </button>
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-ink" title={listing?.path}>
           {listing?.path ?? "…"}
@@ -81,7 +81,7 @@ export function FolderPicker({ pick, onPick, onCancel, problem, onSearch }: Fold
         {listing?.folders.map((folder) => (
           <li key={folder.path}>
             <button type="button" className={row} onClick={() => open(folder.path)}>
-              <Icon icon={Folder} size={14} className="shrink-0 text-dim" />
+              <Icon icon={FolderIcon} size={14} className="shrink-0 text-dim" />
               <span className="min-w-0 flex-1 truncate">{folder.name}</span>
               {folder.models && <span className="text-xs text-good">models</span>}
             </button>
@@ -90,7 +90,7 @@ export function FolderPicker({ pick, onPick, onCancel, problem, onSearch }: Fold
         {listing?.files.map((file) => (
           <li key={file.path}>
             <button type="button" className={row} onClick={() => onPick(file.path)}>
-              <Icon icon={FileMagnifyingGlass} size={14} className="shrink-0 text-dim" />
+              <Icon icon={FileMagnifyingGlassIcon} size={14} className="shrink-0 text-dim" />
               <span className="min-w-0 flex-1 truncate">{file.name}</span>
               <span className="text-xs text-dim">use this</span>
             </button>

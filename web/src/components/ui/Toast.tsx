@@ -1,4 +1,4 @@
-import { Info, X } from "@phosphor-icons/react";
+import { InfoIcon, XIcon } from "@phosphor-icons/react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { Icon } from "./Icon";
@@ -18,7 +18,7 @@ export function Toast({ message, onClose }: { message: string; onClose: () => vo
             transition={{ type: "spring", stiffness: 420, damping: 30 }}
             className="pointer-events-auto flex max-w-[560px] items-start gap-2.5 rounded-3xl bg-ink py-2.5 pr-2 pl-3.5 text-sm leading-snug text-paper shadow-(--surface-shadow)"
           >
-            <Icon icon={Info} size={16} className="mt-px flex-none opacity-60" />
+            <Icon icon={InfoIcon} size={16} className="mt-px flex-none opacity-60" />
             <span className="min-w-0">{message}</span>
             <button
               type="button"
@@ -26,7 +26,7 @@ export function Toast({ message, onClose }: { message: string; onClose: () => vo
               className="-my-0.5 flex-none rounded-full border-0 bg-transparent p-1 text-paper/60 transition-colors hover:bg-paper/10 hover:text-paper"
               onClick={onClose}
             >
-              <Icon icon={X} size={14} />
+              <Icon icon={XIcon} size={14} />
             </button>
           </motion.div>
         )}

@@ -1,5 +1,5 @@
-import { CircleNotch, Globe, LockSimple } from "@phosphor-icons/react";
-import { type FormEvent, useState } from "react";
+import { CircleNotchIcon, GlobeIcon, LockSimpleIcon } from "@phosphor-icons/react";
+import { type SubmitEvent, useState } from "react";
 
 import { ApiError, saveKey } from "../../lib/api";
 import { cn, ghostButton, solidButton } from "../../lib/styles";
@@ -24,7 +24,7 @@ export function KeyForm({ target, label, hint, secret = true, onCancel, onSaved 
   const [checking, setChecking] = useState(false);
   const id = `key-${target}`;
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent) => {
     event.preventDefault();
     setChecking(true);
     setError("");
@@ -49,7 +49,7 @@ export function KeyForm({ target, label, hint, secret = true, onCancel, onSaved 
           error ? "ring-warn" : "ring-rule",
         )}
       >
-        <Icon icon={secret ? LockSimple : Globe} size={14} className="text-dim" />
+        <Icon icon={secret ? LockSimpleIcon : GlobeIcon} size={14} className="text-dim" />
         <input
           id={id}
           type={secret ? "password" : "url"}
@@ -86,7 +86,7 @@ export function KeyForm({ target, label, hint, secret = true, onCancel, onSaved 
           disabled={checking}
           className={cn(solidButton, "px-3.5 py-1.5 text-[13px]")}
         >
-          {checking && <Icon icon={CircleNotch} size={12} className="animate-spin" />}
+          {checking && <Icon icon={CircleNotchIcon} size={12} className="animate-spin" />}
           {checking ? "Checking…" : "Check and use"}
         </button>
       </div>

@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type SubmitEvent, useState } from "react";
 
 import { cn, ghostButton } from "../../lib/styles";
 import { Modal } from "../ui/Modal";
@@ -59,7 +59,7 @@ export function AddModelDialog(props: AddModelDialogProps) {
       setBusy(false);
     }
   };
-  const submit = (event: FormEvent) => {
+  const submit = (event: SubmitEvent) => {
     event.preventDefault();
     add(id.trim());
   };

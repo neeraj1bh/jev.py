@@ -1,4 +1,4 @@
-import { ArrowDown, Rows } from "@phosphor-icons/react";
+import { ArrowDownIcon, RowsIcon } from "@phosphor-icons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, type ReactElement, useEffect, useRef, useState } from "react";
 
@@ -283,7 +283,7 @@ export function BatchTable({
 
   return (
     <Surface
-      icon={Rows}
+      icon={RowsIcon}
       live={live}
       className="mt-3.5"
       title={
@@ -368,7 +368,7 @@ export function BatchTable({
             onClick={toLatest}
             className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 animate-pop items-center gap-1.5 rounded-full border-0 bg-ink px-3 py-1.5 text-xs font-medium text-paper shadow-(--surface-shadow)"
           >
-            <Icon icon={ArrowDown} size={12} />
+            <Icon icon={ArrowDownIcon} size={12} />
             Jump to latest
           </button>
         )}

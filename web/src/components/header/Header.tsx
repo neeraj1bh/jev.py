@@ -1,13 +1,13 @@
 import {
-  ArrowsSplit,
-  ClockCounterClockwise,
-  Columns,
-  Key,
-  Monitor,
-  Moon,
-  Stop,
-  Sun,
-  Trophy,
+  ArrowsSplitIcon,
+  ClockCounterClockwiseIcon,
+  ColumnsIcon,
+  KeyIcon,
+  MonitorIcon,
+  MoonIcon,
+  StopIcon,
+  SunIcon,
+  TrophyIcon,
 } from "@phosphor-icons/react";
 import { motion } from "motion/react";
 
@@ -20,16 +20,16 @@ import { Tip } from "../ui/Tip";
 import { ShareMenu } from "./ShareMenu";
 
 const TABS: { mode: Mode; name: string; icon: IconGlyph }[] = [
-  { mode: "compare", name: "Compare", icon: Columns },
-  { mode: "generate", name: "Generate vs readout", icon: ArrowsSplit },
-  { mode: "benchmark", name: "Benchmark", icon: Trophy },
-  { mode: "past", name: "Past runs", icon: ClockCounterClockwise },
+  { mode: "compare", name: "Compare", icon: ColumnsIcon },
+  { mode: "generate", name: "Generate vs readout", icon: ArrowsSplitIcon },
+  { mode: "benchmark", name: "Benchmark", icon: TrophyIcon },
+  { mode: "past", name: "Past runs", icon: ClockCounterClockwiseIcon },
 ];
 
 const THEMES: { preference: ThemePreference; name: string; icon: IconGlyph }[] = [
-  { preference: "light", name: "Light", icon: Sun },
-  { preference: "dark", name: "Dark", icon: Moon },
-  { preference: "system", name: "Device", icon: Monitor },
+  { preference: "light", name: "Light", icon: SunIcon },
+  { preference: "dark", name: "Dark", icon: MoonIcon },
+  { preference: "system", name: "Device", icon: MonitorIcon },
 ];
 
 const LEDE: Record<Mode, string> = {
@@ -79,7 +79,7 @@ export function Header({
                 ? running.labels[0]
                 : `${running.labels.length} models running`}
             </span>
-            <Icon icon={Stop} size={14} />
+            <Icon icon={StopIcon} size={14} />
           </button>
         )}
         <ShareMenu />
@@ -90,7 +90,7 @@ export function Header({
             onClick={onOpenKeys}
             className="grid size-8 place-items-center rounded-full border border-rule bg-transparent text-dim transition-colors hover:border-dim hover:text-ink"
           >
-            <Icon icon={Key} size={14} />
+            <Icon icon={KeyIcon} size={14} />
           </button>
         </Tip>
         <div className={segmentTrack}>

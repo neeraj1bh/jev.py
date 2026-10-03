@@ -1,4 +1,10 @@
-import { Envelope, LinkedinLogo, LinkSimple, ShareNetwork, XLogo } from "@phosphor-icons/react";
+import {
+  EnvelopeIcon,
+  LinkedinLogoIcon,
+  LinkSimpleIcon,
+  ShareNetworkIcon,
+  XLogoIcon,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { Icon } from "../ui/Icon";
@@ -26,11 +32,11 @@ export function ShareMenu() {
       }}
       round
       title="Share jev.py"
-      button={<Icon icon={ShareNetwork} size={14} />}
+      button={<Icon icon={ShareNetworkIcon} size={14} />}
       menuClassName="right-0 left-auto w-[280px] max-[860px]:right-auto max-[860px]:left-0 max-[600px]:fixed max-[600px]:inset-x-4 max-[600px]:top-16 max-[600px]:w-auto"
     >
       <MenuItem
-        icon={LinkSimple}
+        icon={LinkSimpleIcon}
         label="Copy link"
         detail={copied ? "Copied" : "github.com/neeraj1bh/jev.py"}
         highlightDetail={copied}
@@ -44,19 +50,19 @@ export function ShareMenu() {
         }}
       />
       <MenuItem
-        icon={XLogo}
+        icon={XLogoIcon}
         label="Post on X"
         detail=""
         onSelect={() => open(`https://x.com/intent/post?text=${text}&url=${url}`)}
       />
       <MenuItem
-        icon={LinkedinLogo}
+        icon={LinkedinLogoIcon}
         label="LinkedIn"
         detail=""
         onSelect={() => open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`)}
       />
       <MenuItem
-        icon={Envelope}
+        icon={EnvelopeIcon}
         label="Email"
         detail=""
         onSelect={() => {

@@ -1,4 +1,4 @@
-import { CaretUpDown, Check } from "@phosphor-icons/react";
+import { CaretUpDownIcon, CheckIcon } from "@phosphor-icons/react";
 import { motion } from "motion/react";
 import {
   createContext,
@@ -123,7 +123,7 @@ export function Dropdown({
             <>
               {icon && <IconTile icon={icon} tone={active ? "ink" : "idle"} />}
               <span className="flex min-w-0 items-baseline gap-2 truncate">{button}</span>
-              <Icon icon={CaretUpDown} size={12} className="text-dim" />
+              <Icon icon={CaretUpDownIcon} size={12} className="text-dim" />
             </>
           )}
         </button>
@@ -232,7 +232,7 @@ export function MenuItem({
               selected ? "bg-ink text-paper ring-ink" : "bg-panel ring-rule",
             )}
           >
-            {selected && <Icon icon={Check} size={11} />}
+            {selected && <Icon icon={CheckIcon} size={11} />}
           </span>
         )}
         {icon && <IconTile icon={icon} tone={selected ? "ink" : "idle"} className="relative" />}
@@ -249,7 +249,7 @@ export function MenuItem({
         </span>
         {!multi && (
           <Icon
-            icon={Check}
+            icon={CheckIcon}
             size={12}
             className={cn("relative text-ink", selected ? "opacity-100" : "opacity-0")}
           />
