@@ -269,26 +269,27 @@ def get(bid):
         remote.url = url + "/v1/chat/completions"
         LOADED[bid] = remote
         return remote
-    if bid not in LOADED:
-        download_model(bid)  # outside LOCK, so other models keep answering while this one downloads
+    backend = LOADED.get(bid)
+    if backend:
+        return backend
+    if bid.startswith(("remote:", "openrouter:")):
+        kind, _, name = bid.partition(":")
+        try:  # remote:llamacpp:<name> names the model loaded in llama-server
+            backend = Remote(*name.split(":", 1)) if kind == "remote" else Remote("openrouter", model=name)
+        except SystemExit as e:  # no key
+            raise ValueError(str(e)) from None
+        return LOADED.setdefault(bid, backend)
+    download_model(bid)  # outside LOCK, so other models keep answering while this one downloads
     with LOCK:
-        if bid not in LOADED:
-            if bid.startswith(("remote:", "openrouter:")):
-                kind, _, name = bid.partition(":")
-                try:
-                    LOADED[bid] = (  # remote:llamacpp:<name> names the model loaded in llama-server
-                        Remote(*name.split(":", 1)) if kind == "remote" else Remote("openrouter", model=name)
-                    )
-                except SystemExit as e:  # no key
-                    raise ValueError(str(e)) from None
-            else:
-                for old in [k for k in LOADED if not k.startswith("remote:")][:-1]:
-                    del LOADED[old]
-                gc.collect()
-                if DEVICE == "cuda":
-                    torch.cuda.empty_cache()
-                LOADED[bid] = Jev(bid, cache_dir=where(bid)[0])
-        return LOADED[bid]
+        backend = LOADED.get(bid)
+        if not backend:
+            for old in [k for k in LOADED if not k.startswith("remote:")][:-1]:
+                del LOADED[old]
+            gc.collect()
+            if DEVICE == "cuda":
+                torch.cuda.empty_cache()
+            backend = LOADED[bid] = Jev(bid, cache_dir=where(bid)[0])
+        return backend
 
 
 def messages(state, questions):

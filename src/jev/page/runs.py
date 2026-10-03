@@ -6,9 +6,9 @@ import hashlib
 import json
 import os
 import time
+from threading import Lock
 
 from jev.core import ROOT, _options
-from jev.page.models import LOCK
 from jev.remote import total
 
 LOGS = os.path.join(ROOT, "results", "logs", "demo")  # one .jsonl per batch, git-ignored
@@ -39,6 +39,9 @@ def text_answers(text, questions):
     return out
 
 
+LOG_LOCK = Lock()
+
+
 def log_row(body, backend, answers, ms, response=None):
     """One answer of a run, appended to its session's file, with the rest of the reply (usage,
     invalid answers, an error) when there is one."""
@@ -50,7 +53,7 @@ def log_row(body, backend, answers, ms, response=None):
     row |= {"backend": backend, "answers": answers, "ms": ms, "at": round(time.time() * 1000)}
     if response:
         row["response"] = {k: v for k, v in response.items() if k != "answers"}
-    with LOCK, open(os.path.join(LOGS, name + ".jsonl"), "a") as f:
+    with LOG_LOCK, open(os.path.join(LOGS, name + ".jsonl"), "a") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
