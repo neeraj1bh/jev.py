@@ -1,5 +1,8 @@
 import type { Backend, Dataset, Item, KeyInfo, Request, Response, SavedRun, Side } from "./types";
 
+export const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
+
 export class ApiError extends Error {
   constructor(
     message: string,

@@ -4,6 +4,9 @@ import type { GeneratedText, Item, RecordedSide, Response, Side } from "./types"
 
 export const now = () => performance.now();
 
+/** Hosted models answer this many items of a batch at once. */
+export const HOSTED_PARALLEL = 8;
+
 /** Hosted models run at once; models on this machine take turns so they do not slow each other. */
 export async function runEach<T>(
   ids: string[],
