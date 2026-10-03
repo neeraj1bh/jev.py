@@ -33,6 +33,7 @@ and the public datasets and models the code uses.
 | `src/jev/bench/core_v1.py`, `picks.py`, `score.py`, `benchmarks/` | Core v1: how items are picked, frozen item pointers, models, token sizes, scoring |
 | `src/jev/local/` | local models: download, find, run |
 | `src/jev/bench/eval.py`, `readout.py`, `results/` | the older public eval and its committed summaries |
+| `tests/` | offline pytest tests: the letter readout, written answers, fingerprints, picking, scoring |
 | `data/`, `models/`, `results/logs/`, `local/` | per-machine state, git-ignored; never commit |
 
 ## Rules and why

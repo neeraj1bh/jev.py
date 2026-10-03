@@ -15,7 +15,6 @@ answer them, and keeping them apart keeps the main comparison paired across ever
     uv run jev-bench export                        # every item as text, for reviewers
     uv run jev-bench tokens                        # input tokens per item, for cost estimates
     uv run jev-bench score <run.jsonl> ...         # Core v1 scores of saved runs, by track
-    uv run jev-bench check                         # offline self-checks of the readout
 
 Each run is saved like a batch from the page, so Past runs lists it and can compare runs side by side.
 """
@@ -457,10 +456,6 @@ def cli():
         from jev.bench.score import score
 
         score(args[1:])
-    elif args[:1] == ["check"]:
-        from jev.bench.checks import check
-
-        check()
     elif args[:1] == ["tokens"]:
         tokens()
     elif args[:1] == ["run"] and len(args) == 2:

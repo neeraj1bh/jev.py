@@ -13,7 +13,7 @@ options, which rules out CLINC150. Every other model answers the remaining 2,302
 comparison uses only the questions all its models answered.
 
 ```sh
-uv run jev-bench check                            # offline checks, no key, no cost
+uv run pytest                                     # offline tests, no key, no cost
 uv run jev-bench run remote:deepseek              # one model; the run appears in Past runs
 uv run jev-bench run Qwen/Qwen2.5-1.5B-Instruct   # a model on this machine
 uv run jev-bench run remote:laya:typed-decisions  # Laya, with a laya-serve running
