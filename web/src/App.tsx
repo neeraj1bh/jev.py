@@ -1,5 +1,3 @@
-import { ArrowCounterClockwise, CircleNotch, Columns, Play } from "@phosphor-icons/react";
-import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Benchmark } from "./components/benchmark/Benchmark";
 import { Header } from "./components/header/Header";
@@ -7,23 +5,15 @@ import { AddModelDialog } from "./components/models/AddModelDialog";
 import { DownloadBar } from "./components/models/DownloadBar";
 import { KeyDialog } from "./components/models/KeyDialog";
 import { KeysDialog } from "./components/models/KeysDialog";
-import { ModelPicker } from "./components/models/ModelPicker";
-import { ModelsPicker } from "./components/models/ModelsPicker";
 import { RunningDialog } from "./components/models/RunningDialog";
 import { PastRuns } from "./components/past/PastRuns";
 import { GenerateReplay } from "./components/results/GenerateReplay";
 import { ItemDialog } from "./components/results/ItemDialog";
 import { ResultsView } from "./components/results/ResultsView";
-import { CompareTable } from "./components/run/CompareTable";
 import { EditDialog } from "./components/run/EditDialog";
-import { InputBar } from "./components/run/InputBar";
-import { RaceClocks } from "./components/run/RaceClocks";
 import { GenerateView } from "./components/run/ResultPanels";
+import { RunScreen } from "./components/run/RunScreen";
 import { ConfirmDialog } from "./components/ui/ConfirmDialog";
-import { EmptyState } from "./components/ui/EmptyState";
-import { FluxLoader } from "./components/ui/FluxLoader";
-import { Icon } from "./components/ui/Icon";
-import { Tip } from "./components/ui/Tip";
 import { Toast } from "./components/ui/Toast";
 import type { RunContext } from "./hooks/run/context";
 import { useBatchRun } from "./hooks/run/useBatchRun";
@@ -41,9 +31,7 @@ import { useTheme } from "./hooks/useTheme";
 import { useToast } from "./hooks/useToast";
 import { errorMessage, stopDownload } from "./lib/api";
 import { isHosted } from "./lib/backends";
-import { makerIcons } from "./lib/logos";
 import { HOSTED_PARALLEL } from "./lib/runner";
-import { cn, ghostButton, inset, labelText, shell, solidButton } from "./lib/styles";
 import type { Mode, RunKind } from "./lib/types";
 
 const CREDITS = ["neerxjbhatt", "essdecay"];
@@ -133,20 +121,19 @@ export default function App() {
     toast,
     confirm,
     setKeysOpen,
+    openMenu,
     setOpenMenu,
+    menuHandler,
   };
   const view = useRunView(ctx);
-  const { panels, verdict, panelsVisible, setPanelsVisible, writtenAsAnswers, savedNames } = view;
-  const { recording, busy, replaying, panelsRef, compareNames } = view;
+  const { panels, setPanelsVisible, writtenAsAnswers } = view;
   const { closeSavedRun, resetPanels, exampleResults } = view;
   const results = useResults(view);
   const { rows, columns, tableVisible, setTableVisible, resultsOpen, setResultsOpen } = results;
   const { logFile, openItem, setOpenItem, batchReplay, clearBatch } = results;
   const input = useRunInput(ctx, view, results);
-  const { source, setSource, example, dataset, stateText, setStateText } = input;
-  const { questionsText, setQuestionsText, item, remaining, editing, setEditing } = input;
-  const { inputName, labels, asked, questionIds, questionCount } = input;
-  const { chooseExample, chooseSource, nextItem, chooseDataset } = input;
+  const { setSource, stateText, setStateText, questionsText, setQuestionsText } = input;
+  const { remaining, editing, setEditing, inputName, labels, chooseDataset } = input;
 
   function switchMode(next: Mode) {
     if (next === mode) return;
@@ -166,12 +153,10 @@ export default function App() {
   const { waiting, prepare } = usePrepare(ctx, view);
   const models = useModelActions(ctx, view, results, input, switchMode);
   const { addingFor, setAddingFor, setKeyRequest, keyBackend, onKeySaved } = models;
-  const { pickGenerateModel, addLocalModel, localActions, toggleCompareModel } = models;
+  const { addLocalModel, localActions } = models;
   const single = useSingleRun(ctx, view, results, input, prepare);
-  const { onRun, replay } = single;
   const batch = useBatchRun(ctx, view, results, input, prepare, single, savedRuns, switchMode);
-  const { liveBatch, batchRunning, batchProgress, batchSize, setBatchSize, noModel } = batch;
-  const { showItem, runBatch, stopBatch, openSavedRuns } = batch;
+  const { liveBatch, batchRunning, setBatchSize, showItem, stopBatch, openSavedRuns } = batch;
 
   /** Loads a benchmark into Compare; the run itself waits for Run batch, so nothing is spent here. */
   async function setUpBenchmark(models: string[], name: string, items: number) {
@@ -195,14 +180,6 @@ export default function App() {
       ? { ...backend, downloading: got.total ? Math.floor((got.done / got.total) * 100) : 0 }
       : backend;
   });
-
-  const waitingOn = (waiting?.downloads ?? []).flatMap((id) => downloads[id] ?? []);
-
-  const waitingTotal = waitingOn.reduce((sum, part) => sum + part.total, 0);
-
-  const waitingShare = waitingTotal
-    ? waitingOn.reduce((sum, part) => sum + part.done, 0) / waitingTotal
-    : undefined;
 
   const runningModels = backendList.filter((backend) => backend.running);
 
@@ -348,171 +325,17 @@ export default function App() {
             }}
           />
         ) : (
-          <>
-            <div className={shell}>
-              <div className={cn(inset, "px-4 py-3.5")}>
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-                    {isCompare ? (
-                      <>
-                        <ModelsPicker
-                          backends={backendList}
-                          selected={compareModels}
-                          onToggle={toggleCompareModel}
-                          local={localActions("compare")}
-                          open={openMenu === "models"}
-                          onOpenChange={menuHandler("models")}
-                        />
-                        {compareModels.length > 0 && (
-                          <button
-                            type="button"
-                            className="border-0 bg-transparent px-1.5 py-1 text-[13px] text-dim hover:text-ink"
-                            onClick={() => {
-                              setCompareModels([]);
-                              clearBatch();
-                              resetPanels(0);
-                            }}
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </>
-                    ) : (
-                      <ModelPicker
-                        backends={backendList}
-                        value={generateModel}
-                        onPick={pickGenerateModel}
-                        local={localActions("generate")}
-                        open={openMenu === "model"}
-                        onOpenChange={menuHandler("model")}
-                      />
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className={ghostButton}
-                      disabled={!recording || replaying || busy}
-                      onClick={replay}
-                    >
-                      <Icon icon={ArrowCounterClockwise} size={14} />
-                      Replay together
-                    </button>
-                    <Tip content={noModel ? "Pick a model first" : undefined}>
-                      <button
-                        type="button"
-                        className={cn(solidButton, "min-w-[104px] overflow-hidden")}
-                        disabled={busy || replaying || noModel}
-                        onClick={onRun}
-                      >
-                        {/* The label changes in place, so the button says what it is doing. */}
-                        <AnimatePresence mode="popLayout" initial={false}>
-                          <motion.span
-                            key={busy ? "running" : "run"}
-                            className="inline-flex items-center gap-1.5"
-                            initial={{ y: 12, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            exit={{ y: -12, opacity: 0 }}
-                            transition={{ type: "spring", stiffness: 500, damping: 36 }}
-                          >
-                            <Icon
-                              icon={busy ? CircleNotch : Play}
-                              size={14}
-                              className={busy ? "animate-spin" : undefined}
-                            />
-                            {busy ? "Running…" : "Run"}
-                          </motion.span>
-                        </AnimatePresence>
-                      </button>
-                    </Tip>
-                  </div>
-                </div>
-                <InputBar
-                  source={source}
-                  onSourceChange={chooseSource}
-                  example={dataset ? "" : example}
-                  onExampleChange={(name) => {
-                    setOpenMenu("");
-                    chooseExample(name);
-                  }}
-                  exampleMenuOpen={openMenu === "example"}
-                  onExampleMenuOpenChange={menuHandler("example")}
-                  dataset={dataset}
-                  datasets={datasets}
-                  onDatasetChange={chooseDataset}
-                  pickedBackends={(isCompare ? compareModels : [generateModel]).map(
-                    (id) => backends[id],
-                  )}
-                  datasetMenuOpen={openMenu === "dataset"}
-                  onDatasetMenuOpenChange={menuHandler("dataset")}
-                  busy={busy}
-                  remaining={remaining}
-                  batchSize={batchSize}
-                  onBatchSizeChange={setBatchSize}
-                  onNextItem={() => nextItem()}
-                  onRunBatch={runBatch}
-                  batchRunning={batchRunning}
-                  onStop={stopBatch}
-                  onEdit={() => setEditing(true)}
-                />
-                {item && dataset && (
-                  <p className={cn(labelText, "mt-2.5 mb-0")}>
-                    {dataset} · {item.source} · {questionCount} question
-                    {questionCount > 1 ? "s" : ""}
-                    {item.options ? `, ${item.options} options` : ""}
-                    {batchProgress}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {waiting && <FluxLoader label={waiting.label} share={waitingShare} />}
-            <p
-              className={cn(
-                "mt-[18px] mb-0 min-h-[26px] text-sm text-ink [&_b]:font-semibold [&_b]:text-good",
-                waiting && "text-center text-dim",
-              )}
-            >
-              {verdict}
-            </p>
-
-            <div ref={panelsRef} hidden={!panelsVisible}>
-              {isCompare && panels.some((panel) => panel.status !== "idle") && (
-                <RaceClocks names={compareNames} panels={panels} />
-              )}
-              {isCompare && compareModels.length === 0 ? (
-                <div className={shell}>
-                  <div className={cn(inset, "overflow-hidden")}>
-                    <EmptyState
-                      icon={Columns}
-                      around={makerIcons}
-                      title="Pick models to compare"
-                      action={{ label: "Choose models", onClick: () => setOpenMenu("models") }}
-                    >
-                      Compare sends the same questions to every model you pick and lines up their
-                      answers, probabilities and times.
-                    </EmptyState>
-                  </div>
-                </div>
-              ) : isCompare ? (
-                <CompareTable
-                  names={compareNames}
-                  panels={panels}
-                  questionIds={questionIds}
-                  asked={asked}
-                  truth={labels}
-                />
-              ) : (
-                <GenerateView
-                  panels={panels}
-                  savedNames={savedNames}
-                  writtenAsAnswers={writtenAsAnswers}
-                  onePass={onePass}
-                  truth={labels}
-                />
-              )}
-            </div>
-          </>
+          <RunScreen
+            ctx={ctx}
+            view={view}
+            results={results}
+            input={input}
+            models={models}
+            single={single}
+            batch={batch}
+            waiting={waiting}
+            backendList={backendList}
+          />
         )}
       </div>
 

@@ -6,12 +6,17 @@ import type { Backend } from "../../lib/types";
 import type { RunContext } from "./context";
 import type { RunView } from "./useRunView";
 
+/** The step a run is waiting on before its first request, and the downloads that measure it. */
+export interface Waiting {
+  label: string;
+  downloads: string[];
+}
+
 export function usePrepare(
   { backends, confirm, toast, reload }: RunContext,
   { setVerdict }: RunView,
 ) {
-  // The step a run is waiting on before its first request, and the downloads that measure it.
-  const [waiting, setWaiting] = useState<{ label: string; downloads: string[] } | null>(null);
+  const [waiting, setWaiting] = useState<Waiting | null>(null);
 
   // Models loaded from this page already; loading them again is quick and needs no loader.
   const loaded = useRef(new Set<string>());

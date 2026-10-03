@@ -28,5 +28,7 @@ export interface RunContext {
   toast: ReturnType<typeof useToast>;
   confirm: ReturnType<typeof useConfirm>;
   setKeysOpen: (open: boolean) => void;
+  openMenu: string;
   setOpenMenu: (menu: string) => void;
+  menuHandler: (id: string) => (open: boolean) => void;
 }

@@ -182,3 +182,5 @@ export function useModelActions(
     toggleCompareModel,
   };
 }
+
+export type ModelActions = ReturnType<typeof useModelActions>;

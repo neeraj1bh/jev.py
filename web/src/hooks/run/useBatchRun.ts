@@ -270,3 +270,5 @@ export function useBatchRun(
     openSavedRuns,
   };
 }
+
+export type BatchRun = ReturnType<typeof useBatchRun>;

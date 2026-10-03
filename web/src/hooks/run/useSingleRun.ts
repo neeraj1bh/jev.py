@@ -259,3 +259,5 @@ export function useSingleRun(
     logName,
   };
 }
+
+export type SingleRun = ReturnType<typeof useSingleRun>;
