@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Benchmark } from "./components/benchmark/Benchmark";
+import { Credits } from "./components/header/Credits";
 import { Header } from "./components/header/Header";
 import { AddModelDialog } from "./components/models/AddModelDialog";
 import { DownloadBar } from "./components/models/DownloadBar";
@@ -7,11 +8,9 @@ import { KeyDialog } from "./components/models/KeyDialog";
 import { KeysDialog } from "./components/models/KeysDialog";
 import { RunningDialog } from "./components/models/RunningDialog";
 import { PastRuns } from "./components/past/PastRuns";
-import { GenerateReplay } from "./components/results/GenerateReplay";
+import { BatchResults } from "./components/results/BatchResults";
 import { ItemDialog } from "./components/results/ItemDialog";
-import { ResultsView } from "./components/results/ResultsView";
 import { EditDialog } from "./components/run/EditDialog";
-import { GenerateView } from "./components/run/ResultPanels";
 import { RunScreen } from "./components/run/RunScreen";
 import { ConfirmDialog } from "./components/ui/ConfirmDialog";
 import { Toast } from "./components/ui/Toast";
@@ -31,10 +30,7 @@ import { useTheme } from "./hooks/useTheme";
 import { useToast } from "./hooks/useToast";
 import { errorMessage, stopDownload } from "./lib/api";
 import { isHosted } from "./lib/backends";
-import { HOSTED_PARALLEL } from "./lib/runner";
 import type { Mode, RunKind } from "./lib/types";
-
-const CREDITS = ["neerxjbhatt", "essdecay"];
 
 export default function App() {
   const theme = useTheme();
@@ -126,14 +122,13 @@ export default function App() {
     menuHandler,
   };
   const view = useRunView(ctx);
-  const { panels, setPanelsVisible, writtenAsAnswers } = view;
   const { closeSavedRun, resetPanels, exampleResults } = view;
   const results = useResults(view);
-  const { rows, columns, tableVisible, setTableVisible, resultsOpen, setResultsOpen } = results;
-  const { logFile, openItem, setOpenItem, batchReplay, clearBatch } = results;
+  const { rows, columns, tableVisible, setTableVisible, resultsOpen } = results;
+  const { openItem, setOpenItem, clearBatch } = results;
   const input = useRunInput(ctx, view, results);
   const { setSource, stateText, setStateText, questionsText, setQuestionsText } = input;
-  const { remaining, editing, setEditing, inputName, labels, chooseDataset } = input;
+  const { editing, setEditing, inputName, chooseDataset } = input;
 
   function switchMode(next: Mode) {
     if (next === mode) return;
@@ -156,7 +151,7 @@ export default function App() {
   const { addLocalModel, localActions } = models;
   const single = useSingleRun(ctx, view, results, input, prepare);
   const batch = useBatchRun(ctx, view, results, input, prepare, single, savedRuns, switchMode);
-  const { liveBatch, batchRunning, setBatchSize, showItem, stopBatch, openSavedRuns } = batch;
+  const { setBatchSize, showItem, openSavedRuns } = batch;
 
   /** Loads a benchmark into Compare; the run itself waits for Run batch, so nothing is spent here. */
   async function setUpBenchmark(models: string[], name: string, items: number) {
@@ -188,8 +183,6 @@ export default function App() {
 
   const memoryPerGb =
     localModel?.need_gb && localModel.gb ? localModel.need_gb / localModel.gb : undefined;
-
-  const tableNote = `· ${batchReplay.visibleRows.length} done${remaining !== null && batchRunning ? ` · ${remaining} left in the set` : ""}`;
 
   return (
     <div className="mx-auto max-w-[1280px] px-6 pt-7 pb-14 max-[600px]:px-4">
@@ -259,71 +252,7 @@ export default function App() {
             backendLabel={columnName}
           />
         ) : resultsOpen && tableVisible ? (
-          <ResultsView
-            scoreboard={
-              batchReplay.replaying
-                ? {
-                    startedAt: batchReplay.startedAt,
-                    total: rows.length,
-                    pace: batchReplay.pace,
-                    label: `Replaying ${inputName} at ${Math.round(batchReplay.pace)}×`,
-                  }
-                : liveBatch && batchRunning
-                  ? { ...liveBatch, pace: 1, label: `Running ${inputName}` }
-                  : null
-            }
-            stage={
-              isCompare ? undefined : batchReplay.replaying ? (
-                <GenerateReplay
-                  rows={rows}
-                  startedAt={batchReplay.startedAt}
-                  pace={batchReplay.pace}
-                  onePass={onePass}
-                />
-              ) : batchRunning ? (
-                <GenerateView
-                  panels={panels}
-                  savedNames={null}
-                  writtenAsAnswers={writtenAsAnswers}
-                  onePass={onePass}
-                  truth={labels}
-                />
-              ) : undefined
-            }
-            dataset={inputName}
-            priceOf={(column) =>
-              Object.values(backends).find((backend) => columnName(backend.id) === column)
-            }
-            rows={batchReplay.visibleRows}
-            columns={columns}
-            note={tableNote}
-            file={logFile}
-            selected={
-              batchReplay.replaying ? batchReplay.visibleRows.length - 1 : (openItem?.index ?? null)
-            }
-            follow={batchReplay.replaying || !!openItem?.open}
-            running={batchRunning}
-            replaying={batchReplay.replaying}
-            speed={batchReplay.speed}
-            onSpeedChange={batchReplay.setSpeed}
-            onReplay={() =>
-              batchReplay.play(
-                isCompare && compareModels.every((id) => isHosted(backends[id]))
-                  ? HOSTED_PARALLEL
-                  : 1,
-              )
-            }
-            onStopReplay={batchReplay.stop}
-            onStopBatch={stopBatch}
-            onOpenRow={(index) => showItem(index)}
-            onBack={() => {
-              batchReplay.stop();
-              setResultsOpen(false);
-              setPanelsVisible(true);
-              closeSavedRun();
-              resetPanels();
-            }}
-          />
+          <BatchResults ctx={ctx} view={view} results={results} input={input} batch={batch} />
         ) : (
           <RunScreen
             ctx={ctx}
@@ -376,21 +305,7 @@ export default function App() {
         />
       )}
       <Toast message={toast.message} onClose={toast.hide} />
-      <footer className="mt-14 flex items-center justify-center gap-2 text-[13px] text-dim">
-        by
-        {CREDITS.map((handle, index) => [
-          index > 0 && "and",
-          <a
-            key={handle}
-            href={`https://x.com/${handle}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full border border-rule px-2.5 py-0.5 text-dim no-underline transition-colors hover:border-dim hover:text-ink"
-          >
-            @{handle}
-          </a>,
-        ])}
-      </footer>
+      <Credits />
     </div>
   );
 }
