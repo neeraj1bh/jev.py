@@ -53,7 +53,7 @@ from jev.page.models import (
     model_places,
 )
 from jev.page.runs import log_row, run_body, runs, text_answers
-from jev.remote import BACKENDS, NoProbabilities, env
+from jev.remote import BACKENDS, PROBABILITIES_ONLY, NoProbabilities, Remote, env
 
 WEB = os.path.join(ROOT, "web", "dist")  # the built page; see web/
 
@@ -153,9 +153,6 @@ def presets():
     lists = {"Core v1 models": frozen["models"], "Core v1 optional": frozen.get("optional", [])}
     return [{"name": n, "dataset": "Core v1", "models": [m["id"] for m in ms]} for n, ms in lists.items()]
 
-
-# Jev and Laya return probabilities only; they never write text
-TEXTLESS = {"remote:typesafe", "remote:vercel", "remote:laya"}
 
 CHANGES_FILES = ("/key", "/models", "/folders", "/delete", "/download")  # answer this machine only
 
@@ -390,7 +387,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     answer = {"device": jev.device, "stopped": stopped_for_room}
                     return self._send(200, json.dumps(answer).encode())
                 if self.path.endswith("/generate"):
-                    if (body.get("backend") or model_id) in TEXTLESS:
+                    if isinstance(jev, Remote) and jev.backend in PROBABILITIES_ONLY:
                         raise ValueError("This model returns probabilities only; it does not write text")
                     make = generate if isinstance(jev, Jev) else generate_remote
                     t = time.time()

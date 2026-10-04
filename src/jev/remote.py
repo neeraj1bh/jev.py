@@ -53,6 +53,7 @@ BACKENDS = {
 }
 ADDRESS = {"llamacpp": "LLAMACPP_URL", "laya": "LAYA_URL"}  # servers found by address, not by key
 TYPED = ("typesafe", "laya")  # speak TypeSafe's own request and answer shapes: nothing to read by letter
+PROBABILITIES_ONLY = (*TYPED, "vercel")  # never write text
 LETTER_SYSTEM = "You are a calibrated decision engine. Reply with one letter."
 TOP_LOGPROBS = 20  # alternatives asked for with the answer token
 PROMPT_VERSION = "letter-1"  # bump whenever LETTER_SYSTEM or letter_prompt changes; fingerprints hash it
