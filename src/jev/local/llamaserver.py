@@ -185,25 +185,39 @@ def _make_room(gb, binary):
 def serve(gguf, binary, gb=None):
     """The base URL of a llama-server running gguf, starting one if it is not running yet."""
     with LOCK:
-        if running(gguf):
-            SERVERS[gguf]["used"] = time.time()
-            return SERVERS[gguf]["url"]
-        if not SERVERS:
-            _end_leftovers()
-        _make_room(gb, binary)
-        process, url, port = _start(gguf, binary)
-        SERVERS[gguf] = {"process": process, "url": url, "used": time.time(), "gb": gb, "port": port}
-        _remember()
-        deadline = time.time() + READY_SECONDS
-        while time.time() < deadline:
-            if process.poll() is not None:
-                stop(gguf)
-                raise ValueError(f"llama-server stopped loading {os.path.basename(gguf)}: {_last_words()}")
-            if _ready(url):
-                return url
-            time.sleep(1)
-        stop(gguf)
-        raise ValueError(f"llama-server was not ready after {READY_SECONDS // 60} minutes; see {LOG}")
+        if not running(gguf):
+            if not SERVERS:
+                _end_leftovers()
+            _make_room(gb, binary)
+            process, url, port = _start(gguf, binary)
+            SERVERS[gguf] = {"process": process, "url": url, "gb": gb, "port": port, "ready": False}
+            _remember()
+        server = SERVERS[gguf]
+        server["used"] = time.time()
+    if not server["ready"]:
+        _wait_until_ready(gguf, server)
+    return server["url"]
+
+
+def _wait_until_ready(gguf, server):
+    """Outside LOCK, so the models already running keep answering while this one loads."""
+    deadline = time.time() + READY_SECONDS
+    while time.time() < deadline:
+        if server["process"].poll() is not None:
+            _stop_if_current(gguf, server)
+            raise ValueError(f"llama-server stopped loading {os.path.basename(gguf)}: {_last_words()}")
+        if _ready(server["url"]):
+            server["ready"] = True
+            return
+        time.sleep(1)
+    _stop_if_current(gguf, server)
+    raise ValueError(f"llama-server was not ready after {READY_SECONDS // 60} minutes; see {LOG}")
+
+
+def _stop_if_current(gguf, server):
+    with LOCK:
+        if SERVERS.get(gguf) is server:
+            stop(gguf)
 
 
 def running(gguf=None):
