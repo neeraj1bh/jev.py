@@ -3,6 +3,7 @@ it to .env."""
 
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from jev.core import ROOT
@@ -42,6 +43,9 @@ def keys():
 
 def check_key(name, key):
     """One tiny request that fails if the key or address is wrong."""
+    server = {var: backend for backend, var in ADDRESS.items()}.get(name)
+    if server and urllib.parse.urlparse(key).path != urllib.parse.urlparse(BACKENDS[server][1]).path:
+        raise ValueError(f"Give the whole address, such as {BACKENDS[server][1]}")
     if name == "HF_TOKEN":
         request = urllib.request.Request(HF_WHOAMI, headers={"authorization": "Bearer " + key})
         urllib.request.urlopen(request, timeout=15).close()
