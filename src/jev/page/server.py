@@ -157,6 +157,7 @@ def presets():
 # Jev and Laya return probabilities only; they never write text
 TEXTLESS = {"remote:typesafe", "remote:vercel", "remote:laya"}
 
+CHANGES_FILES = ("/key", "/models", "/folders", "/delete", "/download")  # answer this machine only
 
 # Shown instead of the page while web/dist is missing or older than web/src. It polls and reloads
 # by itself, so building in another terminal is the only step. Plain HTML: the built fonts and
@@ -276,7 +277,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
             if self.path.endswith("/folders"):
                 return self._send(200, json.dumps(folder_state()).encode())
             if "/browse" in self.path:
-                if self.client_address[0] not in ("127.0.0.1", "::1"):
+                if not self.from_this_machine():
                     return self._send(
                         403, b'{"error": {"message": "folders can only be browsed from this machine"}}'
                     )
@@ -316,6 +317,9 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 html = f.read().replace("{{model}}", model_id)
             self._send(200, html.encode(), "text/html; charset=utf-8")
 
+        def from_this_machine(self):
+            return self.client_address[0] in ("127.0.0.1", "::1")
+
         def from_elsewhere(self):
             """A request another website's page sent: it could spend your keys or replace them."""
             origin = self.headers.get("origin")
@@ -327,6 +331,8 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                 return self._send(403, b'{"error": {"message": "requests from other sites are refused"}}')
             body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
             try:
+                if self.path.endswith(CHANGES_FILES) and not self.from_this_machine():
+                    raise ValueError("keys, models and folders can only be changed from this machine")
                 if self.path.endswith("/stop") and body.get("backend") in CORE:  # Core v1's rows, not a model
                     core_v1.STOP.set()
                     return self._send(200, b"{}")
@@ -338,8 +344,6 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                             return self._send(409, json.dumps({"error": {"message": str(e)}}).encode())
                     return self._send(200, json.dumps(item).encode())
                 if self.path.endswith("/key"):
-                    if self.client_address[0] not in ("127.0.0.1", "::1"):
-                        raise ValueError("keys can only be set from this machine")
                     if body.get("clear"):
                         clear_key(body["backend"])
                     else:
@@ -349,8 +353,6 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     add_model(body["id"].strip())
                     return self._send(200, b"{}")
                 if self.path.endswith("/folders"):
-                    if self.client_address[0] not in ("127.0.0.1", "::1"):
-                        raise ValueError("folders can only be changed from this machine")
                     if "add" in body:
                         if in_cache(folders.local_path(body["add"])):
                             raise ValueError("These models are already in the menu.")
