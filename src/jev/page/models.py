@@ -329,16 +329,18 @@ def generate(jev, state, questions):
     text = jev.tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
     enc = jev.tok(text, return_tensors="pt").to(jev.device)
     streamer = TextIteratorStreamer(jev.tok, skip_prompt=True, skip_special_tokens=True)
-    Thread(
-        target=jev.model.generate,
-        kwargs=dict(
-            **enc,
-            streamer=streamer,
-            do_sample=False,
-            temperature=None,
-            top_p=None,
-            top_k=None,
-            max_new_tokens=24 * len(questions),
-        ),
-    ).start()
+
+    def write():
+        with jev.lock:
+            jev.model.generate(
+                **enc,
+                streamer=streamer,
+                do_sample=False,
+                temperature=None,
+                top_p=None,
+                top_k=None,
+                max_new_tokens=24 * len(questions),
+            )
+
+    Thread(target=write).start()
     yield from streamer

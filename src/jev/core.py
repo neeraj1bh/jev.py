@@ -25,6 +25,7 @@ import shutil
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Lock
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -85,6 +86,7 @@ class Jev:
             .to(self.device)
             .eval()
         )
+        self.lock = Lock()
         # one letter must be one token, or the letter readout would compare different lengths
         bad = [c for c in LETTERS if len(self.tok.encode(c, add_special_tokens=False)) != 1]
         assert readout != "letter" or not bad, f"{bad} are several tokens each in {model_id}"
@@ -159,7 +161,8 @@ class Jev:
             prompt, cands = self._prompt(state, questions[qid], labels, descs)
             spans.append((len(seqs), len(seqs) + len(cands)))
             seqs += [(prompt + c, len(c)) for c in cands]
-        scores, n_tokens = self._score(seqs)
+        with self.lock:
+            scores, n_tokens = self._score(seqs)
         answers = {}
         for qid, (labels, descs), (a, b) in zip(ids, parsed, spans, strict=True):
             p = torch.softmax(torch.tensor(scores[a:b]), -1).tolist()
