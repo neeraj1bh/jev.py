@@ -1,13 +1,12 @@
 """API keys and server addresses: which are set, checking one with a small request, and saving
 it to .env."""
 
-import json
 import os
 import urllib.error
 import urllib.request
 
 from jev.core import ROOT
-from jev.page.models import LOADED, get, laya_up
+from jev.page.models import LOADED, get, laya_up, llamacpp_up
 from jev.remote import ADDRESS, BACKENDS, env
 
 OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"
@@ -47,9 +46,8 @@ def check_key(name, key):
         request = urllib.request.Request(HF_WHOAMI, headers={"authorization": "Bearer " + key})
         urllib.request.urlopen(request, timeout=15).close()
     elif name == "LLAMACPP_URL":
-        with urllib.request.urlopen(key.split("/v1/")[0] + "/health", timeout=5) as r:
-            if json.loads(r.read()).get("status") != "ok":
-                raise ValueError("that address answered, but not as a llama-server")
+        if not llamacpp_up(key, timeout=5):
+            raise ValueError("no llama-server answered at that address")
     elif name == "LAYA_URL":
         if not laya_up(key, timeout=5):
             raise ValueError("that address did not answer as a laya-serve")

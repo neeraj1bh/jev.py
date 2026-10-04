@@ -71,15 +71,25 @@ def laya_url():
     return env("LAYA_URL") or BACKENDS["laya"][1]
 
 
-def laya_up(url, timeout=0.5):
-    """Whether a laya-serve answers at this address. Its health reply lists the checkpoints it
-    holds, which tells it from whatever else may be listening on so common a port."""
+def health(url, timeout=0.5):
+    """A local server's /health reply, or {} when nothing answers there with JSON."""
     try:
         with urllib.request.urlopen(url.split("/v1/")[0] + "/health", timeout=timeout) as r:
             reply = json.loads(r.read())
-        return reply.get("status") == "ok" and "loaded" in reply
     except (OSError, ValueError, AttributeError):
-        return False
+        return {}
+    return reply if isinstance(reply, dict) else {}
+
+
+def llamacpp_up(url, timeout=0.5):
+    return health(url, timeout).get("status") == "ok"
+
+
+def laya_up(url, timeout=0.5):
+    """Whether a laya-serve answers at this address. Its health reply lists the checkpoints it
+    holds, which tells it from whatever else may be listening on so common a port."""
+    reply = health(url, timeout)
+    return reply.get("status") == "ok" and "loaded" in reply
 
 
 def added():
@@ -199,13 +209,7 @@ def backends(extra):
             need = round(found["gb"] * (1 if BF16 else 2) * 1.3, 1)
             out.append(entry | {"group": "local", "ready": True, "device": DEVICE, "need_gb": need})
     url = llamacpp_url()
-    try:
-        with urllib.request.urlopen(url.split("/v1/")[0] + "/health", timeout=0.5) as r:
-            up = (
-                json.loads(r.read()).get("status") == "ok"
-            )  # llama-server's reply, not a page that mentions "ok"
-    except (OSError, ValueError, AttributeError):
-        up = False
+    up = llamacpp_up(url)
     # Listed only when a llama-server answers or its address was set under Keys; most machines have none.
     if up or env("LLAMACPP_URL"):
         out.append(
@@ -218,7 +222,8 @@ def backends(extra):
                 "max": 26,
             }
         )
-    laya, laya_answers = laya_url(), laya_up(laya_url())
+    laya = laya_url()
+    laya_answers = laya_up(laya)
     # Like the llama-server above: listed only when one answers or its address was set under Keys.
     if laya_answers or env("LAYA_URL"):
         out.append(
