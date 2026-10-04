@@ -283,8 +283,9 @@ def get(bid):
     with LOCK:
         backend = LOADED.get(bid)
         if not backend:
-            for old in [k for k in LOADED if not k.startswith("remote:")][:-1]:
-                del LOADED[old]
+            local = [k for k in LOADED if not k.startswith(("remote:", "openrouter:", "gguf:"))]
+            for old in local[:-1]:
+                LOADED.pop(old, None)
             gc.collect()
             if DEVICE == "cuda":
                 torch.cuda.empty_cache()
