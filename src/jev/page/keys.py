@@ -72,11 +72,21 @@ def key_target(name):
     return bid, BACKENDS[bid.split(":", 1)[1]][0] if bid else name
 
 
+def forget_address(var):
+    """Drop every model that answers from this server address, pinned ones included, so the next
+    request reads the address again."""
+    for backend, address in ADDRESS.items():
+        if var == address:
+            for bid in [b for b in LOADED if b == f"remote:{backend}" or b.startswith(f"remote:{backend}:")]:
+                LOADED.pop(bid, None)
+
+
 def clear_key(name):
     """Forget a key: out of this session and out of .env, with the note saved above it."""
     bid, var = key_target(name)
     os.environ.pop(var, None)
     LOADED.pop(bid, None)
+    forget_address(var)
     path = os.path.join(ROOT, ".env")
     if not os.path.exists(path):
         return
@@ -102,9 +112,7 @@ def set_key(name, key, save):
     old = os.environ.get(var)
     os.environ[var] = key
     LOADED.pop(bid, None)
-    for backend, address in ADDRESS.items():  # a new address must not keep answering from the old one
-        if var == address:
-            LOADED.pop("remote:" + backend, None)
+    forget_address(var)
 
     def undo():
         if old is None:
