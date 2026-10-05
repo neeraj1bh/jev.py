@@ -64,10 +64,10 @@ included; DeepSeek's is read from its balance, Jev's worked out from its reporte
 
 [Laya](docs/local-models.md#laya) is an open encoder built for these questions, run on 2026-09-30
 on an Apple Silicon Mac, one request at a time. It is the fastest here by far, a median of 60 ms
-an item against Jev's 379 ms over the network, and the least accurate; its probabilities score
-about the same as an even spread. Two things shape its number: its makers list news-topic and spam
-sets as training data (it scores 92% and 86% there), and its server refuses a question with more
-than 100 options, so it answered none of CLINC150.
+an item against Jev's 379 ms over the network with eight requests at a time, and the least
+accurate; its probabilities score about the same as an even spread. Two things shape its number:
+its makers list news-topic and spam sets as training data (it scores 92% and 86% there), and its
+server refuses a question with more than 100 options, so it answered none of CLINC150.
 
 How the questions were picked, how to run it, and earlier results: [docs/benchmark.md](docs/benchmark.md).
 

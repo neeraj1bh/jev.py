@@ -18,7 +18,8 @@ instead of reasoning first. Checked against each provider's API reference on 202
 | Cohere | chosen token only | no | no alternatives, so no distribution |
 | Groq | none | no | the API rejects `logprobs` |
 | Anthropic (Claude) | none | no | the Messages API returns no probabilities |
-| Mistral, Qwen (Alibaba), Ollama | unconfirmed | no | not stated in the documentation checked |
+| Ollama | yes, from v0.12.11 | not yet | in its own API and its OpenAI-compatible one (release notes, 2025-11-12) |
+| Mistral, Qwen (Alibaba) | unconfirmed | no | not stated in the documentation checked |
 
 Of the 139 OpenRouter models checked, only 44 really return probabilities, so the page tests each
 one and lists only those.
