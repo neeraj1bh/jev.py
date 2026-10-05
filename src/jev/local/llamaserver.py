@@ -138,8 +138,8 @@ def _last_words():
 
 def _ready(url):
     try:
-        with urllib.request.urlopen(url + "/health", timeout=2) as r:
-            return json.loads(r.read()).get("status") == "ok"
+        with urllib.request.urlopen(url + "/health", timeout=2) as response:
+            return json.loads(response.read()).get("status") == "ok"
     except (OSError, ValueError):  # refused while starting, 503 while loading
         return False
 

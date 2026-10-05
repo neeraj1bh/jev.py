@@ -21,15 +21,15 @@ def text_answers(text, questions):
     except ValueError:
         return {}
     out = {}
-    for qid, q in questions.items():
+    for qid, question in questions.items():
         if not isinstance(got, dict) or qid not in got:
             continue
         v = str(got[qid]).strip().lower()
         first = (v.replace(",", " ").split() or [""])[0]
-        if q["type"] == "noul":
+        if question["type"] == "noul":
             out[qid] = {"type": "noul", "noul": 1.0 if first in ("yes", "true") else 0.0}
-        elif q["type"] == "choice":
-            longest_first = sorted(_options(q)[0], key=len, reverse=True)
+        elif question["type"] == "choice":
+            longest_first = sorted(_options(question)[0], key=len, reverse=True)
             hit = next((la for la in longest_first if v.startswith(la.lower())), None)
             if hit is not None:
                 out[qid] = {"type": "choice", "choice": hit, "probabilities": {hit: 1.0}}
@@ -57,24 +57,26 @@ def log_row(body, backend, answers, ms, response=None):
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def answer(a):
+def answer(reply):
     """The answer a probability reply amounts to, in the label set's words."""
-    if a["type"] == "noul":
-        return "yes" if a["noul"] >= 0.5 else "no"
-    if a["type"] == "choice":
-        return a["choice"]
-    p = a.get("probabilities")  # a score's answer is its most probable level, not the rounded mean
-    return max(p, key=p.get) if p else str(round(a["score"]))
+    if reply["type"] == "noul":
+        return "yes" if reply["noul"] >= 0.5 else "no"
+    if reply["type"] == "choice":
+        return reply["choice"]
+    probabilities = reply.get(
+        "probabilities"
+    )  # a score's answer is its most probable level, not the rounded mean
+    return max(probabilities, key=probabilities.get) if probabilities else str(round(reply["score"]))
 
 
-def right(a, truth):
+def right(reply, truth):
     norm = {"true": "yes", "false": "no"}
-    return answer(a).lower().strip() == norm.get(str(truth).lower(), str(truth).lower().strip())
+    return answer(reply).lower().strip() == norm.get(str(truth).lower(), str(truth).lower().strip())
 
 
-def item_key(x):
+def item_key(logged):
     """One logged item: two TypeSafe steps can share a document, so the questions count too."""
-    return x["source"], json.dumps((x["state"], x["questions"]), sort_keys=True)
+    return logged["source"], json.dumps((logged["state"], logged["questions"]), sort_keys=True)
 
 
 SUMMARIES = {}  # file name -> (mtime, size, summary); a saved run is read again only when it changes
@@ -87,8 +89,8 @@ def summary(f):
     cached = SUMMARIES.get(f)
     if cached and cached[:2] == (stat.st_mtime, stat.st_size):
         return cached[2]
-    with open(path) as fh:
-        lines = [json.loads(x) for x in fh if x.strip()]
+    with open(path) as log:
+        lines = [json.loads(x) for x in log if x.strip()]
     sides = sorted(
         dict.fromkeys(x["backend"] for x in lines), key=lambda b: not b.endswith("#text")
     )  # written side first
@@ -97,12 +99,19 @@ def summary(f):
         sides.sort(key=lambda b: order.index(b) if b in order else len(order))
     items = len({item_key(x) for x in lines})
     score = {b: [0, 0] for b in sides}
-    for x in lines:
-        for qid, t in x["truth"].items():
-            score[x["backend"]][1] += 1
-            score[x["backend"]][0] += qid in x["answers"] and right(x["answers"][qid], t)
-    ds, kind = (lines[0]["dataset"], lines[0].get("mode") or "cmp") if lines else ("", "cmp")
-    out = {"name": f[:-6], "dataset": ds, "backends": sides, "items": items, "score": score, "mode": kind}
+    for logged in lines:
+        for qid, truth in logged["truth"].items():
+            score[logged["backend"]][1] += 1
+            score[logged["backend"]][0] += qid in logged["answers"] and right(logged["answers"][qid], truth)
+    dataset, kind = (lines[0]["dataset"], lines[0].get("mode") or "cmp") if lines else ("", "cmp")
+    out = {
+        "name": f[:-6],
+        "dataset": dataset,
+        "backends": sides,
+        "items": items,
+        "score": score,
+        "mode": kind,
+    }
     if items == 1:  # which item, so runs that can be compared are visible before opening them
         out["item"] = lines[0].get("source")
     # Short item fingerprints, so the page knows which runs share items before opening any; a big
@@ -139,13 +148,14 @@ def run_rows(name):
     """One saved batch as items, each with both sides' answers, in the order they ran."""
     path = os.path.join(LOGS, os.path.basename(name) + ".jsonl")
     items = {}
-    with open(path) as fh:
-        for x in map(json.loads, filter(str.strip, fh)):
-            it = items.setdefault(
-                item_key(x), {"it": {k: x[k] for k in ("state", "questions", "truth", "source")}, "sides": {}}
+    with open(path) as log:
+        for logged in map(json.loads, filter(str.strip, log)):
+            entry = items.setdefault(
+                item_key(logged),
+                {"it": {k: logged[k] for k in ("state", "questions", "truth", "source")}, "sides": {}},
             )
-            res = {"answers": x["answers"]}
-            if usage := (x.get("response") or {}).get("usage"):
+            res = {"answers": logged["answers"]}
+            if usage := (logged.get("response") or {}).get("usage"):
                 # the totals the page prices a run from, not each question's details
                 billed = total((usage.get("per_question") or {}).values(), "cost")
                 res["usage"] = {
@@ -153,10 +163,10 @@ def run_rows(name):
                     "output_tokens": usage.get("output_tokens"),
                     "cost": usage.get("cost", billed if usage.get("per_question") else None),
                 }
-            it["sides"][x["backend"]] = {"ms": x["ms"], "res": res}
-            if "at" in x:  # older runs did not record it
+            entry["sides"][logged["backend"]] = {"ms": logged["ms"], "res": res}
+            if "at" in logged:  # older runs did not record it
                 # the item started when its first model started (local models answer one after
                 # another), and ended with its last answer
-                it["start"] = min(it.get("start", x["at"]), x["at"] - x["ms"])
-                it["at"] = max(it.get("at", 0), x["at"])
+                entry["start"] = min(entry.get("start", logged["at"]), logged["at"] - logged["ms"])
+                entry["at"] = max(entry.get("at", 0), logged["at"])
     return list(items.values())

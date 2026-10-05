@@ -36,8 +36,8 @@ def live_prices():
         for backend, (url, name) in PRICED_AS.items():
             if url not in pages:
                 try:
-                    with urllib.request.urlopen(url, timeout=10) as r:
-                        pages[url] = json.load(r)["data"]
+                    with urllib.request.urlopen(url, timeout=10) as response:
+                        pages[url] = json.load(response)["data"]
                 except (OSError, ValueError, KeyError):
                     pages[url] = None
             data = pages[url]
@@ -78,8 +78,8 @@ def check_gateway(ids):
     """Ask each model one tiny question; keep only those whose answer carries probabilities.
     The catalog claims top_logprobs for many models whose providers then send none."""
     question = {"q": {"type": "noul", "instructions": "Is this a greeting?"}}
-    for n, bid in enumerate(ids):
-        PROGRESS["gateway"] = [n, len(ids), "models"]
+    for checked, bid in enumerate(ids):
+        PROGRESS["gateway"] = [checked, len(ids), "models"]
         try:
             Remote("openrouter", model=bid.split(":", 1)[1], patient=False).ask({"text": "hello"}, question)
             CHECKED[bid] = True
@@ -104,8 +104,8 @@ def gateway():
     """OpenRouter models that really return top log-probabilities, the only ones a readout can use."""
     if time.time() - GATEWAY["at"] > 6 * 3600:
         try:
-            with urllib.request.urlopen("https://openrouter.ai/api/v1/models", timeout=10) as r:
-                data = json.load(r)["data"]
+            with urllib.request.urlopen("https://openrouter.ai/api/v1/models", timeout=10) as response:
+                data = json.load(response)["data"]
         except (OSError, ValueError, KeyError):
             return []  # offline: the page simply shows no gateway models
         usable = [

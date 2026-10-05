@@ -18,8 +18,8 @@ def fetch(model_id, token=None):
         headers={"authorization": f"Bearer {token}"} if token else {},
     )
     try:
-        with urllib.request.urlopen(request, timeout=15) as r:
-            return json.load(r)
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return json.load(response)
     except urllib.error.HTTPError as e:
         if e.code in (401, 404):  # the Hub answers 401 for ids that do not exist, and for private ones
             raise ValueError(f"No model called {model_id} on the Hugging Face Hub.") from None

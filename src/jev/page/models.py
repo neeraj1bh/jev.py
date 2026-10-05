@@ -74,8 +74,8 @@ def laya_url():
 def health(url, timeout=0.5):
     """A local server's /health reply, or {} when nothing answers there with JSON."""
     try:
-        with urllib.request.urlopen(url.split("/v1/")[0] + "/health", timeout=timeout) as r:
-            reply = json.loads(r.read())
+        with urllib.request.urlopen(url.split("/v1/")[0] + "/health", timeout=timeout) as response:
+            reply = json.loads(response.read())
     except (OSError, ValueError, AttributeError):
         return {}
     return reply if isinstance(reply, dict) else {}
@@ -148,8 +148,10 @@ def folder_models():
 def folder_state():
     """The folders added in the page, how many models each holds, and the llama-server in use."""
 
-    def count(d):
-        return len(folders.scan([d])) + (len(cache.on_disk([d])) if folders.is_hf_cache(d) else 0)
+    def count(folder):
+        return len(folders.scan([folder])) + (
+            len(cache.on_disk([folder])) if folders.is_hf_cache(folder) else 0
+        )
 
     listed = [{"path": d, "models": count(d)} for d in model_dirs()]
     gguf = any(k.startswith("gguf:") for k in folders.scan(model_dirs()))
@@ -170,24 +172,24 @@ def backends(extra):
     out, mem = [], memory_gb()
     ids, disk = local_ids(extra)
     in_folders = folders.scan(model_dirs())
-    for m in ids:
-        if m.startswith("remote:") or m in in_folders:
+    for model_id in ids:
+        if model_id.startswith("remote:") or model_id in in_folders:
             continue
-        found = disk.get(m)
+        found = disk.get(model_id)
         folder = found[0] if found else MODELS
-        gb = model_gb(m) or (found and found[1])
+        gb = model_gb(model_id) or (found and found[1])
         out.append(
             {
-                "id": m,
+                "id": model_id,
                 "group": "local",
-                "label": m.split("/")[-1].removesuffix("-Instruct"),
+                "label": model_id.split("/")[-1].removesuffix("-Instruct"),
                 "ready": bool(found),
-                "path": os.path.join(folder, "models--" + m.replace("/", "--")),
+                "path": os.path.join(folder, "models--" + model_id.replace("/", "--")),
                 "gb": gb,
                 "need_gb": gb and round(gb * (1 if BF16 else 2) * 1.3, 1),
                 "have_gb": mem and round(mem, 1),
                 "device": DEVICE,
-                "tested": m in LOCAL,
+                "tested": model_id in LOCAL,
             }
         )
     for fid, found in in_folders.items():
@@ -237,19 +239,19 @@ def backends(extra):
             }
         )
     prices = live_prices()
-    for b, label in HOSTED.items():
-        var = BACKENDS[b][0]
-        ready, most = bool(env(var)), 26 if b in LETTER else None
-        price = prices.get(b)
+    for backend, label in HOSTED.items():
+        var = BACKENDS[backend][0]
+        ready, most = bool(env(var)), 26 if backend in LETTER else None
+        price = prices.get(backend)
         out.append(
             {
-                "id": "remote:" + b,
+                "id": "remote:" + backend,
                 "group": "hosted",
                 "label": label,
                 "ready": ready,
                 "key": var,
                 "max": most,
-                "model": BACKENDS[b][2],  # the one model this direct API is pinned to
+                "model": BACKENDS[backend][2],  # the one model this direct API is pinned to
             }
             | ({"price": price[0], "price_out": price[1]} if price else {})
         )
@@ -308,10 +310,10 @@ def get(bid):
 def messages(state, questions):
     """The usual way: ask for every answer written out as one JSON object."""
     lines = []
-    for qid, q in questions.items():
-        labels, descs = _options(q)
+    for qid, question in questions.items():
+        labels, descs = _options(question)
         opts = ", ".join(f"{la} ({_text(d)})" if d else la for la, d in zip(labels, descs, strict=True))
-        lines.append(f'"{qid}": {_text(q["instructions"])} — one of: {opts}')
+        lines.append(f'"{qid}": {_text(question["instructions"])} — one of: {opts}')
     user = (
         f"STATE:\n{_text(state)}\n\nAnswer every question as one JSON object, "
         f"keys exactly as given, values from the allowed options:\n" + "\n".join(lines)
@@ -319,12 +321,12 @@ def messages(state, questions):
     return [{"role": "system", "content": SYSTEM.split(" Read")[0]}, {"role": "user", "content": user}]
 
 
-def generate_remote(r, state, questions):
+def generate_remote(remote, state, questions):
     """The same request written out by a hosted model, streamed as it arrives."""
-    body = {"model": r.model_id, "messages": messages(state, questions), "stream": True}
-    body |= {"max_tokens": 24 * len(questions), **EXTRAS.get(r.backend, {})}
-    headers = {"authorization": f"Bearer {r.key}", "content-type": "application/json"}
-    req = urllib.request.Request(r.url, data=json.dumps(body).encode(), headers=headers)
+    body = {"model": remote.model_id, "messages": messages(state, questions), "stream": True}
+    body |= {"max_tokens": 24 * len(questions), **EXTRAS.get(remote.backend, {})}
+    headers = {"authorization": f"Bearer {remote.key}", "content-type": "application/json"}
+    req = urllib.request.Request(remote.url, data=json.dumps(body).encode(), headers=headers)
     with urllib.request.urlopen(req, timeout=120) as resp:
         for raw in resp:
             line = raw.decode().strip()

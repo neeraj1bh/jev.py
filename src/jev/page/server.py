@@ -72,12 +72,12 @@ class Exhausted(Exception):
     pass
 
 
-def deal(name, n, fresh):
+def deal(name, size, fresh):
     """The next unseen row index; a fresh deck on request, never a silent reshuffle."""
     if fresh or name not in DECKS:
-        DECKS[name] = random.sample(range(n), n)
+        DECKS[name] = random.sample(range(size), size)
     if not DECKS[name]:
-        raise Exhausted(f"all {n} items of {name} are done")
+        raise Exhausted(f"all {size} items of {name} are done")
     return DECKS[name].pop()
 
 
@@ -125,10 +125,10 @@ def dataset_menu():
     ]
     typesafe = os.path.isdir(os.path.join(ROOT, "results", "typesafe"))
     sets.append({"name": "TypeSafe cases", "options": None, "local": typesafe})
-    for x in sets:
-        record = SETS.get(x["name"])
-        x["group"], x["about"] = (record.group, record.about) if record else OTHERS[x["name"]]
-        x |= SIZES.get(x["name"], {})
+    for entry in sets:
+        record = SETS.get(entry["name"])
+        entry["group"], entry["about"] = (record.group, record.about) if record else OTHERS[entry["name"]]
+        entry |= SIZES.get(entry["name"], {})
     headings = list(dict.fromkeys(x["group"] for x in sets))
     return sorted(sets, key=lambda x: headings.index(x["group"]))
 
@@ -169,7 +169,7 @@ def page_is_stale(index):
 def main(model_id=DEFAULT_MODEL, port=8080):
     started_with = [] if model_id == DEFAULT_MODEL else [model_id]  # a model named at start is listed
 
-    class H(BaseHTTPRequestHandler):
+    class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"  # chunked streaming needs 1.1; 1.0 clients would see the size markers
 
         def _send(self, code, data, ctype="application/json"):
@@ -317,7 +317,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     if isinstance(jev, Remote) and jev.backend in PROBABILITIES_ONLY:
                         raise ValueError("This model returns probabilities only; it does not write text")
                     make = generate if isinstance(jev, Jev) else generate_remote
-                    t = time.time()
+                    started = time.time()
                     pieces = make(jev, body["state"], body["questions"])
                     head = next(pieces, "")  # errors surface here, before the stream starts
                     self.send_response(200)
@@ -339,12 +339,12 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                             body,
                             (body.get("backend") or model_id) + "#text",
                             answers,
-                            round((time.time() - t) * 1000),
+                            round((time.time() - started) * 1000),
                         )
                     return
-                t = time.time()
+                started = time.time()
                 res = jev.ask(body["state"], body["questions"])
-                res["latency_ms"] = round((time.time() - t) * 1000)
+                res["latency_ms"] = round((time.time() - started) * 1000)
                 if body.get("log"):  # every run is kept, with its input, label and the system that answered
                     log_row(body | {"system": SYSTEMS[bid]}, bid, res["answers"], res["latency_ms"], res)
                 self._send(200, json.dumps(res).encode())
@@ -381,10 +381,10 @@ def main(model_id=DEFAULT_MODEL, port=8080):
                     log_row(body | {"system": system}, bid, {}, 0, {"answers": {}, "error": msg})
                 self._send(400, json.dumps({"error": {"message": msg}}).encode())
 
-        def log_message(self, fmt, *a):
+        def log_message(self, fmt, *args):
             if self.path.endswith("/progress"):
                 return  # polled every second while the page is open
-            sys.stderr.write(f"{self.command} {self.path} {a[1] if len(a) > 1 else ''}\n")
+            sys.stderr.write(f"{self.command} {self.path} {args[1] if len(args) > 1 else ''}\n")
 
     print(f"open http://localhost:{port}  ({DEVICE}; models in {HF_HUB_CACHE} or {MODELS})")
     if hint := gpu_hint():
@@ -393,7 +393,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
     # `kill` ends the server like Ctrl+C does, and llama-server stops with it.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     # This machine only; JEV_HOST=0.0.0.0 opens the page and its models to the local network.
-    server = ThreadingHTTPServer((os.environ.get("JEV_HOST", "127.0.0.1"), port), H)
+    server = ThreadingHTTPServer((os.environ.get("JEV_HOST", "127.0.0.1"), port), Handler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -424,12 +424,12 @@ def build_page():
 
 
 def cli(build=True):
-    a = sys.argv[1:]
-    if a and a[0].startswith("-"):  # e.g. `uv run prod --no-sync`, where uv passes the flag on
-        raise SystemExit(f"prod takes a model and a port, not {a[0]}; uv's own flags go before prod")
+    args = sys.argv[1:]
+    if args and args[0].startswith("-"):  # e.g. `uv run prod --no-sync`, where uv passes the flag on
+        raise SystemExit(f"prod takes a model and a port, not {args[0]}; uv's own flags go before prod")
     if build:
         build_page()
-    main(*a[:1], **({"port": int(a[1])} if len(a) > 1 else {}))
+    main(*args[:1], **({"port": int(args[1])} if len(args) > 1 else {}))
 
 
 if __name__ == "__main__":

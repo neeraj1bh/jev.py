@@ -136,12 +136,12 @@ def set_key(name, key, save):
         if os.path.exists(path):
             with open(path) as f:
                 lines = f.read().splitlines()
-        at = next((i for i, x in enumerate(lines) if x.partition("=")[0].strip() == var), None)
-        if at is None:
+        line_index = next((i for i, x in enumerate(lines) if x.partition("=")[0].strip() == var), None)
+        if line_index is None:
             label, unlocks, url = KEYS.get(var, (var, "", ""))
             lines.append(f"# {label}: {unlocks}" + (f" — {url}" if url else ""))
             lines.append(f"{var}={key}")
         else:
-            lines[at] = f"{var}={key}"
+            lines[line_index] = f"{var}={key}"
         with open(path, "w") as f:
             f.write("\n".join(lines) + "\n")
