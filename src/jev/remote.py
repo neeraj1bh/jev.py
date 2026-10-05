@@ -89,8 +89,8 @@ def post(url, key, body, headers=None, patient=True):
     )
     for attempt in range(40):
         try:
-            with urllib.request.urlopen(req, timeout=120) as r:
-                return json.load(r)
+            with urllib.request.urlopen(req, timeout=120) as response:
+                return json.load(response)
         except (urllib.error.URLError, TimeoutError) as e:
             rate_limited = isinstance(e, urllib.error.HTTPError) and e.code == 429
             last = 39 if rate_limited else 5
@@ -118,33 +118,33 @@ class Remote:
         if self.backend == "vercel":
             return self._vercel(state, questions)
         with ThreadPoolExecutor(CONCURRENCY.get(self.backend, 8)) as pool:
-            probs = list(pool.map(lambda q: self._one(state, q), questions.values()))
+            probs = list(pool.map(lambda question: self._one(state, question), questions.values()))
         answers, invalid, usage = {}, {}, {}
-        for qid, (labels, descs), (p, coverage, top, used) in zip(
+        for qid, (labels, descs), (probabilities, coverage, top, used) in zip(
             questions, map(_options, questions.values()), probs, strict=True
         ):
             usage[qid] = used
-            if p is None:  # no option letter among the top tokens: no answer, scored as wrong
+            if probabilities is None:  # no option letter among the top tokens: no answer, scored as wrong
                 invalid[qid] = coverage | {"raw": top}
                 continue
-            q = questions[qid]
+            question = questions[qid]
             read = {"coverage": coverage, "raw": top}
-            if q["type"] == "noul":
-                answers[qid] = {"type": "noul", "noul": p[0]} | read
-            elif q["type"] == "choice":
+            if question["type"] == "noul":
+                answers[qid] = {"type": "noul", "noul": probabilities[0]} | read
+            elif question["type"] == "choice":
                 answers[qid] = {
                     "type": "choice",
-                    "choice": labels[p.index(max(p))],
-                    "probabilities": dict(zip(labels, p, strict=True)),
-                    "confidence": _confidence(p),
+                    "choice": labels[probabilities.index(max(probabilities))],
+                    "probabilities": dict(zip(labels, probabilities, strict=True)),
+                    "confidence": _confidence(probabilities),
                 } | read
             else:
                 answers[qid] = {
                     "type": "score",
-                    "score": sum(i * x for i, x in enumerate(p)),
-                    "probabilities": dict(zip(labels, p, strict=True)),
+                    "score": sum(i * x for i, x in enumerate(probabilities)),
+                    "probabilities": dict(zip(labels, probabilities, strict=True)),
                     "legend": dict(zip(labels, descs, strict=True)),
-                    "confidence": _confidence(p),
+                    "confidence": _confidence(probabilities),
                 } | read
         return {
             "model": self.model_id,
@@ -159,24 +159,31 @@ class Remote:
         }
 
     def _vercel(self, state, questions):
-        qs = {k: {**q, "type": "boolean"} if q["type"] == "noul" else q for k, q in questions.items()}
+        vercel_questions = {
+            k: {**q, "type": "boolean"} if q["type"] == "noul" else q for k, q in questions.items()
+        }
         headers = {
             "ai-model-id": self.model_id,
             "ai-evaluation-model-specification-version": "4",
             "ai-gateway-protocol-version": "0.0.1",
         }
-        res = post(self.url, self.key, {"state": state, "questions": qs}, headers, patient=self.patient)
+        res = post(
+            self.url, self.key, {"state": state, "questions": vercel_questions}, headers, patient=self.patient
+        )
         answers = {}
-        for qid, a in res["answers"].items():
-            if a["type"] == "boolean":
-                answers[qid] = {"type": "noul", "noul": a["probability"]}
+        for qid, answer in res["answers"].items():
+            if answer["type"] == "boolean":
+                answers[qid] = {"type": "noul", "noul": answer["probability"]}
             else:
-                p = a.get("probabilities") or {}
-                answers[qid] = {**a, "confidence": _confidence(list(p.values())) if p else None}
+                probabilities = answer.get("probabilities") or {}
+                answers[qid] = {
+                    **answer,
+                    "confidence": _confidence(list(probabilities.values())) if probabilities else None,
+                }
         return {"model": self.model_id, "answers": answers, "usage": res.get("usage", {})}
 
-    def _one(self, state, q):
-        labels, user = letter_prompt(state, q)
+    def _one(self, state, question):
+        labels, user = letter_prompt(state, question)
         res = post(
             self.url,
             self.key,
@@ -209,32 +216,34 @@ def total(usages, field):
     return None if None in values else sum(values)
 
 
-def letter_probs(top, n):
+def letter_probs(top, option_count):
     """Option probabilities from one token's top log-probabilities: each letter's spellings
     ("A", " A", "a") added together. Returns (probs or None, coverage)."""
     mass = {}
-    for t in top:
-        key = t["token"].strip().upper()
-        if key in LETTERS[:n]:
-            mass[key] = mass.get(key, 0.0) + math.exp(t["logprob"])
+    for token in top:
+        key = token["token"].strip().upper()
+        if key in LETTERS[:option_count]:
+            mass[key] = mass.get(key, 0.0) + math.exp(token["logprob"])
     observed = sum(mass.values())
-    missing = [letter for letter in LETTERS[:n] if letter not in mass]
+    missing = [letter for letter in LETTERS[:option_count] if letter not in mass]
     status = "none" if not mass else "partial" if missing else "complete"
-    probs = None if status == "none" else [mass.get(letter, 0.0) / observed for letter in LETTERS[:n]]
+    probs = (
+        None if status == "none" else [mass.get(letter, 0.0) / observed for letter in LETTERS[:option_count]]
+    )
     return probs, {"status": status, "observed": observed, "missing": missing}
 
 
-def letter_prompt(state, q):
+def letter_prompt(state, question):
     """The option labels and the user message for one question, its options lettered A, B, C…"""
-    labels, descs = _options(q)
+    labels, descs = _options(question)
     if len(labels) > len(LETTERS):
         raise ValueError(f"hosted backends take at most {len(LETTERS)} options, got {len(labels)}")
     lines = []
-    for letter, la, d in zip(LETTERS, labels, descs, strict=False):
-        name = f"level {la}" if q["type"] == "score" else la
-        lines.append(f"{letter}. {name}" + (f" — {_text(d)}" if d else ""))
+    for letter, label, description in zip(LETTERS, labels, descs, strict=False):
+        name = f"level {label}" if question["type"] == "score" else label
+        lines.append(f"{letter}. {name}" + (f" — {_text(description)}" if description else ""))
     user = (
-        f"STATE:\n{_text(state)}\n\nQUESTION: {_text(q['instructions'])}\nOPTIONS:\n"
+        f"STATE:\n{_text(state)}\n\nQUESTION: {_text(question['instructions'])}\nOPTIONS:\n"
         + "\n".join(lines)
         + "\nAnswer with the letter only."
     )
@@ -242,9 +251,9 @@ def letter_prompt(state, q):
 
 
 def cli():
-    a = sys.argv[1:]
-    backend = a[0] if a and a[0] in BACKENDS else "deepseek"
-    rest = a[1:] if a and a[0] in BACKENDS else a
+    args = sys.argv[1:]
+    backend = args[0] if args and args[0] in BACKENDS else "deepseek"
+    rest = args[1:] if args and args[0] in BACKENDS else args
     if rest and rest[0] == "serve":
         serve(jev=Remote(backend), **({"port": int(rest[1])} if len(rest) > 1 else {}))
     else:

@@ -43,30 +43,30 @@ SYSTEM = (
 LETTERS = [chr(c) for c in range(65, 91)]
 
 
-def _confidence(p):
+def _confidence(probabilities):
     """1 - normalized entropy: 1.0 for a single peak, 0.0 for a flat spread."""
-    n = len(p)
-    if n < 2:
+    count = len(probabilities)
+    if count < 2:
         return 1.0
-    h = -sum(x * math.log(x) for x in p if x > 0)
-    return round(1 - h / math.log(n), 4)
+    entropy = -sum(x * math.log(x) for x in probabilities if x > 0)
+    return round(1 - entropy / math.log(count), 4)
 
 
-def _text(x):
-    return x if isinstance(x, str) else json.dumps(x, ensure_ascii=False, indent=1)
+def _text(value):
+    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=1)
 
 
-def _options(q):
+def _options(question):
     """(labels, descriptions) for one question, in order."""
-    t, c = q["type"], q.get("criteria")
-    if t == "noul":
-        c = c or {}
-        return ["yes", "no"], [c.get("true"), c.get("false")]
-    if t == "choice":
-        return list(c.keys()), list(c.values())
-    if t == "score":
-        return [str(i) for i in range(len(c))], list(c)
-    raise ValueError(f"unknown question type {t!r}")
+    kind, criteria = question["type"], question.get("criteria")
+    if kind == "noul":
+        criteria = criteria or {}
+        return ["yes", "no"], [criteria.get("true"), criteria.get("false")]
+    if kind == "choice":
+        return list(criteria.keys()), list(criteria.values())
+    if kind == "score":
+        return [str(i) for i in range(len(criteria))], list(criteria)
+    raise ValueError(f"unknown question type {kind!r}")
 
 
 class Jev:
@@ -91,16 +91,16 @@ class Jev:
         bad = [c for c in LETTERS if len(self.tok.encode(c, add_special_tokens=False)) != 1]
         assert readout != "letter" or not bad, f"{bad} are several tokens each in {model_id}"
 
-    def _prompt(self, state, q, labels, descs):
+    def _prompt(self, state, question, labels, descs):
         """Token ids of the prompt, and of each option's answer text."""
-        names = [f"level {la}" if q["type"] == "score" else la for la in labels]
+        names = [f"level {la}" if question["type"] == "score" else la for la in labels]
         letter = self.readout == "letter"
         if letter and len(names) > len(LETTERS):
             raise ValueError(f"the letter readout takes at most {len(LETTERS)} options, got {len(names)}")
         shown = [f"{a} = {n}" for a, n in zip(LETTERS, names, strict=False)] if letter else names
         lines = [n + (f" — {_text(d)}" if d else "") for n, d in zip(shown, descs, strict=True)]
         user = (
-            f"STATE:\n{_text(state)}\n\nQUESTION: {_text(q['instructions'])}\nOPTIONS:\n- "
+            f"STATE:\n{_text(state)}\n\nQUESTION: {_text(question['instructions'])}\nOPTIONS:\n- "
             + "\n- ".join(lines)
             + ("\nAnswer with the letter of one option." if letter else "\nAnswer with one of the options.")
         )
@@ -114,7 +114,7 @@ class Jev:
     def _score(self, seqs):
         """Mean log-probability of the last `k` tokens of each sequence, given the rest.
         The prefix all sequences share is run once and its cache reused."""
-        n = len(seqs)
+        count = len(seqs)
         pre = 0
         cap = min(len(s) - k - 1 for s, k in seqs)  # every tail keeps its answer and one token before it
         while pre < cap and all(s[pre] == seqs[0][0][pre] for s, _ in seqs):
@@ -129,15 +129,15 @@ class Jev:
         # the shared cache is copied once per tail; keep the copies within a token budget
         step = max(1, CACHE_BUDGET // max(pre, 1))
         hidden = []
-        for j in range(0, n, step):
-            chunk = tails[j : j + step]
+        for start in range(0, count, step):
+            chunk = tails[start : start + step]
             width = max(map(len, chunk))
             ids = torch.full((len(chunk), width), pad, device=self.device)
             mask = torch.zeros((len(chunk), pre + width), dtype=torch.long, device=self.device)
             mask[:, :pre] = 1
-            for i, t in enumerate(chunk):
-                ids[i, : len(t)] = torch.tensor(t, device=self.device)
-                mask[i, pre : pre + len(t)] = 1
+            for i, tail in enumerate(chunk):
+                ids[i, : len(tail)] = torch.tensor(tail, device=self.device)
+                mask[i, pre : pre + len(tail)] = 1
             cache = None
             if prefix is not None:
                 cache = copy.deepcopy(prefix)
@@ -145,10 +145,10 @@ class Jev:
             out = self.model.model(ids, attention_mask=mask, past_key_values=cache, use_cache=True)
             hidden.extend(out.last_hidden_state)
         scores = []
-        for i, (t, k) in enumerate(zip(tails, [k for _, k in seqs], strict=True)):
-            pos = torch.arange(len(t) - k - 1, len(t) - 1, device=self.device)
+        for i, (tail, k) in enumerate(zip(tails, [k for _, k in seqs], strict=True)):
+            pos = torch.arange(len(tail) - k - 1, len(tail) - 1, device=self.device)
             logp = torch.log_softmax(self.model.lm_head(hidden[i][pos]).float(), -1)
-            tok = torch.tensor(t[len(t) - k :], device=self.device)
+            tok = torch.tensor(tail[len(tail) - k :], device=self.device)
             scores.append(logp[torch.arange(k), tok].mean().item())
         return scores, pre + sum(map(len, tails))
 
@@ -164,26 +164,26 @@ class Jev:
         with self.lock:
             scores, n_tokens = self._score(seqs)
         answers = {}
-        for qid, (labels, descs), (a, b) in zip(ids, parsed, spans, strict=True):
-            p = torch.softmax(torch.tensor(scores[a:b]), -1).tolist()
-            raw = {"raw": scores[a:b]}  # each option's own log-probability, before normalising
-            q = questions[qid]
-            if q["type"] == "noul":
-                answers[qid] = {"type": "noul", "noul": p[0]} | raw
-            elif q["type"] == "choice":
+        for qid, (labels, descs), (start, end) in zip(ids, parsed, spans, strict=True):
+            probabilities = torch.softmax(torch.tensor(scores[start:end]), -1).tolist()
+            raw = {"raw": scores[start:end]}  # each option's own log-probability, before normalising
+            question = questions[qid]
+            if question["type"] == "noul":
+                answers[qid] = {"type": "noul", "noul": probabilities[0]} | raw
+            elif question["type"] == "choice":
                 answers[qid] = {
                     "type": "choice",
-                    "choice": labels[p.index(max(p))],
-                    "probabilities": dict(zip(labels, p, strict=True)),
-                    "confidence": _confidence(p),
+                    "choice": labels[probabilities.index(max(probabilities))],
+                    "probabilities": dict(zip(labels, probabilities, strict=True)),
+                    "confidence": _confidence(probabilities),
                 } | raw
             else:
                 answers[qid] = {
                     "type": "score",
-                    "score": sum(i * x for i, x in enumerate(p)),
-                    "probabilities": dict(zip(labels, p, strict=True)),
+                    "score": sum(i * x for i, x in enumerate(probabilities)),
+                    "probabilities": dict(zip(labels, probabilities, strict=True)),
                     "legend": dict(zip(labels, descs, strict=True)),
-                    "confidence": _confidence(p),
+                    "confidence": _confidence(probabilities),
                 } | raw
         return {
             "model": self.model_id,
@@ -195,13 +195,13 @@ class Jev:
 def serve(model_id=DEFAULT_MODEL, port=8080, jev=None):
     jev = jev or Jev(model_id)
 
-    class H(BaseHTTPRequestHandler):
+    class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
             try:
-                t = time.time()
+                started = time.time()
                 res = jev.ask(body["state"], body["questions"])
-                res["latency_ms"] = round((time.time() - t) * 1000)
+                res["latency_ms"] = round((time.time() - started) * 1000)
                 code = 200
             except Exception as e:  # keep the server up; report the error like the real API
                 res, code = {"error": {"message": str(e)}}, 400
@@ -212,11 +212,11 @@ def serve(model_id=DEFAULT_MODEL, port=8080, jev=None):
             self.end_headers()
             self.wfile.write(data)
 
-        def log_message(self, fmt, *a):
-            sys.stderr.write(f"{self.command} {self.path} {a[1] if len(a) > 1 else ''}\n")
+        def log_message(self, fmt, *args):
+            sys.stderr.write(f"{self.command} {self.path} {args[1] if len(args) > 1 else ''}\n")
 
     print(f"jev.py serving {jev.model_id} on http://localhost:{port}/v1/systemone ({jev.device})")
-    server = ThreadingHTTPServer((os.environ.get("JEV_HOST", "127.0.0.1"), port), H)
+    server = ThreadingHTTPServer((os.environ.get("JEV_HOST", "127.0.0.1"), port), Handler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -252,17 +252,17 @@ def demo(model_id=DEFAULT_MODEL, jev=None):
             "criteria": ["calm and polite", "annoyed but civil", "angry, threatening to leave"],
         },
     }
-    t = time.time()
+    started = time.time()
     res = jev.ask(state, questions)
-    ms = (time.time() - t) * 1000
+    ms = (time.time() - started) * 1000
     print(json.dumps(res, indent=1))
-    a = res["answers"]
-    assert a["refund_requested"]["noul"] > 0.5, "should detect the refund request"
-    assert a["is_spam"]["noul"] < 0.5, "a complaint is not spam"
-    assert a["department"]["choice"] == "billing", "double charge is billing"
-    assert abs(sum(a["department"]["probabilities"].values()) - 1) < 1e-3
-    assert a["frustration"]["score"] > 1.0, "'I'm done with you people' is not calm"
-    assert set(a["frustration"]["probabilities"]) == {"0", "1", "2"}
+    answers = res["answers"]
+    assert answers["refund_requested"]["noul"] > 0.5, "should detect the refund request"
+    assert answers["is_spam"]["noul"] < 0.5, "a complaint is not spam"
+    assert answers["department"]["choice"] == "billing", "double charge is billing"
+    assert abs(sum(answers["department"]["probabilities"].values()) - 1) < 1e-3
+    assert answers["frustration"]["score"] > 1.0, "'I'm done with you people' is not calm"
+    assert set(answers["frustration"]["probabilities"]) == {"0", "1", "2"}
     print(
         f"\nOK  {len(questions)} questions, {res['usage']['input_tokens']} input tokens, "
         f"{ms:.0f} ms on {jev.device} with {jev.model_id}"
