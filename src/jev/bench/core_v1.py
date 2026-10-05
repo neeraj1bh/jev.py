@@ -323,7 +323,7 @@ def load(part="main"):
 
 
 def reads_wide(model):
-    """Letter-reading backends answer 26 options at most; Jev and local models read any number."""
+    """Letter-reading backends answer 26 options at most; Jev, Laya and local models read more."""
     if model.startswith(("openrouter:", "gguf:")):
         return False
     kind, _, name = model.partition(":")

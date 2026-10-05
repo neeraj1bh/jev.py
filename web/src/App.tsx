@@ -74,8 +74,9 @@ export default function App() {
 
   const isLocal = (id: string) => !isHosted(backends[id]);
 
-  // Letter-reading backends stop at 26 options; the rest read any number.
-  const readsWide = (models: string[]) => models.every((id) => !backends[id]?.max);
+  // Wide sets ask more than 26 options: letter-reading backends stop at 26, Laya at 100.
+  const readsWide = (models: string[]) =>
+    models.every((id) => (backends[id]?.max ?? Number.POSITIVE_INFINITY) > 26);
 
   const menuHandler = useCallback(
     (id: string) => (open: boolean) =>

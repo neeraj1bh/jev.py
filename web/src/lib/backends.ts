@@ -61,7 +61,7 @@ export function ggufOverBudget(picked: Backend[]) {
     : "";
 }
 
-/** A set with more options than a letter-reading backend can take (26) cannot run there. */
+/** A set with more options than a backend takes (26 when it reads letters, 100 for Laya) cannot run there. */
 export const blockingBackend = (dataset: Dataset, backends: (Backend | undefined)[]) =>
   backends.find((backend) => backend?.max && dataset.options && dataset.options > backend.max);
 

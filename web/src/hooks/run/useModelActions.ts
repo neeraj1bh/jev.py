@@ -39,7 +39,7 @@ export function useModelActions(
       models.map((id) => backends[id]).find((b) => b?.max && set.options && set.options > b.max);
     if (set && blocker) {
       toast.show(
-        `${name} asks to pick 1 of ${set.options}; ${blocker.label} reads the answer as a letter and takes at most ${blocker.max}. Pick Jev or a local model, or another set.`,
+        `${name} asks to pick 1 of ${set.options}; ${blocker.label} takes at most ${blocker.max} options. Pick Jev or a local model, or another set.`,
       );
     }
   };

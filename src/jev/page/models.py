@@ -227,7 +227,14 @@ def backends(extra):
     # Like the llama-server above: listed only when one answers or its address was set under Keys.
     if laya_answers or env("LAYA_URL"):
         out.append(
-            {"id": "remote:laya", "group": "server", "label": "Laya", "ready": laya_answers, "url": laya}
+            {
+                "id": "remote:laya",
+                "group": "server",
+                "label": "Laya",
+                "ready": laya_answers,
+                "url": laya,
+                "max": 100,  # laya-serve refuses a question with more options
+            }
         )
     prices = live_prices()
     for b, label in HOSTED.items():
