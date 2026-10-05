@@ -44,20 +44,20 @@ class MultipleChoice(Source):
     options_of: Callable[[dict], tuple[list, int]]  # the options and the index of the right one
 
 
-def _subject_and_question(r):
-    return {"subject": r["subject"].replace("_", " "), "question": r["question"]}
+def _subject_and_question(row):
+    return {"subject": row["subject"].replace("_", " "), "question": row["question"]}
 
 
-def _question(r):
-    return {"question": r["question"]}
+def _question(row):
+    return {"question": row["question"]}
 
 
-def _lettered(r):
-    return r["choices"]["text"], r["choices"]["label"].index(r["answerKey"])
+def _lettered(row):
+    return row["choices"]["text"], row["choices"]["label"].index(row["answerKey"])
 
 
-def _global_mmlu_lite(r):
-    return [r[f"option_{k}"] for k in "abcd"], "ABCD".index(r["answer"])
+def _global_mmlu_lite(row):
+    return [row[f"option_{k}"] for k in "abcd"], "ABCD".index(row["answer"])
 
 
 def _joined(value):
@@ -70,8 +70,8 @@ def _joined(value):
 
 def _pair(item_id, chosen, rejected):
     """RewardBench always lists the better response first; alternate by id so A is not always right."""
-    a, b = (chosen, rejected) if int(item_id) % 2 == 0 else (rejected, chosen)
-    return {"response A": a, "response B": b}
+    first, second = (chosen, rejected) if int(item_id) % 2 == 0 else (rejected, chosen)
+    return {"response A": first, "response B": second}
 
 
 def _bbh_options(text, target):

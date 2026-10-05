@@ -38,8 +38,8 @@ def rows_page(hub, config, split, offset, length=100):
     )
     for attempt in range(7):
         try:
-            with urllib.request.urlopen(req, timeout=30) as r:
-                return json.load(r)
+            with urllib.request.urlopen(req, timeout=30) as response:
+                return json.load(response)
         except urllib.error.HTTPError as e:
             if e.code in (401, 403) or (e.code == 404 and token):  # the Hub hides gated sets as 404
                 raise ValueError(
@@ -64,8 +64,8 @@ def revision(hub, fresh=False):
             f"https://huggingface.co/api/datasets/{hub}",
             headers={"authorization": f"Bearer {token}"} if token else {},
         )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            REVISIONS[hub] = json.load(r)["sha"]
+        with urllib.request.urlopen(req, timeout=30) as response:
+            REVISIONS[hub] = json.load(response)["sha"]
     return REVISIONS[hub]
 
 
@@ -91,26 +91,26 @@ def download(name):
 
 
 def read_pool(name):
-    s = SETS[name]
-    first = rows_page(s.hub, s.config, s.split, 0, 1)
+    record = SETS[name]
+    first = rows_page(record.hub, record.config, record.split, 0, 1)
     total = first["num_rows_total"]
-    if total <= FULL_ROWS or s.full:
+    if total <= FULL_ROWS or record.full:
         rule, seed, size = "full", None, 100
         starts = list(range(0, total, size))
     else:
         rule, seed, size, stretch = (
-            f"{s.windows} seeded windows",
+            f"{record.windows} seeded windows",
             f"pool:{name}",
-            POOL // s.windows,
-            total / s.windows,
+            POOL // record.windows,
+            total / record.windows,
         )
         rng = random.Random(seed)
-        starts = [int(k * stretch + rng.random() * (stretch - size)) for k in range(s.windows)]
+        starts = [int(k * stretch + rng.random() * (stretch - size)) for k in range(record.windows)]
     PROGRESS[name] = [0, len(starts), "pages"]
     rows = []
     try:
         for start in starts:
-            rows += rows_page(s.hub, s.config, s.split, start, size)["rows"]
+            rows += rows_page(record.hub, record.config, record.split, start, size)["rows"]
             PROGRESS[name][0] += 1
     finally:
         PROGRESS.pop(name, None)
@@ -123,46 +123,60 @@ def read_pool(name):
 def labelled_rows(name, page):
     """The rows of a downloaded page that carry a label (SNLI marks unlabelled pairs -1) and that
     the set keeps."""
-    s = SETS[name]
-    rows = [r for r in page["rows"] if s.keep(r["row"])] if s.keep else page["rows"]
-    if isinstance(s, MultipleChoice) or callable(s.label):
+    record = SETS[name]
+    rows = [r for r in page["rows"] if record.keep(r["row"])] if record.keep else page["rows"]
+    if isinstance(record, MultipleChoice) or callable(record.label):
         return rows
-    return [r for r in rows if r["row"][s.label] != -1]
+    return [r for r in rows if r["row"][record.label] != -1]
 
 
-def _criteria(s, options):
-    return {o: (s.describe or {}).get(o) for o in options}
+def _criteria(record, options):
+    return {o: (record.describe or {}).get(o) for o in options}
 
 
-def row_item(name, page, r):
+def row_item(name, page, hub_row):
     """One downloaded row as a request with its truth."""
-    s = SETS[name]
-    row = r["row"]
-    source = f"{s.hub} · {s.split} row {r['row_idx']}"
-    if isinstance(s, MultipleChoice):
-        options, answer = s.options_of(row)
-        if s.scored:
-            q, truth = {"type": "score", "instructions": s.question, "criteria": options}, str(answer)
+    record = SETS[name]
+    row = hub_row["row"]
+    source = f"{record.hub} · {record.split} row {hub_row['row_idx']}"
+    if isinstance(record, MultipleChoice):
+        options, answer = record.options_of(row)
+        if record.scored:
+            question, truth = (
+                {"type": "score", "instructions": record.question, "criteria": options},
+                str(answer),
+            )
         else:
-            q = {"type": "choice", "instructions": s.question, "criteria": _criteria(s, options)}
+            question = {
+                "type": "choice",
+                "instructions": record.question,
+                "criteria": _criteria(record, options),
+            }
             truth = options[answer]
-        state, count = s.state(row), len(options)
+        state, count = record.state(row), len(options)
     else:
-        if callable(s.label):
-            names, value = None, s.label(row)
+        if callable(record.label):
+            names, value = None, record.label(row)
         else:
-            names = next(x["type"].get("names") for x in page["features"] if x["name"] == s.label)
-            value = names[row[s.label]] if names else row[s.label]
-        if s.yes is not None:
-            q = {"type": "noul", "instructions": s.question}
-            truth = "yes" if value == s.yes else "no"
+            names = next(x["type"].get("names") for x in page["features"] if x["name"] == record.label)
+            value = names[row[record.label]] if names else row[record.label]
+        if record.yes is not None:
+            question = {"type": "noul", "instructions": record.question}
+            truth = "yes" if value == record.yes else "no"
         else:
-            q = {"type": "choice", "instructions": s.question, "criteria": _criteria(s, names)}
+            question = {
+                "type": "choice",
+                "instructions": record.question,
+                "criteria": _criteria(record, names),
+            }
             truth = value
-        state, count = {k: row[v] for k, v in s.fields.items()}, 2 if s.yes is not None else len(names)
+        state, count = (
+            {k: row[v] for k, v in record.fields.items()},
+            2 if record.yes is not None else len(names),
+        )
     return {
         "state": state,
-        "questions": {"answer": q},
+        "questions": {"answer": question},
         "truth": {"answer": truth},
         "source": source,
         "options": count,
@@ -178,29 +192,29 @@ def typesafe_rows():
     cache = os.path.join(ROOT, "results", "typesafe")
     os.makedirs(cache, exist_ok=True)
     rows = []
-    for wf in TYPESAFE_WORKFLOWS:
-        path = os.path.join(cache, wf + ".js")
+    for workflow in TYPESAFE_WORKFLOWS:
+        path = os.path.join(cache, workflow + ".js")
         if not os.path.exists(path):
             req = urllib.request.Request(
-                f"https://evals.typesafe.ai/{wf}-cases.js", headers={"User-Agent": "Mozilla/5.0"}
+                f"https://evals.typesafe.ai/{workflow}-cases.js", headers={"User-Agent": "Mozilla/5.0"}
             )
-            with urllib.request.urlopen(req, timeout=60) as r, open(path, "wb") as f:
-                f.write(r.read())
+            with urllib.request.urlopen(req, timeout=60) as response, open(path, "wb") as f:
+                f.write(response.read())
         with open(path) as f:
             raw = f.read()
-        ev = json.loads(raw[raw.index("(") + 1 : raw.rindex(")")])["eval"]
-        for cid, case in ev["cases"].items():
+        evaluation = json.loads(raw[raw.index("(") + 1 : raw.rindex(")")])["eval"]
+        for cid, case in evaluation["cases"].items():
             refs = case["reference_answers"]
             for node in case["models"]["typesafe"]["nodes"]:
                 if node["doc"] is None or node["node"] not in refs:
                     continue
-                qs = {
-                    qid: ev["questions"][i]
+                questions = {
+                    qid: evaluation["questions"][i]
                     for qid, i in node["questions"].items()
                     if qid in refs[node["node"]]
                 }
                 truth = {}
-                for qid in qs:
+                for qid in questions:
                     sets = refs[node["node"]][qid]["sets"]
                     if all(x.get("probabilities") for x in sets):
                         keys = {k for x in sets for k in x["probabilities"]}
@@ -208,15 +222,23 @@ def typesafe_rows():
                         truth[qid] = max(mean, key=mean.get)
                     else:  # a value without a distribution
                         truth[qid] = str(sets[0]["value"]).lower()
-                rows.append((f"{wf}/{cid}", node["node"], ev["documents"][node["doc"]], qs, truth))
+                rows.append(
+                    (
+                        f"{workflow}/{cid}",
+                        node["node"],
+                        evaluation["documents"][node["doc"]],
+                        questions,
+                        truth,
+                    )
+                )
     return rows
 
 
-def typesafe_item(case, node, doc, qs, truth):
+def typesafe_item(case, node, doc, questions, truth):
     """One TypeSafe step: its document and every question on it, each with its consensus label."""
     return {
         "state": doc,
-        "questions": qs,
+        "questions": questions,
         "truth": {k: {"true": "yes", "false": "no"}.get(v, v) for k, v in truth.items()},
         "source": f"TypeSafe · {case} · {node}",
         "options": None,

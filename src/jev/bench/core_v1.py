@@ -80,12 +80,12 @@ def fingerprint(item, prompt_version=PROMPT_VERSION):
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
-def typesafe_step(case, node, doc, qs, truth, omit=()):
+def typesafe_step(case, node, doc, questions, truth, omit=()):
     """One TypeSafe step as Core v1 asks it, without its omitted questions."""
-    unknown = set(omit) - set(qs)
+    unknown = set(omit) - set(questions)
     if unknown:
         raise ValueError(f"TypeSafe {case} {node} has no question {', '.join(sorted(unknown))}")
-    item = datasets.typesafe_item(case, node, doc, qs, truth)
+    item = datasets.typesafe_item(case, node, doc, questions, truth)
     return item | {
         "questions": {k: v for k, v in item["questions"].items() if k not in omit},
         "truth": {k: v for k, v in item["truth"].items() if k not in omit},
@@ -100,8 +100,13 @@ def manifest(name, options):
         track = "ordinal"
     else:
         track = "auxiliary" if name in AUXILIARY else "headline"
-    s = SETS[name]
-    out = {"track": track, "group": s.group, "knowledge": s.knowledge, "provenance": s.provenance}
+    record = SETS[name]
+    out = {
+        "track": track,
+        "group": record.group,
+        "knowledge": record.knowledge,
+        "provenance": record.provenance,
+    }
     return out | ({"families": REWARDBENCH_FAMILIES} if name == "RewardBench" else {})
 
 
@@ -145,9 +150,9 @@ def freeze():
         }
         print(f"{name}: {len(picked)} items", flush=True)
     steps = []
-    for case, node, doc, qs, truth in datasets.typesafe_rows():
+    for case, node, doc, questions, truth in datasets.typesafe_rows():
         omit = TYPESAFE_OMIT.get((case, node), [])
-        sha = fingerprint(typesafe_step(case, node, doc, qs, truth, omit))
+        sha = fingerprint(typesafe_step(case, node, doc, questions, truth, omit))
         steps.append({"case": case, "node": node, "sha": sha} | ({"omit": omit} if omit else {}))
     if missing := set(TYPESAFE_OMIT) - {(s["case"], s["node"]) for s in steps}:
         raise ValueError(f"TypeSafe has no step {sorted(missing)}")
@@ -416,8 +421,8 @@ def tokens():
     per_set = {}
     for item in load("main"):
         size = 0
-        for q in item["questions"].values():
-            _, user = letter_prompt(item["state"], q)
+        for question in item["questions"].values():
+            _, user = letter_prompt(item["state"], question)
             messages = [{"role": "system", "content": LETTER_SYSTEM}, {"role": "user", "content": user}]
             prompt = tok.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
             size += len(tok(prompt)["input_ids"])

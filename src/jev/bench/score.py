@@ -98,8 +98,8 @@ def outcomes(row, fields, families):
         cluster = value if name in ("SQuAD v2", *LANGUAGES) else row["state"].get("context", row["source"])
         unit = families.get(value) if name == "RewardBench" else None
     for qid, truth in row["truth"].items():
-        q = row["questions"][qid]
-        labels = _options(q)[0]
+        question = row["questions"][qid]
+        labels = _options(question)[0]
         truth = {"true": "yes", "false": "no"}.get(str(truth).lower(), str(truth))
         if truth not in labels:
             raise ValueError(f"{row['source']} {qid}: label {truth!r} is not an option")
@@ -157,9 +157,9 @@ def headline(counts, sets):
 def tally(scored):
     """Right and total per cluster and (set, unit), the bootstrap's building blocks."""
     clusters = defaultdict(lambda: defaultdict(lambda: [0, 0]))
-    for o in scored:
-        cell = clusters[o["cluster"]][o["unit"]]
-        cell[0] += o["right"]
+    for outcome in scored:
+        cell = clusters[outcome["cluster"]][outcome["unit"]]
+        cell[0] += outcome["right"]
         cell[1] += 1
     return clusters
 
@@ -170,8 +170,8 @@ def bootstrap(systems, sets):
     tallies = {name: tally(scored) for name, scored in systems.items()}
     strata = defaultdict(set)
     for scored in systems.values():
-        for o in scored:
-            strata[o["cluster"][0]].add(o["cluster"])
+        for outcome in scored:
+            strata[outcome["cluster"][0]].add(outcome["cluster"])
     strata = {s: sorted(c, key=str) for s, c in strata.items()}
     rng = random.Random(SEED)
     draws = {name: [] for name in systems}
@@ -179,16 +179,18 @@ def bootstrap(systems, sets):
         chosen = [c for clusters in strata.values() for c in rng.choices(clusters, k=len(clusters))]
         for name, clusters in tallies.items():
             counts = defaultdict(lambda: [0, 0])
-            for c in chosen:
-                for unit, (right, total) in clusters.get(c, {}).items():
+            for cluster in chosen:
+                for unit, (right, total) in clusters.get(cluster, {}).items():
                     counts[unit][0] += right
                     counts[unit][1] += total
             draws[name].append(headline(counts, sets)[0])
     names = list(systems)
     out = {name: interval(values) for name, values in draws.items()}
-    for i, a in enumerate(names):
-        for b in names[i + 1 :]:
-            out[f"{a} − {b}"] = interval([x - y for x, y in zip(draws[a], draws[b], strict=True)])
+    for i, first in enumerate(names):
+        for second in names[i + 1 :]:
+            out[f"{first} − {second}"] = interval(
+                [x - y for x, y in zip(draws[first], draws[second], strict=True)]
+            )
     return out
 
 
@@ -203,8 +205,8 @@ def probability_scores(scored):
     if not complete:
         return {"complete": 0, "of": len(scored)}
 
-    def brier(p, y):
-        return sum((x - (i == y)) ** 2 for i, x in enumerate(p))
+    def brier(probabilities, truth):
+        return sum((x - (i == truth)) ** 2 for i, x in enumerate(probabilities))
 
     clipped = sum(o["p"][o["y"]] < CLIP for o in complete)
     return {
@@ -223,15 +225,17 @@ def probability_scores(scored):
 def ece(scored):
     """Descriptive calibration: five equal-width bins of the top probability, with their counts."""
     bins = defaultdict(list)
-    for o in scored:
-        if o["p"] is not None:
-            top = max(o["p"])
-            bins[min(int(top * ECE_BINS), ECE_BINS - 1)].append((top, o["p"].index(top) == o["y"]))
-    n = sum(map(len, bins.values()))
-    if not n:
+    for outcome in scored:
+        if outcome["p"] is not None:
+            top = max(outcome["p"])
+            bins[min(int(top * ECE_BINS), ECE_BINS - 1)].append(
+                (top, outcome["p"].index(top) == outcome["y"])
+            )
+    binned = sum(map(len, bins.values()))
+    if not binned:
         return None, []
     rows = [(b, len(v), mean(t for t, _ in v), mean(r for _, r in v)) for b, v in sorted(bins.items())]
-    return sum(count / n * abs(acc - conf) for _, count, conf, acc in rows), rows
+    return sum(count / binned * abs(acc - conf) for _, count, conf, acc in rows), rows
 
 
 def ordinal(scored, complete):
@@ -242,11 +246,11 @@ def ordinal(scored, complete):
     k = scored[0]["k"] - 1
     seen = [o for o in scored if o["key"] in complete]
 
-    def rps(p, y):
+    def rps(probabilities, truth):
         cdf, total = 0.0, 0.0
-        for i in range(len(p) - 1):
-            cdf += p[i]
-            total += (cdf - (i >= y)) ** 2
+        for i in range(len(probabilities) - 1):
+            cdf += probabilities[i]
+            total += (cdf - (i >= truth)) ** 2
         return total
 
     return {
@@ -263,10 +267,10 @@ def typesafe(scored):
     families, false positives and negatives among the answered, the unanswered apart, balanced
     accuracy where both labels occur; the all-no and (hindsight) commonest-label baselines."""
     rows = []
-    by = defaultdict(list)
-    for o in scored:
-        by[(o["unit"][1], o["family"])].append(o)
-    for (workflow, family), group in sorted(by.items()):
+    by_workflow = defaultdict(list)
+    for outcome in scored:
+        by_workflow[(outcome["unit"][1], outcome["family"])].append(outcome)
+    for (workflow, family), group in sorted(by_workflow.items()):
         labels = Counter(o["y"] for o in group)
         row = {
             "workflow": workflow,
@@ -324,17 +328,17 @@ def score(paths):
     report = {}
     for system, all_scored in scored.items():
         track = defaultdict(list)
-        for o in all_scored:
-            track[sets[o["set"]]["track"]].append(o)
+        for outcome in all_scored:
+            track[sets[outcome["set"]]["track"]].append(outcome)
         counts = defaultdict(lambda: [0, 0])
-        for o in track["headline"]:
-            counts[o["unit"]][0] += o["right"]
-            counts[o["unit"]][1] += 1
+        for outcome in track["headline"]:
+            counts[outcome["unit"]][0] += outcome["right"]
+            counts[outcome["unit"]][1] += 1
         overall, groups = headline(counts, sets) if counts else (None, {})
         every = defaultdict(lambda: [0, 0])
-        for o in all_scored:
-            every[o["unit"]][0] += o["right"]
-            every[o["unit"]][1] += 1
+        for outcome in all_scored:
+            every[outcome["unit"]][0] += outcome["right"]
+            every[outcome["unit"]][1] += 1
         by_set = Counter(o["set"] for o in all_scored)
         comparable = [o for o in track["headline"] if o["key"] in complete]
         own_complete = sum(o["p"] is not None for o in track["headline"])
@@ -370,62 +374,66 @@ def print_report(report, intervals, sets, shared):
         "| Brier (uniform, always A) | Log loss (uniform, always A) |"
     )
     print("|---|---|---:|---:|---:|---:|---:|")
-    for system, r in report.items():
+    for system, result in report.items():
         lo, hi = intervals.get(system, (None, None))
-        p = r["probabilities"]
+        probabilities = result["probabilities"]
         cells = [
-            r["coverage"],
-            pct(r["headline"]) if r["headline"] is not None else "—",
+            result["coverage"],
+            pct(result["headline"]) if result["headline"] is not None else "—",
             f"{pct(lo)}–{pct(hi)}" if lo is not None else "—",
-            f"{p['complete']} ({p['own complete']})",
-            f"{p['brier']:.3f} ({p['brier uniform']:.3f}, {p['brier always A']:.3f})"
-            if p.get("brier") is not None
+            f"{probabilities['complete']} ({probabilities['own complete']})",
+            f"{probabilities['brier']:.3f} "
+            f"({probabilities['brier uniform']:.3f}, {probabilities['brier always A']:.3f})"
+            if probabilities.get("brier") is not None
             else "—",
-            f"{p['log loss']:.3f} ({p['log loss uniform']:.3f}, {p['log loss always A']:.3f}), "
-            f"{p['clipped']} clipped"
-            if p.get("log loss") is not None
+            f"{probabilities['log loss']:.3f} "
+            f"({probabilities['log loss uniform']:.3f}, {probabilities['log loss always A']:.3f}), "
+            f"{probabilities['clipped']} clipped"
+            if probabilities.get("log loss") is not None
             else "—",
         ]
         print(f"| {system} | " + " | ".join(cells) + " |")
     for pair, (lo, hi) in intervals.items():
         if " − " in pair:
             print(f"\nPaired difference {pair}: {lo:+.1%} to {hi:+.1%} (95%)")
-    for system, r in report.items():
+    for system, result in report.items():
         print(f"\n## {system}\n")
         print("| Group | Score |\n|---|---:|")
-        for group, value in r["groups"].items():
+        for group, value in result["groups"].items():
             print(f"| {group} | {pct(value)} |")
         print("\n| Set | Track | Score | Questions |\n|---|---|---:|---:|")
-        for name, (acc, n) in r["sets"].items():
+        for name, (acc, count) in result["sets"].items():
             family = " (mean of its families)" if name == "RewardBench" else ""
-            print(f"| {name}{family} | {sets[name]['track']} | {pct(acc)} | {n} |")
-        if r["ordinal"]:
-            o = r["ordinal"]
+            print(f"| {name}{family} | {sets[name]['track']} | {pct(acc)} | {count} |")
+        if result["ordinal"]:
+            ordinal = result["ordinal"]
             print(
-                f"\nHelpSteer2: exact level {pct(o['exact'])} on {o['of']} questions; MAE/(K−1) "
-                f"{o['mae']:.3f} and RPS/(K−1) {o['rps']:.3f} on the {o['complete']} every run "
+                f"\nHelpSteer2: exact level {pct(ordinal['exact'])} on {ordinal['of']} questions; MAE/(K−1) "
+                f"{ordinal['mae']:.3f} and RPS/(K−1) {ordinal['rps']:.3f} "
+                f"on the {ordinal['complete']} every run "
                 "answered with all levels seen"
-                if o["complete"]
-                else f"\nHelpSteer2: exact level {pct(o['exact'])} on {o['of']} questions; no MAE or RPS, "
+                if ordinal["complete"]
+                else f"\nHelpSteer2: exact level {pct(ordinal['exact'])} on {ordinal['of']} questions; "
+                "no MAE or RPS, "
                 "as no question was answered with all levels seen by every run"
             )
-        value, bins = r["ece"]
+        value, bins = result["ece"]
         if value is not None:
             shown = ", ".join(
                 f"{b / ECE_BINS:.1f}–{(b + 1) / ECE_BINS:.1f}: {n} ({pct(acc)} right)"
                 for b, n, _, acc in bins
             )
             print(f"\nECE (descriptive, headline): {value:.3f}; bins {shown}")
-        if r["typesafe"]:
+        if result["typesafe"]:
             print(
                 "\n| Workflow | Family | Cases | n | Accuracy | Balanced | FP | FN | No answer | All no "
                 "| Commonest (hindsight) |"
             )
             print("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
-            for t in r["typesafe"]:
-                cells = [t["workflow"], t["family"], t["cases"], t["n"], pct(t["accuracy"]),
-                         pct(t["balanced accuracy"]) if "balanced accuracy" in t else "—",
-                         t.get("false positives", "—"), t.get("false negatives", "—"), t["no answer"],
-                         pct(t["all no"]) if "all no" in t else "—",
-                         pct(t["commonest label (hindsight)"])]  # fmt: skip
+            for row in result["typesafe"]:
+                cells = [row["workflow"], row["family"], row["cases"], row["n"], pct(row["accuracy"]),
+                         pct(row["balanced accuracy"]) if "balanced accuracy" in row else "—",
+                         row.get("false positives", "—"), row.get("false negatives", "—"), row["no answer"],
+                         pct(row["all no"]) if "all no" in row else "—",
+                         pct(row["commonest label (hindsight)"])]  # fmt: skip
                 print("| " + " | ".join(map(str, cells)) + " |")

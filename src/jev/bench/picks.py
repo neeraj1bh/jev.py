@@ -75,7 +75,7 @@ def answer_group(name, item):
     return truth
 
 
-def balanced(pairs, key, n, seed):
+def balanced(pairs, key, count, seed):
     """Up to n items taking turns across groups, so no label or answer position dominates."""
     rng = random.Random(seed)
     groups = {}
@@ -84,14 +84,14 @@ def balanced(pairs, key, n, seed):
     for members in groups.values():
         rng.shuffle(members)
     picked = []
-    while len(picked) < n and any(groups.values()):
+    while len(picked) < count and any(groups.values()):
         for k in sorted(groups, key=str):
-            if groups[k] and len(picked) < n:
+            if groups[k] and len(picked) < count:
                 picked.append(groups[k].pop())
     return picked
 
 
-def spread(pairs, topic, answer, n, seed):
+def spread(pairs, topic, answer, count, seed):
     """Up to n items taking turns across topics. Within a topic it takes the answer least used
     overall so far, then in that topic, so answers stay even even where a topic lacks some."""
     rng = random.Random(seed)
@@ -103,12 +103,18 @@ def spread(pairs, topic, answer, n, seed):
     order = sorted(topics, key=str)
     rng.shuffle(order)
     within, overall, picked = {t: Counter() for t in topics}, Counter(), []
-    while len(picked) < n and any(topics.values()):
-        for t in order:
-            if topics[t] and len(picked) < n:
-                pair = min(topics[t], key=lambda p, t=t: (overall[answer(p)], within[t][answer(p)]))
-                topics[t].remove(pair)
-                within[t][answer(pair)] += 1
+    while len(picked) < count and any(topics.values()):
+        for topic_key in order:
+            if topics[topic_key] and len(picked) < count:
+                pair = min(
+                    topics[topic_key],
+                    key=lambda candidate, topic_key=topic_key: (
+                        overall[answer(candidate)],
+                        within[topic_key][answer(candidate)],
+                    ),
+                )
+                topics[topic_key].remove(pair)
+                within[topic_key][answer(pair)] += 1
                 overall[answer(pair)] += 1
                 picked.append(pair)
     return picked
@@ -267,9 +273,9 @@ def redux_ok(subjects):
     """(subject, question) of each MMLU question that MMLU-Redux 2.0 re-checked and marked ok."""
     ok = set()
     for subject in subjects:
-        for r in datasets.rows_page(REDUX, subject, "test", 0)["rows"]:
-            if r["row"]["error_type"] == "ok":
-                ok.add((subject, r["row"]["question"].strip()))
+        for hub_row in datasets.rows_page(REDUX, subject, "test", 0)["rows"]:
+            if hub_row["row"]["error_type"] == "ok":
+                ok.add((subject, hub_row["row"]["question"].strip()))
     return ok
 
 
@@ -281,17 +287,18 @@ def usable(name, pairs):
         ok = redux_ok({r["row"]["subject"] for r, _ in pairs})
         pairs = [(r, item) for r, item in pairs if (r["row"]["subject"], r["row"]["question"].strip()) in ok]
     seen, kept = set(), []
-    for r, item in pairs:
+    for hub_row, item in pairs:
         if isinstance(SETS[name], MultipleChoice):
             options = [
-                re.sub(r"[^\w\s]", "", str(o)).lower().strip() for o in SETS[name].options_of(r["row"])[0]
+                re.sub(r"[^\w\s]", "", str(o)).lower().strip()
+                for o in SETS[name].options_of(hub_row["row"])[0]
             ]
             if len(set(options)) < len(options):
                 continue
         decision = json.dumps([item["state"], item["questions"]], ensure_ascii=False)
         if decision not in seen:
             seen.add(decision)
-            kept.append((r, item))
+            kept.append((hub_row, item))
     return kept
 
 

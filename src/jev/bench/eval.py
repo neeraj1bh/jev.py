@@ -47,15 +47,15 @@ def get(url):
     req = urllib.request.Request(url, headers={"User-Agent": "jev.py eval"})
     for attempt in range(8):
         try:
-            with urllib.request.urlopen(req, timeout=30) as r:
-                return json.load(r)
+            with urllib.request.urlopen(req, timeout=30) as response:
+                return json.load(response)
         except urllib.error.HTTPError as e:
             if (e.code != 429 and e.code < 500) or attempt == 7:
                 raise
             time.sleep(min(2**attempt, 60))  # rate limited or a passing server error
 
 
-HN = "https://hn.algolia.com/api/v1/{}?tags=story&hitsPerPage=300&query={}"
+HN_SEARCH = "https://hn.algolia.com/api/v1/{}?tags=story&hitsPerPage=300&query={}"
 KINDS = {
     "github.com": "code",
     "arxiv.org": "paper",
@@ -136,43 +136,43 @@ SHELL = [
 ]
 
 
-def hn_rows(n):
-    def hits(kind, q, extra=""):
-        return get(HN.format(kind, urllib.parse.quote(q)) + extra)["hits"]
+def hn_rows(count):
+    def hits(kind, query, extra=""):
+        return get(HN_SEARCH.format(kind, urllib.parse.quote(query)) + extra)["hits"]
 
     rows = []
     for prefix in ("Show HN", "Ask HN"):
-        for h in [
+        for hit in [
             h for h in hits("search_by_date", f'"{prefix}:"') if h["title"].lower().startswith(prefix.lower())
-        ][:n]:
+        ][:count]:
             rows.append(
-                (re.sub(rf"^{prefix}:?\s*", "", h["title"], flags=re.I), {prefix.split()[0].lower(): 1})
+                (re.sub(rf"^{prefix}:?\s*", "", hit["title"], flags=re.I), {prefix.split()[0].lower(): 1})
             )
-    for h in [
+    for hit in [
         h for h in hits("search_by_date", "") if not re.match(r"(show|ask|tell|launch) hn", h["title"], re.I)
-    ][:n]:
-        rows.append((h["title"], {"show": 0, "ask": 0}))
+    ][:count]:
+        rows.append((hit["title"], {"show": 0, "ask": 0}))
     for dom, kind in KINDS.items():
-        for h in [
+        for hit in [
             h for h in hits("search", dom, "&restrictSearchableAttributes=url") if dom in (h.get("url") or "")
-        ][: n // 3]:
-            rows.append((h["title"], {"kind": kind}))
+        ][: count // 3]:
+            rows.append((hit["title"], {"kind": kind}))
     return rows
 
 
-def commit_rows(n):
+def commit_rows(count):
     rows = []
     for repo in COMMIT_REPOS:
         for page in (1, 2):
-            for c in get(f"https://api.github.com/repos/{repo}/commits?per_page=100&page={page}"):
-                m = re.match(
+            for commit in get(f"https://api.github.com/repos/{repo}/commits?per_page=100&page={page}"):
+                match = re.match(
                     r"(fix|feat|docs|refactor|test|chore)(\(.*?\))?!?:\s*(.+)",
-                    c["commit"]["message"].split("\n")[0],
+                    commit["commit"]["message"].split("\n")[0],
                 )
-                if m:
-                    rows.append((m.group(3), {"type": m.group(1)}))
+                if match:
+                    rows.append((match.group(3), {"type": match.group(1)}))
     per = {}
-    return [r for r in rows if per.setdefault(r[1]["type"], []).append(r) or len(per[r[1]["type"]]) <= n]
+    return [r for r in rows if per.setdefault(r[1]["type"], []).append(r) or len(per[r[1]["type"]]) <= count]
 
 
 def report(name, pairs, kind):
@@ -188,17 +188,17 @@ def report(name, pairs, kind):
         print(f"\n{name:<8} noul    n={len(pairs):<4} accuracy={acc:.3f}  brier={brier:.3f}")
         print("  p(yes)       n   actually yes")
         for lo, hi in ((0, 0.1), (0.1, 0.3), (0.3, 0.5), (0.5, 0.7), (0.7, 0.9), (0.9, 1.01)):
-            b = [y for p, y in pairs if lo <= p < hi]
-            if b:
-                print(f"  [{lo:.1f},{min(hi, 1):.1f})   {len(b):>4}   {sum(b) / len(b):.2f}")
+            in_bin = [y for p, y in pairs if lo <= p < hi]
+            if in_bin:
+                print(f"  [{lo:.1f},{min(hi, 1):.1f})   {len(in_bin):>4}   {sum(in_bin) / len(in_bin):.2f}")
     else:
         acc = sum(c == y for c, y, _ in pairs) / len(pairs)
         print(f"\n{name:<8} choice  n={len(pairs):<4} accuracy={acc:.3f}  (chance {1 / kind:.2f})")
         print("  confidence   n   accuracy")
         for lo, hi in ((0, 0.3), (0.3, 0.6), (0.6, 0.8), (0.8, 1.01)):
-            b = [c == y for c, y, conf in pairs if lo <= conf < hi]
-            if b:
-                print(f"  [{lo:.1f},{min(hi, 1):.1f})   {len(b):>4}   {sum(b) / len(b):.2f}")
+            in_bin = [c == y for c, y, conf in pairs if lo <= conf < hi]
+            if in_bin:
+                print(f"  [{lo:.1f},{min(hi, 1):.1f})   {len(in_bin):>4}   {sum(in_bin) / len(in_bin):.2f}")
 
 
 HUB = "https://datasets-server.huggingface.co/rows?dataset={}&config={}&split={}&offset={}&length=100"
@@ -206,45 +206,46 @@ HUB = "https://datasets-server.huggingface.co/rows?dataset={}&config={}&split={}
 
 def hub(dataset, config, split, offsets=(0,)):
     rows = []
-    for o in offsets:
-        rows += [r["row"] for r in get(HUB.format(dataset, config, split, o))["rows"]]
+    for offset in offsets:
+        rows += [r["row"] for r in get(HUB.format(dataset, config, split, offset))["rows"]]
         time.sleep(1)  # the Hub's rows endpoint is rate limited
     return rows
 
 
-AG = ["world", "sports", "business", "science and technology"]
+AG_NEWS = ["world", "sports", "business", "science and technology"]
 NLI = ["entailment", "neutral", "contradiction"]
 TOX = ["not toxic", "mildly toxic", "toxic", "severely toxic"]
 
 
-def pages(n, step):
+def pages(count, step):
     """Page offsets for n rows of a 100-row endpoint, `step` rows apart."""
-    return tuple(range(0, step * -(-n // 100), step))
+    return tuple(range(0, step * -(-count // 100), step))
 
 
-def public_rows(n):
-    d = {}
-    d["sentiment"] = [
+def public_rows(count):
+    by_task = {}
+    by_task["sentiment"] = [
         (r["sentence"], r["label"] == 1)
-        for r in hub("stanfordnlp/sst2", "default", "validation", pages(n, 100))
-    ][:n]
-    d["phishing"] = [
+        for r in hub("stanfordnlp/sst2", "default", "validation", pages(count, 100))
+    ][:count]
+    by_task["phishing"] = [
         (r["Email Text"][:1500], r["Email Type"] == "Phishing Email")
-        for r in hub("zefang-liu/phishing-email-dataset", "default", "train", pages(n, 9000))
+        for r in hub("zefang-liu/phishing-email-dataset", "default", "train", pages(count, 9000))
         if isinstance(r["Email Text"], str) and len(r["Email Text"]) > 40
-    ][:n]
-    d["entails"] = [
+    ][:count]
+    by_task["entails"] = [
         ((r["sentence1"], r["sentence2"]), r["label"] == 0)
-        for r in hub("nyu-mll/glue", "rte", "validation", pages(n, 100))
-    ][:n]
-    d["snli"] = [
+        for r in hub("nyu-mll/glue", "rte", "validation", pages(count, 100))
+    ][:count]
+    by_task["snli"] = [
         ((r["premise"], r["hypothesis"]), NLI[r["label"]])
-        for r in hub("stanfordnlp/snli", "plain_text", "test", pages(n, 3000))
+        for r in hub("stanfordnlp/snli", "plain_text", "test", pages(count, 3000))
         if r["label"] >= 0
-    ][:n]
-    d["topic"] = [
-        (r["text"], AG[r["label"]]) for r in hub("fancyzhx/ag_news", "default", "test", pages(n, 3000))
-    ][:n]
+    ][:count]
+    by_task["topic"] = [
+        (r["text"], AG_NEWS[r["label"]])
+        for r in hub("fancyzhx/ag_news", "default", "test", pages(count, 3000))
+    ][:count]
     # the file is sorted by intent, about a thousand rows each: one page per thousand covers all 27
     bitext = hub(
         "bitext/Bitext-customer-support-llm-chatbot-training-dataset",
@@ -253,46 +254,49 @@ def public_rows(n):
         tuple(range(0, 26000, 1000)),
     )
     intents = sorted({r["intent"] for r in bitext})
-    d["intent"] = ([(r["instruction"], r["intent"]) for r in bitext[:: len(bitext) // n]][:n], intents)
+    by_task["intent"] = (
+        [(r["instruction"], r["intent"]) for r in bitext[:: len(bitext) // count]][:count],
+        intents,
+    )
 
-    def level(t):
-        return 0 if t < 0.1 else 1 if t < 0.5 else 2 if t < 0.8 else 3
+    def level(toxicity):
+        return 0 if toxicity < 0.1 else 1 if toxicity < 0.5 else 2 if toxicity < 0.8 else 3
 
     calm, harsh, offset = [], [], 0
-    while (len(calm) < n // 2 or len(harsh) < n // 2) and offset < 5000:  # toxic comments are rare
-        for r in hub("google/civil_comments", "default", "test", (offset,)):
-            bucket = calm if r["toxicity"] < 0.1 else harsh if r["toxicity"] >= 0.5 else None
-            if bucket is not None and len(bucket) < n // 2:
-                bucket.append((r["text"][:800], level(r["toxicity"])))
+    while (len(calm) < count // 2 or len(harsh) < count // 2) and offset < 5000:  # toxic comments are rare
+        for comment in hub("google/civil_comments", "default", "test", (offset,)):
+            bucket = calm if comment["toxicity"] < 0.1 else harsh if comment["toxicity"] >= 0.5 else None
+            if bucket is not None and len(bucket) < count // 2:
+                bucket.append((comment["text"][:800], level(comment["toxicity"])))
         offset += 100
-    d["toxicity"] = calm + harsh
-    return d
+    by_task["toxicity"] = calm + harsh
+    return by_task
 
 
-def field_rows(n):
+def field_rows(count):
     rows = []
     for subject in SUBJECTS:
         url = (
             "https://datasets-server.huggingface.co/rows?dataset=cais/mmlu"
-            f"&config={subject}&split=test&offset=0&length={n}"
+            f"&config={subject}&split=test&offset=0&length={count}"
         )
-        for r in get(url)["rows"]:
-            q = r["row"]
-            rows.append((subject, q["question"], q["choices"], q["choices"][q["answer"]]))
+        for hub_row in get(url)["rows"]:
+            item = hub_row["row"]
+            rows.append((subject, item["question"], item["choices"], item["choices"][item["answer"]]))
     return rows
 
 
 PUBLIC_N = 300  # items per Hub task
 
 
-def dist(a):
+def dist(answer):
     """The answer as a distribution over the labels TypeSafe uses."""
-    if a["type"] == "noul":
-        return {"true": a["noul"], "false": 1 - a["noul"]}
-    return a["probabilities"]
+    if answer["type"] == "noul":
+        return {"true": answer["noul"], "false": 1 - answer["noul"]}
+    return answer["probabilities"]
 
 
-def load_set(n):
+def load_set(count):
     """Fetch the items once and keep them, so every model is scored on the same set."""
     path = os.path.join(ROOT, "results", "eval-set.json")
     data = {}
@@ -305,20 +309,20 @@ def load_set(n):
             old_rows = data["public"][task]
             new_rows, rows = (old_rows[0], rows[0]) if task == "intent" else (old_rows, rows)
             seen, add = {json.dumps(r) for r in new_rows}, []
-            for r in map(list, rows):
-                if json.dumps(r) not in seen and len(add) < PUBLIC_N - len(new_rows):
-                    seen.add(json.dumps(r))
-                    add.append(r)
+            for row in map(list, rows):
+                if json.dumps(row) not in seen and len(add) < PUBLIC_N - len(new_rows):
+                    seen.add(json.dumps(row))
+                    add.append(row)
             data["public"][task] = (new_rows + add, old_rows[1]) if task == "intent" else new_rows + add
         with open(path, "w") as f:
             json.dump(data, f, indent=1)
     if all(k in data for k in ("hn", "commits", "shell", "fields", "public")):
         return data
     makers = {
-        "hn": lambda: hn_rows(n),
-        "commits": lambda: commit_rows(n),
+        "hn": lambda: hn_rows(count),
+        "commits": lambda: commit_rows(count),
         "shell": lambda: SHELL,
-        "fields": lambda: field_rows(min(n, 40)),
+        "fields": lambda: field_rows(min(count, 40)),
         "public": lambda: public_rows(PUBLIC_N),
     }
     for key, make in makers.items():
@@ -332,17 +336,17 @@ def load_set(n):
 
 def record(log, jev, task, state, questions, truth, logged=None):
     """Ask, time it, and append one line per question with everything the model returned."""
-    t = time.time()
+    started = time.time()
     answers = jev.ask(state, questions)["answers"]
-    ms = round((time.time() - t) * 1000)
-    for qid, a in answers.items():
+    ms = round((time.time() - started) * 1000)
+    for qid, answer in answers.items():
         row = {
             "task": task,
             "question": qid,
             "state": logged or state,
             "truth": truth.get(qid),
             "ms": ms,
-            **a,
+            **answer,
         }
         log.write(json.dumps(row, ensure_ascii=False) + "\n")
     return answers
@@ -380,8 +384,8 @@ def items(data):
             "any file, process, package or setting?",
         }
     }
-    for cmd, y in data["shell"]:
-        yield "shell", {"shell_command": cmd}, shell_q, {"writes": y}, None
+    for cmd, writes in data["shell"]:
+        yield "shell", {"shell_command": cmd}, shell_q, {"writes": writes}, None
     for subject, question, choices, truth in data["fields"]:
         yield (
             "fields",
@@ -423,7 +427,7 @@ def items(data):
             {
                 "type": "choice",
                 "instructions": "Which section does this news belong to?",
-                "criteria": dict.fromkeys(AG),
+                "criteria": dict.fromkeys(AG_NEWS),
             },
             lambda x: {"news": x},
         ),
@@ -433,8 +437,8 @@ def items(data):
             lambda x: {"comment": x},
         ),
     ):
-        for x, truth in pub[task]:
-            yield task, state_of(x), {task: ask_q}, {task: truth}, None
+        for sample, truth in pub[task]:
+            yield task, state_of(sample), {task: ask_q}, {task: truth}, None
     rows, intents = pub["intent"]
     intent_q = {
         "intent": {
@@ -443,10 +447,10 @@ def items(data):
             "criteria": dict.fromkeys(intents),
         }
     }
-    for x, truth in rows:
-        yield "intent", {"message": x}, intent_q, {"intent": truth}, None
-    for case, node, doc, qs, truth in typesafe_rows():
-        yield "typesafe", doc, qs, truth, {"typesafe_case": case, "node": node}
+    for sample, truth in rows:
+        yield "intent", {"message": sample}, intent_q, {"intent": truth}, None
+    for case, node, doc, questions, truth in typesafe_rows():
+        yield "typesafe", doc, questions, truth, {"typesafe_case": case, "node": node}
 
 
 def main(model=DEFAULT_MODEL, n=60):
@@ -457,32 +461,32 @@ def main(model=DEFAULT_MODEL, n=60):
         jev = Remote(*model.split(":")[1:3])  # remote:<backend>[:<model>]
     else:
         jev = Jev(model)
-    t0, total = time.time(), 0
+    started, total = time.time(), 0
     slug = (getattr(jev, "backend", "") + "-" if hasattr(jev, "backend") else "") + jev.model_id.split("/")[
         -1
     ].lower()
     os.makedirs(os.path.join(ROOT, "results", "logs"), exist_ok=True)
     with open(os.path.join(ROOT, "results", "logs", slug + ".jsonl"), "w") as log:
-        res, ts = {}, []
+        res, typesafe_right = {}, []
         for task, state, questions, truth, logged in items(data):
-            a = record(log, jev, task, state, questions, truth, logged)
+            answers = record(log, jev, task, state, questions, truth, logged)
             if task == "typesafe":
-                for qid, ans in a.items():
+                for qid, ans in answers.items():
                     ours = dist(ans)
-                    ts.append(max(ours, key=ours.get) == truth[qid])
+                    typesafe_right.append(max(ours, key=ours.get) == truth[qid])
                 total += 1
                 continue
-            for qid, y in truth.items():
-                ans = a[qid]
+            for qid, expected in truth.items():
+                ans = answers[qid]
                 if ans["type"] == "noul":
-                    res.setdefault(qid, []).append((ans["noul"], int(y)))
+                    res.setdefault(qid, []).append((ans["noul"], int(expected)))
                 else:
                     res.setdefault(qid, []).append(
-                        (ans.get("choice", ans.get("score")), y, ans["confidence"])
+                        (ans.get("choice", ans.get("score")), expected, ans["confidence"])
                     )
             if task == "fields":
                 res.setdefault(state["subject"].replace(" ", "_"), []).append(
-                    a["answer"]["choice"] == truth["answer"]
+                    answers["answer"]["choice"] == truth["answer"]
                 )
             total += 1
         for name, kind in (
@@ -501,18 +505,21 @@ def main(model=DEFAULT_MODEL, n=60):
             ("toxicity", "score"),
         ):
             report(name, res[name], kind)
-        print(f"typesafe  {len(ts)} questions  accuracy vs consensus={sum(ts) / len(ts):.3f}")
+        print(
+            f"typesafe  {len(typesafe_right)} questions  "
+            f"accuracy vs consensus={sum(typesafe_right) / len(typesafe_right):.3f}"
+        )
         print(
             "  by subject: "
             + "  ".join(f"{s.replace('college_', '')} {sum(res[s]) / len(res[s]):.2f}" for s in SUBJECTS)
         )
-    print(f"\n{total} items, {(time.time() - t0) / total * 1000:.0f} ms each on {jev.device}, {model}")
+    print(f"\n{total} items, {(time.time() - started) / total * 1000:.0f} ms each on {jev.device}, {model}")
     print(f"every answer, probability and latency: {os.path.relpath(log.name, ROOT)}")
 
 
 def cli():
-    a = sys.argv[1:]
-    main(*a[:1], **({"n": int(a[1])} if len(a) > 1 else {}))
+    args = sys.argv[1:]
+    main(*args[:1], **({"n": int(args[1])} if len(args) > 1 else {}))
 
 
 if __name__ == "__main__":
