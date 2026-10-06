@@ -26,6 +26,7 @@ import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock
+from typing import Any, Protocol
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -42,8 +43,20 @@ SYSTEM = (
 )
 LETTERS = [chr(c) for c in range(65, 91)]
 
+Question = dict[str, Any]  # TypeSafe's shape: type, instructions and, for choice and score, criteria
+Response = dict[str, Any]
 
-def _confidence(probabilities):
+
+class Readout(Protocol):
+    """What serve() and demo() need: Jev here, or a hosted backend from remote.py."""
+
+    model_id: str
+    device: str
+
+    def ask(self, state: Any, questions: dict[str, Question]) -> Response: ...
+
+
+def _confidence(probabilities: list[float]) -> float:
     """1 - normalized entropy: 1.0 for a single peak, 0.0 for a flat spread."""
     count = len(probabilities)
     if count < 2:
@@ -52,13 +65,14 @@ def _confidence(probabilities):
     return round(1 - entropy / math.log(count), 4)
 
 
-def _text(value):
+def _text(value: Any) -> str:
     return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=1)
 
 
-def _options(question):
+def _options(question: Question) -> tuple[list[str], list[Any]]:
     """(labels, descriptions) for one question, in order."""
-    kind, criteria = question["type"], question.get("criteria")
+    kind = question["type"]
+    criteria: Any = question.get("criteria")
     if kind == "noul":
         criteria = criteria or {}
         return ["yes", "no"], [criteria.get("true"), criteria.get("false")]
@@ -70,7 +84,14 @@ def _options(question):
 
 
 class Jev:
-    def __init__(self, model_id=DEFAULT_MODEL, device=None, dtype=None, readout="text", cache_dir=None):
+    def __init__(
+        self,
+        model_id: str = DEFAULT_MODEL,
+        device: str | None = None,
+        dtype: torch.dtype | None = None,
+        readout: str = "text",
+        cache_dir: str | None = None,
+    ) -> None:
         """readout="letter" labels the options A, B, C… and scores the letter instead of the words.
         cache_dir: where the weights are, or are downloaded to (default: the Hugging Face cache)."""
         self.model_id, self.readout = model_id, readout
@@ -81,17 +102,17 @@ class Jev:
         cpu_bf16 = getattr(torch.cpu, "_is_avx512_bf16_supported", lambda: False)()
         dtype = dtype or (torch.bfloat16 if self.device == "cuda" or cpu_bf16 else torch.float32)
         self.tok = AutoTokenizer.from_pretrained(model_id, cache_dir=cache_dir)
-        self.model = (
-            AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype, cache_dir=cache_dir)
-            .to(self.device)
-            .eval()
-        )
+        # Any: transformers types .to() for the class, not for a loaded model
+        model: Any = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype, cache_dir=cache_dir)
+        self.model = model.to(self.device).eval()
         self.lock = Lock()
         # one letter must be one token, or the letter readout would compare different lengths
         bad = [c for c in LETTERS if len(self.tok.encode(c, add_special_tokens=False)) != 1]
         assert readout != "letter" or not bad, f"{bad} are several tokens each in {model_id}"
 
-    def _prompt(self, state, question, labels, descs):
+    def _prompt(
+        self, state: Any, question: Question, labels: list[str], descs: list[Any]
+    ) -> tuple[list[int], list[list[int]]]:
         """Token ids of the prompt, and of each option's answer text."""
         names = [f"level {la}" if question["type"] == "score" else la for la in labels]
         letter = self.readout == "letter"
@@ -111,7 +132,7 @@ class Jev:
         return prompt, [self.tok.encode(n, add_special_tokens=False) for n in names]
 
     @torch.no_grad()
-    def _score(self, seqs):
+    def _score(self, seqs: list[tuple[list[int], int]]) -> tuple[list[float], int]:
         """Mean log-probability of the last `k` tokens of each sequence, given the rest.
         The prefix all sequences share is run once and its cache reused."""
         count = len(seqs)
@@ -152,18 +173,19 @@ class Jev:
             scores.append(logp[torch.arange(k), tok].mean().item())
         return scores, pre + sum(map(len, tails))
 
-    def ask(self, state, questions):
+    def ask(self, state: Any, questions: dict[str, Question]) -> Response:
         """TypeSafe request → TypeSafe response (dict)."""
         ids = list(questions)
         parsed = [_options(questions[i]) for i in ids]
-        seqs, spans = [], []
+        seqs: list[tuple[list[int], int]] = []
+        spans: list[tuple[int, int]] = []
         for qid, (labels, descs) in zip(ids, parsed, strict=True):
             prompt, cands = self._prompt(state, questions[qid], labels, descs)
             spans.append((len(seqs), len(seqs) + len(cands)))
             seqs += [(prompt + c, len(c)) for c in cands]
         with self.lock:
             scores, n_tokens = self._score(seqs)
-        answers = {}
+        answers: dict[str, Any] = {}
         for qid, (labels, descs), (start, end) in zip(ids, parsed, spans, strict=True):
             probabilities = torch.softmax(torch.tensor(scores[start:end]), -1).tolist()
             raw = {"raw": scores[start:end]}  # each option's own log-probability, before normalising
@@ -192,15 +214,15 @@ class Jev:
         }
 
 
-def serve(model_id=DEFAULT_MODEL, port=8080, jev=None):
-    jev = jev or Jev(model_id)
+def serve(model_id: str = DEFAULT_MODEL, port: int = 8080, jev: Readout | None = None) -> None:
+    readout = jev or Jev(model_id)
 
     class Handler(BaseHTTPRequestHandler):
-        def do_POST(self):
+        def do_POST(self) -> None:
             body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
             try:
                 started = time.time()
-                res = jev.ask(body["state"], body["questions"])
+                res = readout.ask(body["state"], body["questions"])
                 res["latency_ms"] = round((time.time() - started) * 1000)
                 code = 200
             except Exception as e:  # keep the server up; report the error like the real API
@@ -212,10 +234,10 @@ def serve(model_id=DEFAULT_MODEL, port=8080, jev=None):
             self.end_headers()
             self.wfile.write(data)
 
-        def log_message(self, fmt, *args):
+        def log_message(self, fmt: str, *args: Any) -> None:
             sys.stderr.write(f"{self.command} {self.path} {args[1] if len(args) > 1 else ''}\n")
 
-    print(f"jev.py serving {jev.model_id} on http://localhost:{port}/v1/systemone ({jev.device})")
+    print(f"jev.py serving {readout.model_id} on http://localhost:{port}/v1/systemone ({readout.device})")
     server = ThreadingHTTPServer((os.environ.get("JEV_HOST", "127.0.0.1"), port), Handler)
     try:
         server.serve_forever()
@@ -225,7 +247,7 @@ def serve(model_id=DEFAULT_MODEL, port=8080, jev=None):
         server.server_close()
 
 
-def demo(model_id=DEFAULT_MODEL, jev=None):
+def demo(model_id: str = DEFAULT_MODEL, jev: Readout | None = None) -> None:
     """Runnable self-check: the shapes are right and the tiny model gets easy cases right."""
     jev = jev or Jev(model_id)
     state = {
@@ -233,7 +255,7 @@ def demo(model_id=DEFAULT_MODEL, jev=None):
         "This is the third time I've written, I'm done with you people.",
         "customer_since": "2019",
     }
-    questions = {
+    questions: dict[str, Question] = {
         "refund_requested": {"type": "noul", "instructions": "Is the customer asking for a refund?"},
         "is_spam": {"type": "noul", "instructions": "Is this message spam or an advertisement?"},
         "department": {
@@ -269,7 +291,7 @@ def demo(model_id=DEFAULT_MODEL, jev=None):
     )
 
 
-def gpu_hint():
+def gpu_hint() -> str:
     """How to use an NVIDIA GPU that the installed CPU build of PyTorch cannot reach, else ""."""
     if torch.cuda.is_available() or not shutil.which("nvidia-smi"):
         return ""
@@ -280,12 +302,13 @@ def gpu_hint():
     )
 
 
-def cli():
+def cli() -> None:
     args = sys.argv[1:]
     if hint := gpu_hint():
         print(hint)
     if args and args[0] == "serve":
-        serve(*(a for a in args[1:2]), **({"port": int(args[2])} if len(args) > 2 else {}))
+        model_id = args[1] if len(args) > 1 else DEFAULT_MODEL
+        serve(model_id, int(args[2]) if len(args) > 2 else 8080)
     elif args and args[0].endswith(".json"):
         with open(args[0]) as f:
             req = json.load(f)
@@ -298,7 +321,7 @@ def cli():
             )
         )
     else:
-        demo(*args[:1])
+        demo(args[0] if args else DEFAULT_MODEL)
 
 
 if __name__ == "__main__":

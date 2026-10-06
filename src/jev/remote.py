@@ -19,9 +19,11 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
-from jev.core import LETTERS, ROOT, _confidence, _options, _text, demo, serve
+from jev.core import LETTERS, ROOT, Question, Response, _confidence, _options, _text, demo, serve
 
 
 class NoProbabilities(ValueError):
@@ -67,7 +69,7 @@ EXTRAS = {
 CONCURRENCY = {"moonshot": 2, "llamacpp": 4}  # llamacpp: match llama-server -np
 
 
-def env(name):
+def env(name: str) -> str:
     if name in os.environ:
         return os.environ[name]
     path = os.path.join(ROOT, ".env")
@@ -80,7 +82,9 @@ def env(name):
     return ""
 
 
-def post(url, key, body, headers=None, patient=True):
+def post(
+    url: str, key: str, body: dict[str, Any], headers: dict[str, str] | None = None, patient: bool = True
+) -> Any:
     """A request that waits out slow replies and rate limits; patient=False gives up on the first."""
     req = urllib.request.Request(
         url,
@@ -96,13 +100,17 @@ def post(url, key, body, headers=None, patient=True):
             last = 39 if rate_limited else 5
             if not patient or (isinstance(e, urllib.error.HTTPError) and not rate_limited) or attempt == last:
                 raise
-            wait = e.headers.get("retry-after", "") if rate_limited else ""
+            wait = (
+                e.headers.get("retry-after", "")
+                if isinstance(e, urllib.error.HTTPError) and rate_limited
+                else ""
+            )
             # slow or rate limited: honour retry-after, else 1, 2, 4 … s, capped at a minute
             time.sleep(float(wait) if wait.replace(".", "", 1).isdigit() else min(60, 2**attempt))
 
 
 class Remote:
-    def __init__(self, backend="deepseek", model=None, patient=True):
+    def __init__(self, backend: str = "deepseek", model: str | None = None, patient: bool = True) -> None:
         var, self.url, default = BACKENDS[backend]
         self.patient = patient
         self.backend, self.model_id, self.key = backend, model or default, env(var) if var else "none"
@@ -111,10 +119,11 @@ class Remote:
         if not self.key:
             raise SystemExit(f"{var} is not set: copy .env.example to .env and fill it in")
 
-    def ask(self, state, questions):
+    def ask(self, state: Any, questions: dict[str, Question]) -> Response:
         if self.backend in TYPED:
             body = {"model": self.model_id, "state": state, "questions": questions}
-            return post(self.url, self.key, body, patient=self.patient)
+            reply: Response = post(self.url, self.key, body, patient=self.patient)
+            return reply
         if self.backend == "vercel":
             return self._vercel(state, questions)
         with ThreadPoolExecutor(CONCURRENCY.get(self.backend, 8)) as pool:
@@ -128,7 +137,7 @@ class Remote:
                 invalid[qid] = coverage | {"raw": top}
                 continue
             question = questions[qid]
-            read = {"coverage": coverage, "raw": top}
+            read: dict[str, Any] = {"coverage": coverage, "raw": top}
             if question["type"] == "noul":
                 answers[qid] = {"type": "noul", "noul": probabilities[0]} | read
             elif question["type"] == "choice":
@@ -158,7 +167,7 @@ class Remote:
             },
         }
 
-    def _vercel(self, state, questions):
+    def _vercel(self, state: Any, questions: dict[str, Question]) -> Response:
         vercel_questions = {
             k: {**q, "type": "boolean"} if q["type"] == "noul" else q for k, q in questions.items()
         }
@@ -182,7 +191,9 @@ class Remote:
                 }
         return {"model": self.model_id, "answers": answers, "usage": res.get("usage", {})}
 
-    def _one(self, state, question):
+    def _one(
+        self, state: Any, question: Question
+    ) -> tuple[list[float] | None, dict[str, Any], list[list[Any]], dict[str, Any] | None]:
         labels, user = letter_prompt(state, question)
         res = post(
             self.url,
@@ -209,17 +220,17 @@ class Remote:
         return probs, coverage, raw, res.get("usage")
 
 
-def total(usages, field):
+def total(usages: Iterable[dict[str, Any] | None], field: str) -> float | None:
     """One usage field summed over the questions, or None when a provider left it out: unknown,
     not zero."""
     values = [(u or {}).get(field) for u in usages]
-    return None if None in values else sum(values)
+    return None if None in values else sum(value for value in values if value is not None)
 
 
-def letter_probs(top, option_count):
+def letter_probs(top: list[dict[str, Any]], option_count: int) -> tuple[list[float] | None, dict[str, Any]]:
     """Option probabilities from one token's top log-probabilities: each letter's spellings
     ("A", " A", "a") added together. Returns (probs or None, coverage)."""
-    mass = {}
+    mass: dict[str, float] = {}
     for token in top:
         key = token["token"].strip().upper()
         if key in LETTERS[:option_count]:
@@ -233,7 +244,7 @@ def letter_probs(top, option_count):
     return probs, {"status": status, "observed": observed, "missing": missing}
 
 
-def letter_prompt(state, question):
+def letter_prompt(state: Any, question: Question) -> tuple[list[str], str]:
     """The option labels and the user message for one question, its options lettered A, B, C…"""
     labels, descs = _options(question)
     if len(labels) > len(LETTERS):
@@ -250,12 +261,12 @@ def letter_prompt(state, question):
     return labels, user
 
 
-def cli():
+def cli() -> None:
     args = sys.argv[1:]
     backend = args[0] if args and args[0] in BACKENDS else "deepseek"
     rest = args[1:] if args and args[0] in BACKENDS else args
     if rest and rest[0] == "serve":
-        serve(jev=Remote(backend), **({"port": int(rest[1])} if len(rest) > 1 else {}))
+        serve(jev=Remote(backend), port=int(rest[1]) if len(rest) > 1 else 8080)
     else:
         demo(jev=Remote(backend))
 
