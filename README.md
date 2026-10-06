@@ -228,5 +228,19 @@ Local models and llama.cpp on each system, AMD GPUs included:
 ## Development
 
 Checks, the dev server and where the code lives: [docs/development.md](docs/development.md).
+Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
+Reporting a vulnerability: [SECURITY.md](SECURITY.md).
+
+## Tests
+
+```sh
+uv run pytest           # the letter readout, written answers, fingerprints, picking and scoring
+uv run mypy             # strict types of core.py and remote.py
+cd web && pnpm test     # the page's scoring and merging of saved runs
+```
+
+All offline: no key, no model download, no cost.
+
+## Licence
 
 MIT.

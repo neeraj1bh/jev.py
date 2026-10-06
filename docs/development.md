@@ -2,7 +2,8 @@
 
 ```sh
 uvx ruff format . && uvx ruff check .   # Python
-cd web && pnpm check                    # the page: Biome, types and the build
+uv run pytest && uv run mypy            # Python tests and types
+cd web && pnpm check                    # the page: Biome, types, tests and the build
 uv run dev                              # the server and the page, reloading as you edit
 ```
 
@@ -19,5 +20,6 @@ uv run dev                              # the server and the page, reloading as 
 | `src/jev/page/`, `web/` | the web page's server and its React front end |
 | `src/jev/bench/eval.py`, `results/` | the earlier evaluation and its summaries |
 | `docs/` | the API by example, hosted providers, and local models on each system |
+| `tests/`, `web/src/**/*.test.ts` | the offline tests |
 
 Saved runs, downloaded models and datasets stay on your machine and out of git.
