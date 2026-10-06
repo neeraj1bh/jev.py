@@ -63,7 +63,7 @@ uv run jev                                # self-check against the example ticke
 uv run pytest                             # offline tests, no key, no cost
 uv run mypy                               # strict types of core.py and remote.py
 uvx ruff format . && uvx ruff check .
-cd web && pnpm check                      # Biome, the type check and the build
+cd web && pnpm check                      # Biome, the type check, the tests and the build
 ```
 
 `pnpm install` in `web/` sets up a pre-commit hook that formats the staged files with ruff and Biome
