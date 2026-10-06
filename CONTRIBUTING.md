@@ -12,7 +12,8 @@ cd web && pnpm check
 ```
 
 All of it is offline: no key, no model download, no cost. `pnpm install` in `web/` also sets up a
-pre-commit hook that formats what you stage and a commit-msg hook that checks the message.
+pre-commit hook that formats what you stage and a commit-msg hook that checks the message. CI runs
+the same checks on every push.
 `AGENTS.md` has the rest: where things live, the rules and why, and how commits are written.
 
 ## The rules that matter most

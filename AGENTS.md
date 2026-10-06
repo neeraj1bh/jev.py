@@ -67,7 +67,9 @@ cd web && pnpm check                      # Biome, the type check, the tests and
 ```
 
 `pnpm install` in `web/` sets up a pre-commit hook that formats the staged files with ruff and Biome
-and applies their safe fixes, so only a problem they cannot fix stops the commit.
+and applies their safe fixes, so only a problem they cannot fix stops the commit. On every push, CI
+(`.github/workflows/check.yml`) runs ruff, pytest, mypy and `pnpm check`, and checks a pull
+request's commit messages.
 
 A change to the page is checked in a browser at 390 and 1440 px wide: no console errors, no
 horizontal scroll. Report what was run and what it printed; never claim a check that was not run.
