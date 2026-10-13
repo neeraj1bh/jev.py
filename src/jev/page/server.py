@@ -64,6 +64,7 @@ try:  # input tokens per item, measured by `jev-bench tokens`, for the page's co
 except (OSError, ValueError):
     SIZES = {}
 CORE_ITEMS = {}
+SERVED = {}  # fingerprint -> a Core v1 item as frozen, so a run answers exactly what was stored
 
 DECKS = {}  # dataset name -> row indices not dealt yet, so a batch never repeats an item
 
@@ -89,7 +90,10 @@ def sample(name, fresh=False, wide=False):
         if deck not in CORE_ITEMS:
             CORE_ITEMS[deck] = core_v1.load("main") + (core_v1.load("wide") if wide else [])
         items = CORE_ITEMS[deck]
-        return items[deal(deck, len(items), fresh)] | {"pool": len(items), "left": len(DECKS[deck])}
+        item = items[deal(deck, len(items), fresh)]
+        sha = core_v1.fingerprint(item)
+        SERVED[sha] = item
+        return item | {"fingerprint": sha, "pool": len(items), "left": len(DECKS[deck])}
     if name == "TypeSafe cases":
         cases = typesafe_rows()
         item = typesafe_item(*cases[deal(name, len(cases), fresh)])
@@ -98,6 +102,14 @@ def sample(name, fresh=False, wide=False):
     rows = datasets.labelled_rows(name, page)
     item = datasets.row_item(name, page, rows[deal(name, len(rows), fresh)])
     return item | {"pool": len(rows), "left": len(DECKS[name])}
+
+
+def as_served(body):
+    """The request with a served Core v1 item's own state, questions and truth. The browser puts
+    integer-like option keys first in ascending order and writes 70600.0 as 70600, so its copy can
+    differ from the frozen item and the scorer would refuse the run."""
+    item = SERVED.get(body.get("fingerprint"))
+    return body | {k: item[k] for k in ("state", "questions", "truth")} if item else body
 
 
 def dataset_menu():
@@ -253,7 +265,7 @@ def main(model_id=DEFAULT_MODEL, port=8080):
         def do_POST(self):
             if self.from_elsewhere():
                 return self._send(403, b'{"error": {"message": "requests from other sites are refused"}}')
-            body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
+            body = as_served(json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}"))
             try:
                 if self.path.endswith(CHANGES_FILES) and not self.from_this_machine():
                     raise ValueError("keys, models and folders can only be changed from this machine")

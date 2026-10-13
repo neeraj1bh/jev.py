@@ -90,10 +90,14 @@ export function useSingleRun(
 
   async function run(batchItem?: Item): Promise<boolean> {
     const current = batchItem ?? item;
-    let request: Request;
+    let request: Request & { fingerprint?: string };
     try {
       request = batchItem
-        ? { state: batchItem.state, questions: batchItem.questions }
+        ? {
+            state: batchItem.state,
+            questions: batchItem.questions,
+            fingerprint: batchItem.fingerprint,
+          }
         : { state: JSON.parse(stateText), questions: JSON.parse(questionsText) };
     } catch {
       setVerdict("The state and the questions must both be valid JSON.");

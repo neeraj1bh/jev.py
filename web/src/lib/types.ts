@@ -97,6 +97,8 @@ export interface Item extends Request {
   set?: string;
   truth: Record<string, string>;
   source: string;
+  /** A Core v1 item's fingerprint: the server answers its own frozen copy of that item. */
+  fingerprint?: string;
   options?: number;
   left?: number;
 }
