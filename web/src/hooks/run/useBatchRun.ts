@@ -48,6 +48,8 @@ export function useBatchRun(
   const freshDeck = useRef(false);
 
   const stopRequested = useRef(false);
+  /** The tab a running batch belongs to, so leaving it and coming back keeps the batch in view. */
+  const batchMode = useRef<Mode>("compare");
   const noModel = isCompare ? compareModels.length === 0 : !generateModel;
 
   function showItem(index: number, open = true) {
@@ -167,6 +169,7 @@ export function useBatchRun(
     }
     const total = all ? (remaining ?? 0) : Math.max(1, Math.floor(Number(batchSize) || 1));
     setBusy(true);
+    batchMode.current = mode;
     setBatchRunning(true);
     setLiveBatch({ startedAt: performance.now(), total });
     stopRequested.current = false;
@@ -260,6 +263,7 @@ export function useBatchRun(
   return {
     liveBatch,
     batchRunning,
+    batchMode,
     batchProgress,
     batchSize,
     setBatchSize,

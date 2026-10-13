@@ -131,13 +131,29 @@ export default function App() {
   const { setSource, stateText, setStateText, questionsText, setQuestionsText } = input;
   const { editing, setEditing, inputName, chooseDataset } = input;
 
-  function switchMode(next: Mode) {
+  async function switchMode(next: Mode) {
     if (next === mode) return;
+    const running = batch.batchRunning ? batch.batchMode.current : null;
+    const runTab = next === "compare" || next === "generate";
+    // Clearing the table would hide a batch that keeps sending, and spending, out of sight.
+    if (running && runTab && next !== running) {
+      const stop = await confirm.ask(
+        "Stop the running batch?",
+        "Its answers so far stay in its saved run under Past runs.",
+        "Stop and switch",
+      );
+      if (!stop) return;
+      batch.stopBatch();
+    }
     setMode(next);
     closeSavedRun();
     setTableVisible(false);
-    if (next === "past" || next === "benchmark") {
+    if (!runTab) {
       savedRuns.refresh();
+      return;
+    }
+    if (next === running) {
+      setTableVisible(true);
       return;
     }
     clearBatch();
