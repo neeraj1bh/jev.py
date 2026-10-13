@@ -7,7 +7,7 @@ license = "MIT"
 authors = [{ name = "Neeraj Bhatt" }, { name = "Gaurav Bhatt" }]
 requires-python = ">=3.10"
 keywords = ["llm", "log-probabilities", "classification", "structured-output", "benchmark", "jev"]
-dependencies = ["torch>=2.4", "transformers>=4.45", "httpx>=0.27"]
+dependencies = ["torch>=2.4", "transformers>=5.19.0", "httpx>=0.27"]
 
 [project.urls]
 Homepage = "https://github.com/neeraj1bh/jev.py"
